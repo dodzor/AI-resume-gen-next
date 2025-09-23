@@ -1,5 +1,21 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment Setup
+
+Before running the application, you need to set up your environment variables. Create a `.env.local` file in the root directory with the following variables:
+
+```bash
+# Convex
+NEXT_PUBLIC_CONVEX_URL=your_convex_deployment_url
+
+# Clerk Authentication
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+CLERK_JWT_ISSUER_DOMAIN=your_clerk_jwt_issuer_domain
+```
+
+**Important**: The `CLERK_JWT_ISSUER_DOMAIN` should be obtained from your Clerk Dashboard under JWT Templates > convex template > Issuer field. Make sure you have created a JWT template named "convex" in your Clerk Dashboard.
+
 ## Getting Started
 
 First, run the development server:
