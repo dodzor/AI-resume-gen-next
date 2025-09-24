@@ -10,7 +10,9 @@ export default function Home() {
   return (
     <>
       <Authenticated>
-        <UserButton />
+        <div className="flex justify-end p-4 fixed right-0">
+          <UserButton />
+        </div>
         <Content />
       </Authenticated>
       <Unauthenticated>
@@ -47,28 +49,33 @@ function Content() {
     e.preventDefault()
     setIsGenerating(true)
     
-    // Simulate AI generation (replace with actual API call later)
-    setTimeout(() => {
+    try {
+      const response = await fetch('/api/generate-resume', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to generate resume')
+      }
+
+      setGeneratedResume(data.resume)
+    } catch (error) {
+      console.error('Error generating resume:', error)
       setGeneratedResume(`
-        <div class="space-y-6">
-          <div class="border-b pb-4">
-            <h1 class="text-3xl font-bold text-gray-800">${formData.name}</h1>
-            <p class="text-blue-600 font-medium">${formData.email}</p>
-          </div>
-          
-          <div>
-            <h2 class="text-xl font-semibold text-gray-800 mb-3">Experience</h2>
-            <div class="text-gray-700 whitespace-pre-line">${formData.experience}</div>
-          </div>
-          
-          <div>
-            <h2 class="text-xl font-semibold text-gray-800 mb-3">Skills</h2>
-            <div class="text-gray-700">${formData.skills}</div>
-          </div>
+        <div class="text-red-600 p-4 border border-red-300 rounded-lg bg-red-50">
+          <h3 class="font-semibold mb-2">Error Generating Resume</h3>
+          <p>${error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.'}</p>
         </div>
       `)
+    } finally {
       setIsGenerating(false)
-    }, 2000)
+    }
   }
 
   return (

@@ -5,6 +5,10 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 Before running the application, you need to set up your environment variables. Create a `.env.local` file in the root directory with the following variables:
 
 ```bash
+# OpenAI API Configuration
+# Get your API key from: https://platform.openai.com/api-keys
+OPENAI_API_KEY=your_openai_api_key_here
+
 # Convex
 NEXT_PUBLIC_CONVEX_URL=your_convex_deployment_url
 
