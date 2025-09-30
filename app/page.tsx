@@ -5,7 +5,10 @@ import { SignInButton, UserButton } from '@clerk/nextjs'
 import { useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import { useState } from 'react'
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 
+/** Automatically called when visiting the root route (/) */
 export default function Home() {
   return (
     <>
@@ -36,6 +39,7 @@ function Content() {
   
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedResume, setGeneratedResume] = useState('')
+  const [isDownloading, setIsDownloading] = useState(false)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -75,6 +79,180 @@ function Content() {
       `)
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  const handleDownloadPDF = async () => {
+    if (!generatedResume) {
+      alert('No resume content to download. Please generate a resume first.')
+      return
+    }
+
+    setIsDownloading(true)
+
+    try {
+      // Create a temporary container with better styling for PDF
+      const pdfContainer = document.createElement('div')
+      pdfContainer.style.cssText = `
+        position: absolute;
+        left: -9999px;
+        top: 0;
+        width: 800px;
+        padding: 40px;
+        background: white !important;
+        font-family: Arial, sans-serif !important;
+        line-height: 1.6 !important;
+        color: #333 !important;
+        border: none !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        isolation: isolate;
+      `
+      
+      // Create content div and set innerHTML
+      const contentDiv = document.createElement('div')
+      contentDiv.innerHTML = generatedResume
+      
+      // Apply PDF-friendly styles
+      contentDiv.style.cssText = `
+        max-width: none;
+        font-size: 14px;
+        line-height: 1.5;
+      `
+      
+      // Style headings for PDF
+      const headings = contentDiv.querySelectorAll('h1, h2, h3, h4, h5, h6')
+      headings.forEach((heading) => {
+        ;(heading as HTMLElement).style.cssText = `
+          color: #2563eb;
+          margin: 20px 0 10px 0;
+          font-weight: bold;
+        `
+      })
+      
+      // Style paragraphs
+      const paragraphs = contentDiv.querySelectorAll('p')
+      paragraphs.forEach((p) => {
+        ;(p as HTMLElement).style.margin = '10px 0'
+      })
+      
+      // Style lists
+      const lists = contentDiv.querySelectorAll('ul, ol')
+      lists.forEach((list) => {
+        ;(list as HTMLElement).style.margin = '10px 0'
+        ;(list as HTMLElement).style.paddingLeft = '20px'
+      })
+      
+      pdfContainer.appendChild(contentDiv)
+      document.body.appendChild(pdfContainer)
+      
+      // Generate PDF using html2canvas and jsPDF
+      const canvas = await html2canvas(pdfContainer, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        ignoreElements: (element) => {
+          // Skip elements that might cause issues
+          return element.tagName === 'SCRIPT' || 
+                 element.tagName === 'STYLE' ||
+                 element.classList?.contains('ignore-pdf')
+        },
+        onclone: (clonedDoc) => {
+          // Remove all external stylesheets completely
+          const externalStyles = clonedDoc.querySelectorAll('link[rel="stylesheet"]')
+          externalStyles.forEach(link => link.remove())
+          
+          // Remove all style tags completely to avoid parsing issues
+          const styleTags = clonedDoc.querySelectorAll('style')
+          styleTags.forEach(style => style.remove())
+          
+          // Remove any CSS custom properties from the root
+          // const htmlElement = clonedDoc.documentElement
+          // if (htmlElement) {
+          //   htmlElement.style.cssText = ''
+          //   htmlElement.removeAttribute('class')
+          // }
+          
+          // const bodyElement = clonedDoc.body
+          // if (bodyElement) {
+          //   bodyElement.style.cssText = 'background: white; color: #333; font-family: Arial, sans-serif;'
+          //   bodyElement.removeAttribute('class')
+          // }
+          
+          // Clean all elements of problematic classes and styles
+          // const allElements = clonedDoc.querySelectorAll('*')
+          // allElements.forEach(el => {
+          //   // Remove all classes to avoid CSS conflicts
+          //   el.removeAttribute('class')
+            
+          //   // Clean inline styles if they exist
+          //   const style = el.getAttribute('style')
+          //   if (style) {
+          //     // Only keep basic, safe styles
+          //     const safeStyle = style
+          //       .replace(/oklch\([^)]+\)/g, 'transparent')
+          //       .replace(/lab\([^)]+\)/g, 'transparent')
+          //       .replace(/lch\([^)]+\)/g, 'transparent')
+          //       .replace(/oklab\([^)]+\)/g, 'transparent')
+          //       .replace(/color\([^)]+\)/g, 'transparent')
+          //       .replace(/var\([^)]+\)/g, 'transparent')
+          //     el.setAttribute('style', safeStyle)
+          //   }
+          // })
+        }
+      })
+      
+      // Remove temporary container
+      document.body.removeChild(pdfContainer)
+      
+      // Create PDF
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      
+      const imgData = canvas.toDataURL('image/png')
+      const imgWidth = 210 // A4 width in mm
+      const pageHeight = 295 // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      let heightLeft = imgHeight
+      
+      let position = 0
+      
+      // Add first page
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+      
+      // Add additional pages if needed
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+      
+      // Get name from form for filename
+      const fileName = formData.name 
+        ? `${formData.name.replace(/\s+/g, '_')}_Resume.pdf`
+        : 'Resume.pdf'
+      
+      // Download the PDF
+      pdf.save(fileName)
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      
+      // Provide specific error message for color parsing issues
+      let errorMessage = 'Error generating PDF. Please try again.'
+      if (error instanceof Error) {
+        if (error.message.includes('color function') || error.message.includes('oklch') || error.message.includes('lab')) {
+          errorMessage = 'PDF generation failed due to unsupported CSS colors. This is a known issue that we\'re working to resolve.'
+        } else {
+          errorMessage = `PDF generation failed: ${error.message}`
+        }
+      }
+      
+      alert(errorMessage)
+    } finally {
+      setIsDownloading(false)
     }
   }
 
@@ -220,12 +398,26 @@ function Content() {
             {generatedResume && (
               <div className="mt-6 text-center">
                 <button 
-                  className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition duration-200 flex items-center justify-center space-x-2 mx-auto"
+                  onClick={handleDownloadPDF}
+                  disabled={isDownloading}
+                  className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition duration-200 flex items-center justify-center space-x-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                  </svg>
-                  <span>Download as PDF</span>
+                  {isDownloading ? (
+                    <>
+                      <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Generating PDF...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                      </svg>
+                      <span>Download as PDF</span>
+                    </>
+                  )}
                 </button>
               </div>
             )}
