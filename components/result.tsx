@@ -1,147 +1,38 @@
 'use client'
 
 import { useState } from 'react'
-import html2canvas from 'html2canvas'
-import { jsPDF } from 'jspdf'
+import { generatePDF, generateFileName } from '../lib/pdfUtils'
+import { validatePDFContent, handlePDFError, showPDFErrorAlert } from '../lib/pdfErrorHandler'
 
 export default function Result({ formData, generatedResume }: { formData: any, generatedResume: string }) {
     const [isDownloading, setIsDownloading] = useState(false)
 
     const handleDownloadPDF = async () => {
-        if (!generatedResume) {
-            alert('No resume content to download. Please generate a resume first.')
+        // Validate content before proceeding
+        const validation = validatePDFContent(generatedResume)
+        if (!validation.isValid) {
+            alert(validation.error)
             return
         }
 
         setIsDownloading(true)
 
         try {
-            // Create a temporary container with better styling for PDF
-            const pdfContainer = document.createElement('div')
-            pdfContainer.style.cssText = `
-                position: absolute;
-                left: -9999px;
-                top: 0;
-                width: 800px;
-                padding: 40px;
-                background: white !important;
-                font-family: Arial, sans-serif !important;
-                line-height: 1.6 !important;
-                color: #333 !important;
-                border: none !important;
-                margin: 0 !important;
-                box-shadow: none !important;
-                isolation: isolate;
-            `
+            // Generate filename from form data
+            const fileName = generateFileName(formData)
             
-            // Create content div and set innerHTML
-            const contentDiv = document.createElement('div')
-            contentDiv.innerHTML = generatedResume
-            
-            // Apply PDF-friendly styles
-            contentDiv.style.cssText = `
-                max-width: none;
-                font-size: 14px;
-                line-height: 1.5;
-            `
-            
-            // Style headings for PDF
-            const headings = contentDiv.querySelectorAll('h1, h2, h3, h4, h5, h6')
-            headings.forEach((heading) => {
-                ;(heading as HTMLElement).style.cssText = `
-                    color: #2563eb;
-                    margin: 20px 0 10px 0;
-                    font-weight: bold;
-                `
-            })
-            
-            // Style paragraphs
-            const paragraphs = contentDiv.querySelectorAll('p')
-            paragraphs.forEach((p) => {
-                ;(p as HTMLElement).style.margin = '10px 0'
-            })
-            
-            // Style lists
-            const lists = contentDiv.querySelectorAll('ul, ol')
-            lists.forEach((list) => {
-                ;(list as HTMLElement).style.margin = '10px 0'
-                ;(list as HTMLElement).style.paddingLeft = '20px'
-            })
-            
-            pdfContainer.appendChild(contentDiv)
-            document.body.appendChild(pdfContainer)
-            
-            // Generate PDF using html2canvas and jsPDF
-            const canvas = await html2canvas(pdfContainer, {
+            // Generate and download PDF using utility functions
+            await generatePDF({
+                content: generatedResume,
+                fileName,
                 scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                ignoreElements: (element) => {
-                    // Skip elements that might cause issues
-                    return element.tagName === 'SCRIPT' || 
-                           element.tagName === 'STYLE' ||
-                           element.classList?.contains('ignore-pdf')
-                },
-                onclone: (clonedDoc) => {
-                    // Remove all external stylesheets completely
-                    const externalStyles = clonedDoc.querySelectorAll('link[rel="stylesheet"]')
-                    externalStyles.forEach(link => link.remove())
-                    
-                    // Remove all style tags completely to avoid parsing issues
-                    const styleTags = clonedDoc.querySelectorAll('style')
-                    styleTags.forEach(style => style.remove())
-                }
+                backgroundColor: '#ffffff'
             })
-            
-            // Remove temporary container
-            document.body.removeChild(pdfContainer)
-            
-            // Create PDF
-            const pdf = new jsPDF('p', 'mm', 'a4')
-            
-            const imgData = canvas.toDataURL('image/png')
-            const imgWidth = 210 // A4 width in mm
-            const pageHeight = 295 // A4 height in mm
-            const imgHeight = (canvas.height * imgWidth) / canvas.width
-            let heightLeft = imgHeight
-            
-            let position = 0
-            
-            // Add first page
-            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-            heightLeft -= pageHeight
-            
-            // Add additional pages if needed
-            while (heightLeft >= 0) {
-                position = heightLeft - imgHeight
-                pdf.addPage()
-                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-                heightLeft -= pageHeight
-            }
-            
-            // Get name from form for filename
-            const fileName = formData.name 
-                ? `${formData.name.replace(/\s+/g, '_')}_Resume.pdf`
-                : 'Resume.pdf'
-            
-            // Download the PDF
-            pdf.save(fileName)
             
         } catch (error) {
-            console.error('Error generating PDF:', error)
-            
-            // Provide specific error message for color parsing issues
-            let errorMessage = 'Error generating PDF. Please try again.'
-            if (error instanceof Error) {
-                if (error.message.includes('color function') || error.message.includes('oklch') || error.message.includes('lab')) {
-                    errorMessage = 'PDF generation failed due to unsupported CSS colors. This is a known issue that we\'re working to resolve.'
-                } else {
-                    errorMessage = `PDF generation failed: ${error.message}`
-                }
-            }
-            
-            alert(errorMessage)
+            // Handle errors using utility function
+            const pdfError = handlePDFError(error)
+            showPDFErrorAlert(pdfError)
         } finally {
             setIsDownloading(false)
         }
