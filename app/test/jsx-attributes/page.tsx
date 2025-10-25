@@ -26,3 +26,9 @@ function Form() {
   }
 
 export default Form;
+
+/*
+💡 Use className instead of class
+📌 Use htmlFor instead of for
+⚡ All attributes use camelCase naming
+*/

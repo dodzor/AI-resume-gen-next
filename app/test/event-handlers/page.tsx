@@ -34,3 +34,9 @@ function App() {
 }
 
 export default App;
+
+/*
+🟢 Essential - Events enable interactivity
+💡 Use arrow functions to pass parameters
+⚠️ Don't call the function: onClick={handleClick} not onClick={handleClick()}
+*/

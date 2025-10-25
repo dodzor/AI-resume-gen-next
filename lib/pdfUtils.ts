@@ -91,6 +91,104 @@ export function applyPDFStyles(
 }
 
 /**
+ * Creates a PDF-specific stylesheet for clean resume styling
+ */
+function createPDFStylesheet(): string {
+  return `
+    <style>
+      /* Reset and base styles */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body, div {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        background: white;
+      }
+      
+      /* Typography */
+      h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 8px;
+        border-bottom: 2px solid #3b82f6;
+        padding-bottom: 8px;
+      }
+      
+      h2 {
+        font-size: 20px;
+        font-weight: 600;
+        color: #374151;
+        margin: 24px 0 12px 0;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 4px;
+      }
+      
+      h3 {
+        font-size: 16px;
+        font-weight: 600;
+        color: #4b5563;
+        margin: 16px 0 8px 0;
+      }
+      
+      p {
+        font-size: 14px;
+        margin-bottom: 8px;
+        color: #374151;
+      }
+      
+      /* Lists */
+      ul, ol {
+        margin: 8px 0 16px 20px;
+      }
+      
+      li {
+        font-size: 14px;
+        margin-bottom: 4px;
+        color: #374151;
+      }
+      
+      /* Contact info and sections */
+      .contact-info {
+        font-size: 14px;
+        color: #6b7280;
+        margin-bottom: 16px;
+      }
+      
+      /* Links */
+      a {
+        color: #3b82f6;
+        text-decoration: none;
+      }
+      
+      /* Strong/Bold text */
+      strong, b {
+        font-weight: 600;
+        color: #1f2937;
+      }
+      
+      /* Spacing utilities */
+      .mb-2 { margin-bottom: 8px; }
+      .mb-4 { margin-bottom: 16px; }
+      .mt-4 { margin-top: 16px; }
+      
+      /* Remove any problematic styles */
+      * {
+        box-shadow: none !important;
+        text-shadow: none !important;
+        filter: none !important;
+        transform: none !important;
+      }
+    </style>
+  `
+}
+
+/**
  * Generates a canvas from HTML content using html2canvas
  */
 export async function generateCanvas(
@@ -105,17 +203,22 @@ export async function generateCanvas(
     ignoreElements: (element) => {
       // Skip elements that might cause issues
       return element.tagName === 'SCRIPT' || 
-             element.tagName === 'STYLE' ||
              element.classList?.contains('ignore-pdf')
     },
     onclone: (clonedDoc) => {
-      // Remove all external stylesheets completely
+      // Remove external stylesheets to avoid loading issues
       const externalStyles = clonedDoc.querySelectorAll('link[rel="stylesheet"]')
       externalStyles.forEach(link => link.remove())
       
-      // Remove all style tags completely to avoid parsing issues
+      // Remove existing style tags to avoid conflicts
       const styleTags = clonedDoc.querySelectorAll('style')
       styleTags.forEach(style => style.remove())
+      
+      // Add our clean PDF stylesheet
+      const head = clonedDoc.head || clonedDoc.getElementsByTagName('head')[0]
+      if (head) {
+        head.insertAdjacentHTML('beforeend', createPDFStylesheet())
+      }
     }
   })
   
@@ -168,7 +271,7 @@ export async function generatePDF(options: PDFGenerationOptions): Promise<void> 
     throw new Error('No content provided for PDF generation')
   }
 
-  // Create temporary container
+  // Create temporary container with clean styling
   const pdfContainer = createPDFContainer()
   
   try {
@@ -176,14 +279,11 @@ export async function generatePDF(options: PDFGenerationOptions): Promise<void> 
     const contentDiv = document.createElement('div')
     contentDiv.innerHTML = options.content
     
-    // Apply PDF-friendly styles
-    applyPDFStyles(contentDiv)
-    
     // Add to container and DOM
     pdfContainer.appendChild(contentDiv)
     document.body.appendChild(pdfContainer)
     
-    // Generate canvas
+    // Generate canvas (the stylesheet will be applied in the onclone callback)
     const canvas = await generateCanvas(pdfContainer, options)
     
     // Create and save PDF

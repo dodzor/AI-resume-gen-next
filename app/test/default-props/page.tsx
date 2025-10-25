@@ -23,4 +23,10 @@ function App() {
   )
 }
 
-export default App;
+export default App
+
+/*
+💡 Use = in destructuring for clean defaults
+📌 Default values only used if prop is undefined
+⚡ Defaults make components more flexible
+*/

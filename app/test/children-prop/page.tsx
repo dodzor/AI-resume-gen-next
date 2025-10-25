@@ -24,3 +24,9 @@ function App() {
 }
 
 export default App;
+
+/*
+🟢 Essential - Children enables component composition
+💡 Anything between tags becomes children prop
+📌 Can be text, elements, or other components 
+*/

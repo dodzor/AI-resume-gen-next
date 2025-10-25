@@ -21,3 +21,9 @@ function App() {
 }
 
 export default App;
+
+/*
+🟢 Essential - Use function components for all new code
+💡 Component names must start with capital letter
+📌 Returns JSX to describe the UI
+*/

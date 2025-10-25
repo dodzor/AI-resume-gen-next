@@ -21,3 +21,9 @@ function App() {
 }
 
 export default App;
+
+/*
+🟢 Essential - Props make components reusable
+💡 Props are read-only, never modify them
+📌 Pass any JavaScript value as a prop
+*/
