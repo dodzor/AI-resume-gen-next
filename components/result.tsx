@@ -41,10 +41,10 @@ export default function Result({ formData, generatedResume }: { formData: any, g
     return (
         <>
             <div className="bg-white rounded-xl shadow-lg p-8">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
-                    <span className="bg-green-100 text-green-600 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">2</span>
-                    Your Resume
-                </h2>
+                {/* <h2 className="text-2xl font-semibold text-gray-800 mb-6 flex items-center"> */}
+                    {/* <span className="bg-green-100 text-green-600 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">2</span> */}
+                    {/* Your Resume */}
+                {/* </h2> */}
                 
                 <div className="min-h-[400px] bg-gray-50 rounded-lg p-6 border-2 border-dashed border-gray-300">
                     {generatedResume ? (

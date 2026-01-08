@@ -8,13 +8,16 @@ interface FormProps {
   isGenerating: boolean
   setIsGenerating: (generating: boolean) => void
   setGeneratedResume: (resume: string) => void
+  isFormCompleted: boolean
+  setIsFormCompleted: (completed: boolean) => void
 }
 
 const STEPS = [
   { id: 1, title: 'Personal Info', description: 'Basic information about you' },
   { id: 2, title: 'Experience', description: 'Your work history' },
-  { id: 3, title: 'Skills', description: 'Your technical and soft skills' },
-  { id: 4, title: 'Target Job', description: 'Job you\'re applying for' }
+  { id: 3, title: 'Education', description: 'Your educational background' },
+  { id: 4, title: 'Skills', description: 'Your technical and soft skills' },
+  { id: 5, title: 'Target Job', description: 'Job you\'re applying for' }
 ]
 
 export default function Form({ 
@@ -22,7 +25,9 @@ export default function Form({
   setFormData, 
   isGenerating, 
   setIsGenerating, 
-  setGeneratedResume 
+  setGeneratedResume,
+  isFormCompleted,
+  setIsFormCompleted
 }: FormProps) {
     const [currentStep, setCurrentStep] = useState(1)
 
@@ -41,8 +46,10 @@ export default function Form({
             case 2:
                 return formData.experience?.trim()
             case 3:
-                return formData.skills?.trim()
+                return formData.education?.trim()
             case 4:
+                return formData.skills?.trim()
+            case 5:
                 return formData.job?.trim()
             default:
                 return false
@@ -88,6 +95,7 @@ export default function Form({
             }
         
             setGeneratedResume(data.resume)
+            setIsFormCompleted(true) // Mark form as completed
         } catch (error) {
             console.error('Error generating resume:', error)
             setGeneratedResume(`
@@ -96,9 +104,15 @@ export default function Form({
                 <p>${error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.'}</p>
                 </div>
             `)
+            setIsFormCompleted(true) // Still show result section even on error
         } finally {
             setIsGenerating(false)
         }
+    }
+
+    const handleEditInfo = () => {
+        setIsFormCompleted(false)
+        setCurrentStep(1) // Reset to first step when editing
     }
 
     const ProgressIndicator = () => (
@@ -197,6 +211,21 @@ export default function Form({
             case 3:
                 return (
                     <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Education</label>
+                        <textarea 
+                            name="education" 
+                            placeholder="• Bachelor of Science in Computer Science&#10;  University of Technology (2015-2019)&#10;  - GPA: 3.8/4.0&#10;  - Relevant Coursework: Data Structures, Algorithms, Software Engineering&#10;&#10;• Certifications:&#10;  - AWS Certified Developer Associate (2022)&#10;  - Google Cloud Professional Developer (2021)"
+                            required
+                            rows={8}
+                            value={formData.education || ''}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
+                        />
+                    </div>
+                )
+            case 4:
+                return (
+                    <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Skills</label>
                         <textarea 
                             name="skills" 
@@ -209,7 +238,7 @@ export default function Form({
                         />
                     </div>
                 )
-            case 4:
+            case 5:
                 return (
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Target Job Description</label>
@@ -227,6 +256,35 @@ export default function Form({
             default:
                 return null
         }
+    }
+
+    if (isFormCompleted) {
+        return (
+            <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
+                <div className="text-center">
+                    <div className="mb-6">
+                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                        </div>
+                        <h2 className="text-2xl font-semibold text-gray-800 mb-2">Resume Generated!</h2>
+                        <p className="text-gray-600">Your AI-powered resume is ready. You can edit your information anytime.</p>
+                    </div>
+                    
+                    <button
+                        type="button"
+                        onClick={handleEditInfo}
+                        className="bg-blue-600 text-white font-medium py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-200 flex items-center justify-center space-x-2 mx-auto"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        <span>Edit Info</span>
+                    </button>
+                </div>
+            </div>
+        )
     }
 
     return (

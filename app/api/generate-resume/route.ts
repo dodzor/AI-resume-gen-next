@@ -20,31 +20,25 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, experience, skills, job, education = 'Politehnica University of Bucharest' } = body;
+    const { name, email, experience, education, skills, job } = body;
 
     // Validate required fields
-    if (!name || !email || !experience || !skills || !job) {
+    if (!name || !email || !experience || !education || !skills || !job) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    const prompt = `Generate a professional resume that includes a Summary, Work Experience, Skills, and Education for the following person based on the target job description: ${job}
+    const prompt = `Generate a professional resume that includes a Summary, Work Experience, Skills, and Education for the following person based on:
+                    target job description: ${job}
+                    name: ${name}
+                    email: ${email}
+                    education: ${education}
+                    work experience: ${experience}
+                    skills: ${skills}
 
-Name: ${name}
-Email: ${email}
-
-Work Experience:
-${experience}
-
-Skills:
-${skills}
-
-Education:
-${education}
-
-Format it in clean HTML with clear sections and professional styling.`;
+                    Format it in clean HTML with clear sections and professional styling.`;
 
     console.log('Sending to OpenAI API:', { name, email, job: job.substring(0, 100) + '...' });
 
