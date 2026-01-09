@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { createResumePrompt } from '../../../lib/resumeTemplate';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -30,15 +31,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const prompt = `Generate a professional resume that includes a Summary, Work Experience, Skills, and Education for the following person based on:
-                    target job description: ${job}
-                    name: ${name}
-                    email: ${email}
-                    education: ${education}
-                    work experience: ${experience}
-                    skills: ${skills}
-
-                    Format it in clean HTML with clear sections and professional styling.`;
+    const prompt = createResumePrompt({
+      name,
+      email,
+      experience,
+      education,
+      skills,
+      job
+    });
 
     console.log('Sending to OpenAI API:', { name, email, job: job.substring(0, 100) + '...' });
 
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: "system",
-          content: "You are a professional resume writer. Create a well-formatted, professional resume based on the provided information. Use HTML formatting with proper structure and styling."
+          content: "You are a professional resume writer. Create a well-formatted, professional resume using ONLY the HTML structure and classes provided in the prompt. Do not add any additional CSS classes, inline styles, or complex formatting that might cause issues with PDF generation."
         },
         {
           role: "user",

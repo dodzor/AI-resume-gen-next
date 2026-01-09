@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { generatePDF, generateFileName } from '../lib/pdfUtils'
 import { validatePDFContent, handlePDFError, showPDFErrorAlert } from '../lib/pdfErrorHandler'
+import '../styles/resume-display.css'
 
 export default function Result({ formData, generatedResume }: { formData: any, generatedResume: string }) {
     const [isDownloading, setIsDownloading] = useState(false)
@@ -48,7 +49,7 @@ export default function Result({ formData, generatedResume }: { formData: any, g
                 
                 <div className="min-h-[400px] bg-gray-50 rounded-lg p-6 border-2 border-dashed border-gray-300">
                     {generatedResume ? (
-                        <div dangerouslySetInnerHTML={{ __html: generatedResume }} />
+                        <div className="resume-display-container" dangerouslySetInnerHTML={{ __html: generatedResume }} />
                     ) : (
                         <div className="flex items-center justify-center h-full">
                             <div className="text-center text-gray-500">

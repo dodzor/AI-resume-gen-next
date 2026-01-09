@@ -1,5 +1,6 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
+import { createPDFStylesheet } from './sharedStyles'
 
 export interface PDFGenerationOptions {
   content: string
@@ -8,40 +9,19 @@ export interface PDFGenerationOptions {
   backgroundColor?: string
 }
 
-export interface PDFStylingOptions {
-  width: number
-  padding: number
-  fontSize: number
-  lineHeight: number
-  headingColor: string
-  fontFamily: string
-}
-
 /**
- * Default PDF styling configuration
+ * Creates a temporary DOM container for PDF generation
  */
-export const DEFAULT_PDF_STYLING: PDFStylingOptions = {
-  width: 800,
-  padding: 40,
-  fontSize: 14,
-  lineHeight: 1.5,
-  headingColor: '#2563eb',
-  fontFamily: 'Arial, sans-serif'
-}
-
-/**
- * Creates a temporary DOM container with PDF-friendly styling
- */
-export function createPDFContainer(styling: PDFStylingOptions = DEFAULT_PDF_STYLING): HTMLDivElement {
+function createPDFContainer(): HTMLDivElement {
   const container = document.createElement('div')
   container.style.cssText = `
     position: absolute;
     left: -9999px;
     top: 0;
-    width: ${styling.width}px;
-    padding: ${styling.padding}px;
+    width: 800px;
+    padding: 40px;
     background: white !important;
-    font-family: ${styling.fontFamily} !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     line-height: 1.6 !important;
     color: #333 !important;
     border: none !important;
@@ -50,142 +30,6 @@ export function createPDFContainer(styling: PDFStylingOptions = DEFAULT_PDF_STYL
     isolation: isolate;
   `
   return container
-}
-
-/**
- * Applies PDF-friendly styles to content elements
- */
-export function applyPDFStyles(
-  contentDiv: HTMLDivElement, 
-  styling: PDFStylingOptions = DEFAULT_PDF_STYLING
-): void {
-  // Apply base content styles
-  contentDiv.style.cssText = `
-    max-width: none;
-    font-size: ${styling.fontSize}px;
-    line-height: ${styling.lineHeight};
-  `
-  
-  // Style headings
-  const headings = contentDiv.querySelectorAll('h1, h2, h3, h4, h5, h6')
-  headings.forEach((heading) => {
-    ;(heading as HTMLElement).style.cssText = `
-      color: ${styling.headingColor};
-      margin: 20px 0 10px 0;
-      font-weight: bold;
-    `
-  })
-  
-  // Style paragraphs
-  const paragraphs = contentDiv.querySelectorAll('p')
-  paragraphs.forEach((p) => {
-    ;(p as HTMLElement).style.margin = '10px 0'
-  })
-  
-  // Style lists
-  const lists = contentDiv.querySelectorAll('ul, ol')
-  lists.forEach((list) => {
-    ;(list as HTMLElement).style.margin = '10px 0'
-    ;(list as HTMLElement).style.paddingLeft = '20px'
-  })
-}
-
-/**
- * Creates a PDF-specific stylesheet for clean resume styling
- */
-function createPDFStylesheet(): string {
-  return `
-    <style>
-      /* Reset and base styles */
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      
-      body, div {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        line-height: 1.6;
-        color: #333;
-        background: white;
-      }
-      
-      /* Typography */
-      h1 {
-        font-size: 28px;
-        font-weight: 700;
-        color: #1f2937;
-        margin-bottom: 8px;
-        border-bottom: 2px solid #3b82f6;
-        padding-bottom: 8px;
-      }
-      
-      h2 {
-        font-size: 20px;
-        font-weight: 600;
-        color: #374151;
-        margin: 24px 0 12px 0;
-        border-bottom: 1px solid #e5e7eb;
-        padding-bottom: 4px;
-      }
-      
-      h3 {
-        font-size: 16px;
-        font-weight: 600;
-        color: #4b5563;
-        margin: 16px 0 8px 0;
-      }
-      
-      p {
-        font-size: 14px;
-        margin-bottom: 8px;
-        color: #374151;
-      }
-      
-      /* Lists */
-      ul, ol {
-        margin: 8px 0 16px 20px;
-      }
-      
-      li {
-        font-size: 14px;
-        margin-bottom: 4px;
-        color: #374151;
-      }
-      
-      /* Contact info and sections */
-      .contact-info {
-        font-size: 14px;
-        color: #6b7280;
-        margin-bottom: 16px;
-      }
-      
-      /* Links */
-      a {
-        color: #3b82f6;
-        text-decoration: none;
-      }
-      
-      /* Strong/Bold text */
-      strong, b {
-        font-weight: 600;
-        color: #1f2937;
-      }
-      
-      /* Spacing utilities */
-      .mb-2 { margin-bottom: 8px; }
-      .mb-4 { margin-bottom: 16px; }
-      .mt-4 { margin-top: 16px; }
-      
-      /* Remove any problematic styles */
-      * {
-        box-shadow: none !important;
-        text-shadow: none !important;
-        filter: none !important;
-        transform: none !important;
-      }
-    </style>
-  `
 }
 
 /**

@@ -1,13 +1,10 @@
 'use client'
 
-import { useQuery } from 'convex/react'
-import { api } from '../convex/_generated/api'
 import { useState } from 'react'
 import Result from './result'
 import Form from './form'
 
 export default function Content() {
-    const messages = useQuery(api.messages.getForCurrentUser)
     
     // Form state - lifted up to parent
     const [formData, setFormData] = useState({
