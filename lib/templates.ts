@@ -1,0 +1,281 @@
+/**
+ * Resume Template System
+ * Provides multiple templates with shared styles between browser display and PDF
+ */
+
+export type TemplateId = 'professional-blue' | 'modern-minimal';
+
+export interface ResumeTemplate {
+  id: TemplateId;
+  name: string;
+  description: string;
+  preview: string; // CSS class for preview styling
+}
+
+export const TEMPLATES: ResumeTemplate[] = [
+  {
+    id: 'professional-blue',
+    name: 'Professional Blue',
+    description: 'Classic professional style with blue accents and centered header',
+    preview: 'template-professional-blue'
+  },
+  {
+    id: 'modern-minimal',
+    name: 'Modern Minimal',
+    description: 'Clean, minimalist design with elegant typography and subtle borders',
+    preview: 'template-modern-minimal'
+  }
+];
+
+/**
+ * Get PDF stylesheet for a specific template
+ */
+export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'): string {
+  const baseStyles = `
+    <style>
+      /* Reset and base styles */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        box-shadow: none !important;
+        text-shadow: none !important;
+        filter: none !important;
+        transform: none !important;
+        transition: none !important;
+        animation: none !important;
+      }
+  `;
+
+  if (templateId === 'professional-blue') {
+    return `${baseStyles}
+      .resume-container {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        background: white;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 40px;
+      }
+      
+      /* Header styles */
+      .resume-header {
+        text-align: center;
+        margin-bottom: 30px;
+        border-bottom: 2px solid #3b82f6;
+        padding-bottom: 20px;
+      }
+      
+      .name {
+        font-size: 32px;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 8px;
+      }
+      
+      .contact-info {
+        font-size: 16px;
+        color: #6b7280;
+      }
+      
+      /* Section styles */
+      .resume-section {
+        margin-bottom: 25px;
+      }
+      
+      .section-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 12px;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 4px;
+      }
+      
+      .section-content {
+        margin-left: 0;
+      }
+      
+      /* Work experience styles */
+      .job-entry {
+        margin-bottom: 16px;
+      }
+      
+      .job-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #4b5563;
+        margin-bottom: 6px;
+      }
+      
+      /* Skills styles */
+      .skills-list {
+        list-style-type: disc;
+        margin-left: 20px;
+      }
+      
+      .skills-list li {
+        margin-bottom: 4px;
+        font-size: 14px;
+      }
+      
+      /* Education styles */
+      .education-entry {
+        margin-bottom: 12px;
+      }
+      
+      .degree-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #4b5563;
+        margin-bottom: 4px;
+      }
+      
+      .school-info {
+        font-size: 14px;
+        color: #6b7280;
+        margin-bottom: 6px;
+      }
+      
+      /* General text styles */
+      p {
+        font-size: 14px;
+        margin-bottom: 8px;
+        color: #374151;
+        line-height: 1.5;
+      }
+    </style>
+  `;
+  }
+
+  // Modern Minimal template
+  return `${baseStyles}
+      .resume-container {
+        font-family: "Georgia", "Times New Roman", serif;
+        line-height: 1.7;
+        color: #2d3748;
+        background: white;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 50px 40px;
+      }
+      
+      /* Header styles */
+      .resume-header {
+        text-align: left;
+        margin-bottom: 35px;
+        padding-bottom: 25px;
+        border-bottom: 1px solid #cbd5e0;
+      }
+      
+      .name {
+        font-size: 36px;
+        font-weight: 400;
+        color: #1a202c;
+        margin-bottom: 10px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      
+      .contact-info {
+        font-size: 14px;
+        color: #718096;
+        font-style: italic;
+      }
+      
+      /* Section styles */
+      .resume-section {
+        margin-bottom: 28px;
+      }
+      
+      .section-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #4a5568;
+        margin-bottom: 15px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+      
+      .section-content {
+        margin-left: 0;
+        padding-left: 0;
+      }
+      
+      /* Work experience styles */
+      .job-entry {
+        margin-bottom: 18px;
+        padding-left: 15px;
+        border-left: 2px solid #e2e8f0;
+      }
+      
+      .job-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 6px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      
+      /* Skills styles */
+      .skills-list {
+        list-style-type: none;
+        margin-left: 0;
+        padding-left: 0;
+      }
+      
+      .skills-list li {
+        display: inline-block;
+        margin-right: 12px;
+        margin-bottom: 8px;
+        font-size: 13px;
+        padding: 4px 12px;
+        background: #f7fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 3px;
+        color: #4a5568;
+      }
+      
+      /* Education styles */
+      .education-entry {
+        margin-bottom: 14px;
+        padding-left: 15px;
+        border-left: 2px solid #e2e8f0;
+      }
+      
+      .degree-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 4px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      
+      .school-info {
+        font-size: 14px;
+        color: #718096;
+        margin-bottom: 6px;
+        font-style: italic;
+      }
+      
+      /* General text styles */
+      p {
+        font-size: 14px;
+        margin-bottom: 8px;
+        color: #4a5568;
+        line-height: 1.7;
+      }
+    </style>
+  `;
+}
+
+/**
+ * Get the CSS class name for browser display
+ */
+export function getDisplayClassName(templateId: TemplateId = 'professional-blue'): string {
+  return `resume-display-${templateId}`;
+}
+

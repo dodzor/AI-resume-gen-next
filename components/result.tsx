@@ -3,10 +3,15 @@
 import { useState } from 'react'
 import { generatePDF, generateFileName } from '../lib/pdfUtils'
 import { validatePDFContent, handlePDFError, showPDFErrorAlert } from '../lib/pdfErrorHandler'
+import { getDisplayClassName, TemplateId } from '../lib/templates'
 import '../styles/resume-display.css'
 
 export default function Result({ formData, generatedResume }: { formData: any, generatedResume: string }) {
     const [isDownloading, setIsDownloading] = useState(false)
+    
+    // Get the template from formData, default to 'professional-blue'
+    const templateId: TemplateId = formData.template || 'professional-blue'
+    const displayClassName = getDisplayClassName(templateId)
 
     const handleDownloadPDF = async () => {
         // Validate content before proceeding
@@ -22,12 +27,13 @@ export default function Result({ formData, generatedResume }: { formData: any, g
             // Generate filename from form data
             const fileName = generateFileName(formData)
             
-            // Generate and download PDF using utility functions
+            // Generate and download PDF using utility functions with template
             await generatePDF({
                 content: generatedResume,
                 fileName,
                 scale: 2,
-                backgroundColor: '#ffffff'
+                backgroundColor: '#ffffff',
+                templateId
             })
             
         } catch (error) {
@@ -49,7 +55,7 @@ export default function Result({ formData, generatedResume }: { formData: any, g
                 
                 <div className="min-h-[400px] bg-gray-50 rounded-lg p-6 border-2 border-dashed border-gray-300">
                     {generatedResume ? (
-                        <div className="resume-display-container" dangerouslySetInnerHTML={{ __html: generatedResume }} />
+                        <div className={displayClassName} dangerouslySetInnerHTML={{ __html: generatedResume }} />
                     ) : (
                         <div className="flex items-center justify-center h-full">
                             <div className="text-center text-gray-500">

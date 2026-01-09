@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { TEMPLATES, TemplateId } from '../lib/templates'
 
 interface FormProps {
   formData: any
@@ -17,7 +18,8 @@ const STEPS = [
   { id: 2, title: 'Experience', description: 'Your work history' },
   { id: 3, title: 'Education', description: 'Your educational background' },
   { id: 4, title: 'Skills', description: 'Your technical and soft skills' },
-  { id: 5, title: 'Target Job', description: 'Job you\'re applying for' }
+  { id: 5, title: 'Target Job', description: 'Job you\'re applying for' },
+  { id: 6, title: 'Template', description: 'Choose your resume style' }
 ]
 
 export default function Form({ 
@@ -51,9 +53,18 @@ export default function Form({
                 return formData.skills?.trim()
             case 5:
                 return formData.job?.trim()
+            case 6:
+                return !!formData.template
             default:
                 return false
         }
+    }
+
+    const handleTemplateSelect = (templateId: TemplateId) => {
+        setFormData((prev: any) => ({
+            ...prev,
+            template: templateId
+        }))
     }
 
     const nextStep = () => {
@@ -94,6 +105,7 @@ export default function Form({
                 throw new Error(data.message || 'Failed to generate resume')
             }
         
+            console.log('Generated resume:', data.resume)
             setGeneratedResume(data.resume)
             setIsFormCompleted(true) // Mark form as completed
         } catch (error) {
@@ -251,6 +263,59 @@ export default function Form({
                             onChange={handleInputChange}
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
                         />
+                    </div>
+                )
+            case 6:
+                return (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-4">Choose a Resume Template</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {TEMPLATES.map((template) => (
+                                <button
+                                    key={template.id}
+                                    type="button"
+                                    onClick={() => handleTemplateSelect(template.id)}
+                                    className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
+                                        formData.template === template.id
+                                            ? 'border-blue-500 bg-blue-50 shadow-md'
+                                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    {/* Template Preview */}
+                                    <div className={`template-preview mb-4 ${
+                                        formData.template === template.id ? 'selected' : ''
+                                    } template-preview-${template.id}`}>
+                                        <div className="preview-header">
+                                            <div className="preview-name">John Doe</div>
+                                            <div className="text-gray-400 text-[8px]">john@example.com</div>
+                                        </div>
+                                        <div className="preview-section-title">Summary</div>
+                                        <div className="text-gray-400 h-3 bg-gray-100 rounded mb-2"></div>
+                                        <div className="text-gray-400 h-3 bg-gray-100 rounded w-3/4 mb-3"></div>
+                                        <div className="preview-section-title">Experience</div>
+                                        <div className="text-gray-400 h-3 bg-gray-100 rounded mb-2"></div>
+                                        <div className="text-gray-400 h-3 bg-gray-100 rounded w-2/3"></div>
+                                    </div>
+                                    
+                                    {/* Template Info */}
+                                    <div className="flex items-start justify-between">
+                                        <div>
+                                            <h3 className="font-semibold text-gray-800">{template.name}</h3>
+                                            <p className="text-sm text-gray-500 mt-1">{template.description}</p>
+                                        </div>
+                                        {formData.template === template.id && (
+                                            <div className="flex-shrink-0 ml-3">
+                                                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )
             default:

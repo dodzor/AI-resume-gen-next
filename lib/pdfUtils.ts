@@ -1,12 +1,13 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
-import { createPDFStylesheet } from './sharedStyles'
+import { createPDFStylesheet, TemplateId } from './templates'
 
 export interface PDFGenerationOptions {
   content: string
   fileName?: string
   scale?: number
   backgroundColor?: string
+  templateId?: TemplateId
 }
 
 /**
@@ -35,10 +36,12 @@ function createPDFContainer(): HTMLDivElement {
 /**
  * Generates a canvas from HTML content using html2canvas
  */
-export async function generateCanvas(
+async function generateCanvas(
   container: HTMLDivElement,
   options: Partial<PDFGenerationOptions> = {}
 ): Promise<HTMLCanvasElement> {
+  const templateId = options.templateId || 'professional-blue'
+  
   const canvas = await html2canvas(container, {
     scale: options.scale || 2,
     useCORS: true,
@@ -58,10 +61,10 @@ export async function generateCanvas(
       const styleTags = clonedDoc.querySelectorAll('style')
       styleTags.forEach(style => style.remove())
       
-      // Add our clean PDF stylesheet
+      // Add our clean PDF stylesheet for the selected template
       const head = clonedDoc.head || clonedDoc.getElementsByTagName('head')[0]
       if (head) {
-        head.insertAdjacentHTML('beforeend', createPDFStylesheet())
+        head.insertAdjacentHTML('beforeend', createPDFStylesheet(templateId))
       }
     }
   })
