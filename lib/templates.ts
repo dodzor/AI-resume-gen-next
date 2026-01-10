@@ -3,7 +3,7 @@
  * Provides multiple templates with shared styles between browser display and PDF
  */
 
-export type TemplateId = 'professional-blue' | 'modern-minimal';
+export type TemplateId = 'professional-blue' | 'modern-minimal' | 'creative-designer';
 
 export interface ResumeTemplate {
   id: TemplateId;
@@ -24,6 +24,12 @@ export const TEMPLATES: ResumeTemplate[] = [
     name: 'Modern Minimal',
     description: 'Clean, minimalist design with elegant typography and subtle borders',
     preview: 'template-modern-minimal'
+  },
+  {
+    id: 'creative-designer',
+    name: 'Creative Designer',
+    description: 'Vibrant yet intentional design for UI/UX, Graphic & Product designers',
+    preview: 'template-creative-designer'
   }
 ];
 
@@ -172,8 +178,8 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
   `;
   }
 
-  // Modern Minimal template
-  return `${baseStyles}
+  if (templateId === 'modern-minimal') {
+    return `${baseStyles}
       .resume-container {
         font-family: "Georgia", "Times New Roman", serif;
         line-height: 1.7;
@@ -317,6 +323,176 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         margin-bottom: 8px;
         color: #4a5568;
         line-height: 1.7;
+      }
+    </style>
+  `;
+  }
+
+  // Creative Designer template - vibrant yet intentional for UI/UX, Graphic & Product designers
+  return `${baseStyles}
+      .resume-container {
+        font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+        line-height: 1.65;
+        color: #1a1a2e;
+        background: white;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 48px 44px;
+      }
+      
+      /* Header styles - asymmetric layout for visual interest */
+      .resume-header {
+        text-align: left;
+        margin-bottom: 36px;
+        padding-bottom: 28px;
+        border-bottom: 3px solid #E85A4F;
+        position: relative;
+      }
+      
+      .name {
+        font-size: 38px;
+        font-weight: 700;
+        color: #1a1a2e;
+        margin-bottom: 12px;
+        letter-spacing: -0.5px;
+        line-height: 1.1;
+      }
+      
+      .contact-info {
+        font-size: 13px;
+        color: #5c5c6d;
+        font-weight: 500;
+        letter-spacing: 0.3px;
+      }
+      
+      .contact-info a {
+        color: #E85A4F;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      
+      /* Section styles */
+      .resume-section {
+        margin-bottom: 28px;
+      }
+      
+      .section-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: #E85A4F;
+        margin-bottom: 14px;
+        text-transform: uppercase;
+        letter-spacing: 2.5px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      
+      .section-title::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(to right, #E85A4F, transparent);
+      }
+      
+      .section-content {
+        margin-left: 0;
+        padding-left: 0;
+      }
+      
+      /* Work experience styles */
+      .job-entry {
+        margin-bottom: 20px;
+        padding: 16px;
+        background: #fafafa;
+        border-radius: 6px;
+        border-left: 3px solid #E85A4F;
+      }
+      
+      .job-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1a1a2e;
+        margin-bottom: 8px;
+        letter-spacing: -0.2px;
+      }
+      
+      /* Skills styles - tag-like display */
+      .skills-list {
+        list-style-type: none;
+        margin-left: 0;
+        padding-left: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      
+      .skills-list li {
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 14px;
+        background: #1a1a2e;
+        color: white;
+        border-radius: 20px;
+        letter-spacing: 0.3px;
+      }
+      
+      /* Education styles */
+      .education-entry {
+        margin-bottom: 16px;
+        padding: 16px;
+        background: #fafafa;
+        border-radius: 6px;
+        border-left: 3px solid #4a4a5e;
+      }
+      
+      .degree-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1a1a2e;
+        margin-bottom: 4px;
+      }
+      
+      .school-info {
+        font-size: 13px;
+        color: #5c5c6d;
+        margin-bottom: 6px;
+        font-weight: 500;
+      }
+      
+      /* Portfolio styles - emphasized for designers */
+      .portfolio-entry {
+        margin-bottom: 20px;
+        padding: 18px;
+        background: linear-gradient(135deg, #fff5f4 0%, #fafafa 100%);
+        border-radius: 8px;
+        border: 1px solid #f0e0de;
+      }
+      
+      .project-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #E85A4F;
+        margin-bottom: 8px;
+        letter-spacing: -0.2px;
+      }
+      
+      .project-links {
+        font-size: 12px;
+        color: #E85A4F;
+        margin-top: 8px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      /* General text styles */
+      p {
+        font-size: 13px;
+        margin-bottom: 8px;
+        color: #3d3d4e;
+        line-height: 1.65;
       }
     </style>
   `;

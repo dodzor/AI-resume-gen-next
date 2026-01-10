@@ -357,3 +357,216 @@
   letter-spacing: 1px;
   margin: 10px 0 6px 0;
 }
+
+
+/* ===========================================
+   TEMPLATE: Creative Designer
+   Vibrant yet intentional for UI/UX, Graphic & Product designers
+   =========================================== */
+
+.resume-display-creative-designer {
+  font-family: var(--font-dm-sans), "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1.65;
+  color: #1a1a2e;
+  background: white;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 48px 44px;
+}
+
+.resume-display-creative-designer .resume-header {
+  text-align: left;
+  margin-bottom: 36px;
+  padding-bottom: 28px;
+  border-bottom: 3px solid #E85A4F;
+  position: relative;
+}
+
+.resume-display-creative-designer .name {
+  font-size: 38px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 12px;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+}
+
+.resume-display-creative-designer .contact-info {
+  font-size: 13px;
+  color: #5c5c6d;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.resume-display-creative-designer .contact-info a {
+  color: #E85A4F;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.resume-display-creative-designer .contact-info a:hover {
+  text-decoration: underline;
+}
+
+.resume-display-creative-designer .resume-section {
+  margin-bottom: 28px;
+}
+
+.resume-display-creative-designer .section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #E85A4F;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.resume-display-creative-designer .section-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, #E85A4F, transparent);
+}
+
+.resume-display-creative-designer .section-content {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.resume-display-creative-designer .job-entry {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 6px;
+  border-left: 3px solid #E85A4F;
+}
+
+.resume-display-creative-designer .job-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 8px;
+  letter-spacing: -0.2px;
+}
+
+.resume-display-creative-designer .skills-list {
+  list-style-type: none;
+  margin-left: 0;
+  padding-left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.resume-display-creative-designer .skills-list li {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  background: #1a1a2e;
+  color: white;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+}
+
+.resume-display-creative-designer .education-entry {
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 6px;
+  border-left: 3px solid #4a4a5e;
+}
+
+.resume-display-creative-designer .degree-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 4px;
+}
+
+.resume-display-creative-designer .school-info {
+  font-size: 13px;
+  color: #5c5c6d;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+/* Portfolio styles - emphasized for designers */
+.resume-display-creative-designer .portfolio-entry {
+  margin-bottom: 20px;
+  padding: 18px;
+  background: linear-gradient(135deg, #fff5f4 0%, #fafafa 100%);
+  border-radius: 8px;
+  border: 1px solid #f0e0de;
+}
+
+.resume-display-creative-designer .project-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #E85A4F;
+  margin-bottom: 8px;
+  letter-spacing: -0.2px;
+}
+
+.resume-display-creative-designer .project-links {
+  font-size: 12px;
+  color: #E85A4F;
+  margin-top: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.resume-display-creative-designer p {
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: #3d3d4e;
+  line-height: 1.65;
+}
+
+.resume-display-creative-designer * {
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+
+/* Creative Designer Preview */
+.template-preview-creative-designer .preview-header {
+  text-align: left;
+  border-bottom: 3px solid #E85A4F;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.template-preview-creative-designer .preview-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+  letter-spacing: -0.3px;
+}
+
+.template-preview-creative-designer .preview-section-title {
+  font-size: 9px;
+  font-weight: 700;
+  color: #E85A4F;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin: 10px 0 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.template-preview-creative-designer .preview-section-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, #E85A4F, transparent);
+}
