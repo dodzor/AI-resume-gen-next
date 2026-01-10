@@ -4,18 +4,62 @@
 export function createResumePrompt(formData: {
   name: string;
   email: string;
+  phone?: string;
+  location?: string;
   experience: string;
   education: string;
   skills: string;
+  portfolio?: string;
+  portfolioLink?: string;
   job: string;
 }) {
-  return `Generate a professional resume using ONLY the following simple HTML structure. Do not add any CSS styles, classes beyond what's specified, or complex formatting. Use only basic HTML tags (h1, h2, h3, p, ul, li, strong, div).
+  // Build contact info items
+  const contactItems = [formData.email];
+  if (formData.phone?.trim()) contactItems.push(formData.phone.trim());
+  if (formData.location?.trim()) contactItems.push(formData.location.trim());
+  if (formData.portfolioLink?.trim()) contactItems.push(formData.portfolioLink.trim());
+  
+  const contactInfoExample = contactItems.length > 1 
+    ? `[Email] | [Phone if provided] | [Location if provided] | [Portfolio Link if provided]`
+    : `[Email]`;
+
+  // Build portfolio section only if portfolio data is provided
+  const portfolioSection = formData.portfolio?.trim() ? `
+  <section class="resume-section">
+    <h2 class="section-title">Portfolio / Projects</h2>
+    <div class="section-content">
+      <div class="portfolio-entry">
+        <h3 class="project-title">[Project Name] ([Year])</h3>
+        <p>[Project description and technologies used]</p>
+        <p class="project-links">[Links if available]</p>
+      </div>
+      <!-- Repeat for each project -->
+    </div>
+  </section>` : '';
+
+  const portfolioInstructions = formData.portfolio?.trim() 
+    ? `- Portfolio/Projects: ${formData.portfolio}` 
+    : '';
+
+  const portfolioClasses = formData.portfolio?.trim()
+    ? ', portfolio-entry, project-title, project-links'
+    : '';
+
+  // Build contact info data for the prompt
+  const contactData = [
+    `- Email: ${formData.email}`,
+    formData.phone?.trim() ? `- Phone: ${formData.phone}` : '',
+    formData.location?.trim() ? `- Location: ${formData.location}` : '',
+    formData.portfolioLink?.trim() ? `- Portfolio Link: ${formData.portfolioLink}` : ''
+  ].filter(Boolean).join('\n');
+
+  return `Generate a professional resume using ONLY the following simple HTML structure. Do not add any CSS styles, classes beyond what's specified, or complex formatting. Use only basic HTML tags (h1, h2, h3, p, ul, li, strong, div, a).
 
 REQUIRED STRUCTURE:
 <div class="resume-container">
   <header class="resume-header">
     <h1 class="name">[Full Name]</h1>
-    <div class="contact-info">[Email]</div>
+    <div class="contact-info">${contactInfoExample}</div>
   </header>
 
   <section class="resume-section">
@@ -35,7 +79,7 @@ REQUIRED STRUCTURE:
       <!-- Repeat for each job -->
     </div>
   </section>
-
+${portfolioSection}
   <section class="resume-section">
     <h2 class="section-title">Skills</h2>
     <div class="section-content">
@@ -60,17 +104,20 @@ REQUIRED STRUCTURE:
 </div>
 
 IMPORTANT RULES:
-1. Use ONLY the classes specified above (resume-container, resume-header, name, contact-info, resume-section, section-title, section-content, job-entry, job-title, skills-list, education-entry, degree-title, school-info)
+1. Use ONLY the classes specified above (resume-container, resume-header, name, contact-info, resume-section, section-title, section-content, job-entry, job-title, skills-list, education-entry, degree-title, school-info${portfolioClasses})
 2. Do NOT add any inline styles or additional CSS classes
 3. Do NOT use complex HTML elements (tables, divs with complex nesting, etc.)
 4. Keep the structure simple and flat
-5. Use semantic HTML tags (h1, h2, h3, p, ul, li, strong)
+5. Use semantic HTML tags (h1, h2, h3, p, ul, li, strong, a)
+6. In contact-info: separate items with " | " (pipe with spaces). IMPORTANT: Wrap email in <a href="mailto:email"> and wrap portfolio link in <a href="url">. Only include items that are provided.
+${formData.portfolio?.trim() ? '7. Include the Portfolio/Projects section between Work Experience and Skills' : '7. Do NOT include a Portfolio section if no portfolio data is provided'}
 
 Generate a resume for:
 - Name: ${formData.name}
-- Email: ${formData.email}
+${contactData}
 - Target Job: ${formData.job}
 - Experience: ${formData.experience}
+${portfolioInstructions}
 - Education: ${formData.education}
 - Skills: ${formData.skills}
 

@@ -8,6 +8,26 @@ export interface PDFGenerationOptions {
   scale?: number
   backgroundColor?: string
   templateId?: TemplateId
+  formData?: {
+    email?: string
+    phone?: string
+    location?: string
+    portfolioLink?: string
+  }
+}
+
+interface LinkInfo {
+  url: string
+  text: string
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+interface ContainerDimensions {
+  width: number
+  height: number
 }
 
 /**
@@ -73,9 +93,49 @@ async function generateCanvas(
 }
 
 /**
- * Creates a PDF from canvas data
+ * Extract link positions from the rendered container
+ * Returns positions in CSS pixels relative to the container's top-left corner
  */
-export function createPDFFromCanvas(canvas: HTMLCanvasElement, fileName: string = 'Resume.pdf'): jsPDF {
+function extractLinkPositions(container: HTMLDivElement): { links: LinkInfo[], dimensions: ContainerDimensions } {
+  const links: LinkInfo[] = []
+  const containerRect = container.getBoundingClientRect()
+  
+  // Get the actual container dimensions (includes padding with content-box)
+  const dimensions: ContainerDimensions = {
+    width: container.offsetWidth,
+    height: container.offsetHeight
+  }
+  
+  // Find all anchor tags
+  const anchors = container.querySelectorAll('a[href]')
+  anchors.forEach((anchor) => {
+    const href = anchor.getAttribute('href')
+    if (href && (href.startsWith('http') || href.startsWith('mailto:'))) {
+      const rect = anchor.getBoundingClientRect()
+      // Store positions in CSS pixels (not scaled)
+      links.push({
+        url: href,
+        text: anchor.textContent || '',
+        x: rect.left - containerRect.left,
+        y: rect.top - containerRect.top,
+        width: rect.width,
+        height: rect.height
+      })
+    }
+  })
+  
+  return { links, dimensions }
+}
+
+/**
+ * Creates a PDF from canvas data with optional clickable links
+ */
+export function createPDFFromCanvas(
+  canvas: HTMLCanvasElement, 
+  fileName: string = 'Resume.pdf',
+  links: LinkInfo[] = [],
+  containerDimensions?: ContainerDimensions
+): jsPDF {
   const pdf = new jsPDF('p', 'mm', 'a4')
   
   const imgData = canvas.toDataURL('image/png')
@@ -84,10 +144,30 @@ export function createPDFFromCanvas(canvas: HTMLCanvasElement, fileName: string 
   const imgHeight = (canvas.height * imgWidth) / canvas.width
   let heightLeft = imgHeight
   
+  // Calculate scale factor from CSS pixels to PDF mm
+  // Use actual container width if provided, otherwise estimate from canvas
+  const containerWidth = containerDimensions?.width || (canvas.width / 2)
+  const scaleFactor = imgWidth / containerWidth
+  
   let position = 0
   
   // Add first page
   pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+  
+  // Add clickable links to first page
+  links.forEach((link) => {
+    // Convert CSS pixel positions to PDF mm positions
+    const linkX = link.x * scaleFactor
+    const linkY = link.y * scaleFactor
+    const linkW = link.width * scaleFactor
+    const linkH = link.height * scaleFactor
+    
+    // Only add links that are on the first page
+    if (linkY < pageHeight && linkY >= 0) {
+      pdf.link(linkX, linkY, linkW, linkH, { url: link.url })
+    }
+  })
+  
   heightLeft -= pageHeight
   
   // Add additional pages if needed
@@ -130,11 +210,17 @@ export async function generatePDF(options: PDFGenerationOptions): Promise<void> 
     pdfContainer.appendChild(contentDiv)
     document.body.appendChild(pdfContainer)
     
+    // Wait for layout to settle
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Extract link positions and container dimensions before rendering to canvas
+    const { links, dimensions } = extractLinkPositions(pdfContainer)
+    
     // Generate canvas (the stylesheet will be applied in the onclone callback)
     const canvas = await generateCanvas(pdfContainer, options)
     
-    // Create and save PDF
-    const pdf = createPDFFromCanvas(canvas, options.fileName)
+    // Create and save PDF with clickable links, using actual container dimensions for scale
+    const pdf = createPDFFromCanvas(canvas, options.fileName, links, dimensions)
     pdf.save(options.fileName || 'Resume.pdf')
     
   } finally {

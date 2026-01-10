@@ -79,6 +79,11 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         color: #6b7280;
       }
       
+      .contact-info a {
+        color: #3b82f6;
+        text-decoration: none;
+      }
+      
       /* Section styles */
       .resume-section {
         margin-bottom: 25px;
@@ -138,6 +143,24 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         margin-bottom: 6px;
       }
       
+      /* Portfolio styles */
+      .portfolio-entry {
+        margin-bottom: 16px;
+      }
+      
+      .project-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #4b5563;
+        margin-bottom: 6px;
+      }
+      
+      .project-links {
+        font-size: 13px;
+        color: #3b82f6;
+        margin-top: 4px;
+      }
+      
       /* General text styles */
       p {
         font-size: 14px;
@@ -182,6 +205,11 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         font-size: 14px;
         color: #718096;
         font-style: italic;
+      }
+      
+      .contact-info a {
+        color: #4299e1;
+        text-decoration: none;
       }
       
       /* Section styles */
@@ -258,6 +286,28 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         font-size: 14px;
         color: #718096;
         margin-bottom: 6px;
+        font-style: italic;
+      }
+      
+      /* Portfolio styles */
+      .portfolio-entry {
+        margin-bottom: 18px;
+        padding-left: 15px;
+        border-left: 2px solid #e2e8f0;
+      }
+      
+      .project-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 6px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      
+      .project-links {
+        font-size: 13px;
+        color: #4299e1;
+        margin-top: 4px;
         font-style: italic;
       }
       

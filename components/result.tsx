@@ -33,7 +33,11 @@ export default function Result({ formData, generatedResume }: { formData: any, g
                 fileName,
                 scale: 2,
                 backgroundColor: '#ffffff',
-                templateId
+                templateId,
+                formData: {
+                    email: formData.email,
+                    portfolioLink: formData.portfolioLink
+                }
             })
             
         } catch (error) {

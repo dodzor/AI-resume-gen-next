@@ -10,9 +10,13 @@ export default function Content() {
     const [formData, setFormData] = useState({
       name: 'John Doe',
       email: 'john.doe@example.com',
+      phone: '',
+      location: '',
       experience: '• Software Developer at Tech Corp (2020-2023)\n  - Built web applications using React and Node.js\n  - Improved system performance by 40%\n\n• Junior Developer at StartupXYZ (2019-2020)\n  - Developed mobile apps using React Native',
       education: '• Bachelor of Science in Computer Science\n  University of Technology (2015-2019)\n  - GPA: 3.8/4.0\n  - Relevant Coursework: Data Structures, Algorithms, Software Engineering\n\n• Certifications:\n  - AWS Certified Developer Associate (2022)\n  - Google Cloud Professional Developer (2021)',
       skills: 'JavaScript, React, Node.js, Python, SQL, Git, AWS, Docker, Agile, Problem Solving, Team Leadership',
+      portfolio: '',
+      portfolioLink: '',
       job: 'Senior Full Stack Developer position requiring expertise in modern web technologies, database design, and team collaboration. Looking for someone with 3+ years experience in React, Node.js, and cloud platforms.',
       template: 'professional-blue' as const
     })

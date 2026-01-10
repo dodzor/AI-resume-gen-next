@@ -21,9 +21,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, experience, education, skills, job } = body;
+    const { name, email, phone, location, experience, education, skills, portfolio, portfolioLink, job } = body;
 
-    // Validate required fields
+    // Validate required fields (phone, location, portfolio, portfolioLink are optional)
     if (!name || !email || !experience || !education || !skills || !job) {
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -34,9 +34,13 @@ export async function POST(request: NextRequest) {
     const prompt = createResumePrompt({
       name,
       email,
+      phone,
+      location,
       experience,
       education,
       skills,
+      portfolio,
+      portfolioLink,
       job
     });
 

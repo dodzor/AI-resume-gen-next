@@ -18,8 +18,9 @@ const STEPS = [
   { id: 2, title: 'Experience', description: 'Your work history' },
   { id: 3, title: 'Education', description: 'Your educational background' },
   { id: 4, title: 'Skills', description: 'Your technical and soft skills' },
-  { id: 5, title: 'Target Job', description: 'Job you\'re applying for' },
-  { id: 6, title: 'Template', description: 'Choose your resume style' }
+  { id: 5, title: 'Portfolio', description: 'Your projects and work samples (optional)' },
+  { id: 6, title: 'Target Job', description: 'Job you\'re applying for' },
+  { id: 7, title: 'Template', description: 'Choose your resume style' }
 ]
 
 export default function Form({ 
@@ -52,8 +53,10 @@ export default function Form({
             case 4:
                 return formData.skills?.trim()
             case 5:
-                return formData.job?.trim()
+                return true // Portfolio is optional
             case 6:
+                return formData.job?.trim()
+            case 7:
                 return !!formData.template
             default:
                 return false
@@ -105,7 +108,7 @@ export default function Form({
                 throw new Error(data.message || 'Failed to generate resume')
             }
         
-            console.log('Generated resume:', data.resume)
+            // console.log('Generated resume:', data.resume)
             setGeneratedResume(data.resume)
             setIsFormCompleted(true) // Mark form as completed
         } catch (error) {
@@ -155,7 +158,7 @@ export default function Form({
                             )}
                         </button>
                         {index < STEPS.length - 1 && (
-                            <div className={`w-28 h-1 mx-2 rounded-full transition-all duration-200 ${
+                            <div className={`w-16 h-1 mx-1 rounded-full transition-all duration-200 ${
                                 step.id < currentStep ? 'bg-green-500' : 'bg-gray-200'
                             }`} />
                         )}
@@ -202,6 +205,38 @@ export default function Form({
                                 onChange={handleInputChange}
                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
                             />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+                                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">Optional</span>
+                                </div>
+                                <input 
+                                    name="phone" 
+                                    type="tel"
+                                    placeholder="+1 (555) 123-4567"
+                                    value={formData.phone || ''}
+                                    onChange={handleInputChange}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                />
+                            </div>
+                            
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="block text-sm font-medium text-gray-700">Location</label>
+                                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">Optional</span>
+                                </div>
+                                <input 
+                                    name="location" 
+                                    type="text"
+                                    placeholder="San Francisco, CA"
+                                    value={formData.location || ''}
+                                    onChange={handleInputChange}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                />
+                            </div>
                         </div>
                     </div>
                 )
@@ -252,6 +287,71 @@ export default function Form({
                 )
             case 5:
                 return (
+                    <div className="space-y-4">
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                    </svg>
+                                    <label className="block text-sm font-medium text-gray-700">Portfolio / Website Link</label>
+                                </div>
+                                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">Optional</span>
+                            </div>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                                    </svg>
+                                </div>
+                                <input 
+                                    name="portfolioLink" 
+                                    type="url"
+                                    placeholder="https://yourportfolio.com"
+                                    value={formData.portfolioLink || ''}
+                                    onChange={handleInputChange}
+                                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                />
+                            </div>
+                            <p className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+                                <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                This link will be <strong className="text-gray-700">clickable</strong> in your resume header and downloaded PDF.
+                            </p>
+                        </div>
+
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-sm font-medium text-gray-700">Portfolio / Projects Details</label>
+                                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">Optional</span>
+                            </div>
+                            <textarea 
+                                name="portfolio"
+                                placeholder={`Mobile Banking Redesign — UI/UX, Figma, usability testing
+→ Increased task success rate by 32%
+
+E-commerce Storefront — React, Tailwind, Stripe
+→ 5k+ users, 99.9% uptime`}
+                                rows={7}
+                                value={formData.portfolio || ''}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
+                            />
+                            <div className="mt-2 text-sm text-gray-500">
+                            Add a small section if:
+                            <ul>
+                                <li>You don’t have a full portfolio website</li>
+                                <li>You want to highlight 1–3 signature projects</li>
+                                <li>You’re junior and need to show concrete work</li>
+                                <li>You’re switching careers and need proof</li>
+                            </ul>
+                            </div>
+                        </div>
+                    </div>
+                )
+            case 6:
+                return (
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Target Job Description</label>
                         <textarea 
@@ -265,7 +365,7 @@ export default function Form({
                         />
                     </div>
                 )
-            case 6:
+            case 7:
                 return (
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-4">Choose a Resume Template</label>
