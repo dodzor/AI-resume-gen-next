@@ -3,7 +3,7 @@
  * Provides multiple templates with shared styles between browser display and PDF
  */
 
-export type TemplateId = 'professional-blue' | 'modern-minimal' | 'creative-designer';
+export type TemplateId = 'professional-blue' | 'modern-minimal' | 'creative-designer' | 'developer';
 
 export interface ResumeTemplate {
   id: TemplateId;
@@ -30,6 +30,12 @@ export const TEMPLATES: ResumeTemplate[] = [
     name: 'Creative Designer',
     description: 'Vibrant yet intentional design for UI/UX, Graphic & Product designers',
     preview: 'template-creative-designer'
+  },
+  {
+    id: 'developer',
+    name: 'Developer',
+    description: 'Clean, structured, ATS-friendly — optimized for engineers and developers',
+    preview: 'template-developer'
   }
 ];
 
@@ -173,6 +179,179 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         margin-bottom: 8px;
         color: #374151;
         line-height: 1.5;
+      }
+    </style>
+  `;
+  }
+
+  if (templateId === 'developer') {
+    return `${baseStyles}
+      .resume-container {
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        line-height: 1.5;
+        color: #111111;
+        background: white;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 36px 40px;
+        font-size: 13px;
+      }
+      
+      /* Header styles - simple and scannable */
+      .resume-header {
+        text-align: left;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid #111111;
+      }
+      
+      .name {
+        font-size: 28px;
+        font-weight: 700;
+        color: #111111;
+        margin-bottom: 6px;
+        letter-spacing: -0.3px;
+      }
+      
+      .contact-info {
+        font-size: 13px;
+        color: #444444;
+        font-family: "SF Mono", "Roboto Mono", Consolas, monospace;
+      }
+      
+      .contact-info a {
+        color: #111111;
+        text-decoration: underline;
+        font-weight: 500;
+      }
+      
+      /* Section styles - clear hierarchy */
+      .resume-section {
+        margin-bottom: 20px;
+      }
+      
+      .section-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #111111;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid #dddddd;
+      }
+      
+      .section-content {
+        margin-left: 0;
+        padding-left: 0;
+      }
+      
+      /* Work experience styles - dense but organized */
+      .job-entry {
+        margin-bottom: 14px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      
+      .job-entry:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+      
+      .job-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #111111;
+        margin-bottom: 4px;
+      }
+      
+      /* Skills styles - inline, comma-separated for ATS */
+      .skills-list {
+        list-style-type: none;
+        margin-left: 0;
+        padding-left: 0;
+      }
+      
+      .skills-list li {
+        display: inline;
+        font-size: 13px;
+        color: #333333;
+      }
+      
+      .skills-list li::after {
+        content: " · ";
+        color: #999999;
+      }
+      
+      .skills-list li:last-child::after {
+        content: "";
+      }
+      
+      /* Education styles */
+      .education-entry {
+        margin-bottom: 10px;
+      }
+      
+      .degree-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #111111;
+        margin-bottom: 2px;
+      }
+      
+      .school-info {
+        font-size: 13px;
+        color: #555555;
+        margin-bottom: 4px;
+      }
+      
+      /* Portfolio/Projects styles - prominent for devs */
+      .portfolio-entry {
+        margin-bottom: 14px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      
+      .portfolio-entry:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+      
+      .project-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #111111;
+        margin-bottom: 4px;
+      }
+      
+      .project-links {
+        font-size: 12px;
+        color: #111111;
+        margin-top: 4px;
+        font-family: "SF Mono", "Roboto Mono", Consolas, monospace;
+      }
+      
+      .project-links a {
+        text-decoration: underline;
+      }
+      
+      /* General text styles */
+      p {
+        font-size: 13px;
+        margin-bottom: 6px;
+        color: #333333;
+        line-height: 1.5;
+      }
+      
+      /* Bullet points for impact */
+      ul {
+        margin-left: 16px;
+        padding-left: 0;
+      }
+      
+      li {
+        margin-bottom: 3px;
+        line-height: 1.45;
       }
     </style>
   `;

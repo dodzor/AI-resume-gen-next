@@ -570,3 +570,212 @@
   height: 1px;
   background: linear-gradient(to right, #E85A4F, transparent);
 }
+
+
+/* ===========================================
+   TEMPLATE: Developer
+   Clean, structured, ATS-friendly for engineers
+   "This person writes clean, maintainable code."
+   =========================================== */
+
+.resume-display-developer {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  line-height: 1.5;
+  color: #111111;
+  background: white;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 36px 40px;
+  font-size: 13px;
+}
+
+.resume-display-developer .resume-header {
+  text-align: left;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #111111;
+}
+
+.resume-display-developer .name {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111111;
+  margin-bottom: 6px;
+  letter-spacing: -0.3px;
+}
+
+.resume-display-developer .contact-info {
+  font-size: 13px;
+  color: #444444;
+  font-family: "SF Mono", "Roboto Mono", Consolas, monospace;
+}
+
+.resume-display-developer .contact-info a {
+  color: #111111;
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.resume-display-developer .contact-info a:hover {
+  color: #000000;
+}
+
+.resume-display-developer .resume-section {
+  margin-bottom: 20px;
+}
+
+.resume-display-developer .section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111111;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #dddddd;
+}
+
+.resume-display-developer .section-content {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.resume-display-developer .job-entry {
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.resume-display-developer .job-entry:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.resume-display-developer .job-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111111;
+  margin-bottom: 4px;
+}
+
+/* Skills - inline for ATS compatibility */
+.resume-display-developer .skills-list {
+  list-style-type: none;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.resume-display-developer .skills-list li {
+  display: inline;
+  font-size: 13px;
+  color: #333333;
+}
+
+.resume-display-developer .skills-list li::after {
+  content: " · ";
+  color: #999999;
+}
+
+.resume-display-developer .skills-list li:last-child::after {
+  content: "";
+}
+
+.resume-display-developer .education-entry {
+  margin-bottom: 10px;
+}
+
+.resume-display-developer .degree-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111111;
+  margin-bottom: 2px;
+}
+
+.resume-display-developer .school-info {
+  font-size: 13px;
+  color: #555555;
+  margin-bottom: 4px;
+}
+
+/* Portfolio/Projects - prominent for developers */
+.resume-display-developer .portfolio-entry {
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.resume-display-developer .portfolio-entry:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.resume-display-developer .project-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111111;
+  margin-bottom: 4px;
+}
+
+.resume-display-developer .project-links {
+  font-size: 12px;
+  color: #111111;
+  margin-top: 4px;
+  font-family: "SF Mono", "Roboto Mono", Consolas, monospace;
+}
+
+.resume-display-developer .project-links a {
+  text-decoration: underline;
+}
+
+.resume-display-developer p {
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #333333;
+  line-height: 1.5;
+}
+
+.resume-display-developer ul {
+  margin-left: 16px;
+  padding-left: 0;
+}
+
+.resume-display-developer li {
+  margin-bottom: 3px;
+  line-height: 1.45;
+}
+
+.resume-display-developer * {
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+
+/* Developer Preview */
+.template-preview-developer .preview-header {
+  text-align: left;
+  border-bottom: 2px solid #111111;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.template-preview-developer .preview-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111111;
+  letter-spacing: -0.2px;
+}
+
+.template-preview-developer .preview-section-title {
+  font-size: 9px;
+  font-weight: 700;
+  color: #111111;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 8px 0 5px 0;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #dddddd;
+}
