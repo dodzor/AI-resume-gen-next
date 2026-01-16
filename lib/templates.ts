@@ -516,23 +516,23 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         background: white;
         max-width: 800px;
         margin: 0 auto;
-        padding: 48px 44px;
+        padding: 28px 44px;
       }
       
       /* Header styles - asymmetric layout for visual interest */
       .resume-header {
         text-align: left;
-        margin-bottom: 36px;
-        padding-bottom: 28px;
+        margin-bottom: 32px;
+        padding-bottom: 36px;
         border-bottom: 3px solid #E85A4F;
         position: relative;
       }
       
       .name {
         font-size: 38px;
-        font-weight: 700;
+        font-weight: 600;
         color: #1a1a2e;
-        margin-bottom: 12px;
+        margin-bottom: 16px;
         letter-spacing: -0.5px;
         line-height: 1.1;
       }
@@ -540,14 +540,14 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
       .contact-info {
         font-size: 13px;
         color: #5c5c6d;
-        font-weight: 500;
+        font-weight: 400;
         letter-spacing: 0.3px;
       }
       
       .contact-info a {
         color: #E85A4F;
         text-decoration: none;
-        font-weight: 600;
+        font-weight: 500;
       }
       
       /* Section styles */
@@ -555,23 +555,21 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         margin-bottom: 28px;
       }
       
+      /* Only first section (Summary) gets margin-bottom */
+      .resume-section:first-of-type .section-title {
+        margin-bottom: 6px !important;
+      }
+      
       .section-title {
         font-size: 11px;
         font-weight: 700;
         color: #E85A4F;
-        margin-bottom: 14px;
+        margin-bottom: 18px;
         text-transform: uppercase;
         letter-spacing: 2.5px;
         display: flex;
         align-items: center;
         gap: 10px;
-      }
-      
-      .section-title::after {
-        content: "";
-        flex: 1;
-        height: 1px;
-        background: linear-gradient(to right, #E85A4F, transparent);
       }
       
       .section-content {
@@ -582,7 +580,7 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
       /* Work experience styles */
       .job-entry {
         margin-bottom: 20px;
-        padding: 16px;
+        padding: 8px 16px 24px 16px;
         background: #fafafa;
         border-radius: 6px;
         border-left: 3px solid #E85A4F;
@@ -590,7 +588,7 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
       
       .job-title {
         font-size: 15px;
-        font-weight: 700;
+        font-weight: 600;
         color: #1a1a2e;
         margin-bottom: 8px;
         letter-spacing: -0.2px;
@@ -610,7 +608,7 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         display: inline-block;
         font-size: 12px;
         font-weight: 600;
-        padding: 6px 14px;
+        padding: 0px 14px 8px 14px;
         background: #1a1a2e;
         color: white;
         border-radius: 20px;
@@ -620,7 +618,7 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
       /* Education styles */
       .education-entry {
         margin-bottom: 16px;
-        padding: 16px;
+        padding: 8px 16px 24px 16px;
         background: #fafafa;
         border-radius: 6px;
         border-left: 3px solid #4a4a5e;
@@ -628,7 +626,7 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
       
       .degree-title {
         font-size: 15px;
-        font-weight: 700;
+        font-weight: 600;
         color: #1a1a2e;
         margin-bottom: 4px;
       }

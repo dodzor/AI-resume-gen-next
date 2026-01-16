@@ -39,8 +39,8 @@ function createPDFContainer(): HTMLDivElement {
     position: absolute;
     left: -9999px;
     top: 0;
-    width: 800px;
-    padding: 40px;
+    width: 794px; // A4 width in mm
+    padding: 0px;
     background: white !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     line-height: 1.6 !important;

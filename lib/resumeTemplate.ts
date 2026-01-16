@@ -63,7 +63,7 @@ REQUIRED STRUCTURE:
   </header>
 
   <section class="resume-section">
-    <h2 class="section-title">Summary</h2>
+    <h2 class="section-title" id="summary">Summary</h2>
     <div class="section-content">
       <p>[Professional summary paragraph]</p>
     </div>

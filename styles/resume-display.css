@@ -424,12 +424,13 @@
   gap: 10px;
 }
 
-.resume-display-creative-designer .section-title::after {
+/* commented out because it was not appearing in the PDF */
+/* .resume-display-creative-designer .section-title::after {
   content: "";
   flex: 1;
   height: 1px;
   background: linear-gradient(to right, #E85A4F, transparent);
-}
+} */
 
 .resume-display-creative-designer .section-content {
   margin-left: 0;
