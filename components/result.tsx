@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { generatePDF, generateFileName } from '../lib/pdfUtils'
-import { validatePDFContent, handlePDFError, showPDFErrorAlert } from '../lib/pdfErrorHandler'
+import { generateFileName } from '../lib/pdfUtils'
+import { validatePDFContent } from '../lib/pdfErrorHandler'
 import { getDisplayClassName, TemplateId } from '../lib/templates'
 import '../styles/resume-display.css'
 
@@ -27,23 +27,38 @@ export default function Result({ formData, generatedResume }: { formData: any, g
             // Generate filename from form data
             const fileName = generateFileName(formData)
             
-            // Generate and download PDF using utility functions with template
-            await generatePDF({
-                content: generatedResume,
-                fileName,
-                scale: 2,
-                backgroundColor: '#ffffff',
-                templateId,
-                formData: {
-                    email: formData.email,
-                    portfolioLink: formData.portfolioLink
-                }
+            // Call the server-side PDF generation API
+            const response = await fetch('/api/generate-pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: generatedResume,
+                    templateId,
+                    fileName,
+                }),
             })
+
+            if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.message || 'Failed to generate PDF')
+            }
+
+            // Get the PDF blob and trigger download
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = fileName
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
             
-        } catch (error) {
-            // Handle errors using utility function
-            const pdfError = handlePDFError(error)
-            showPDFErrorAlert(pdfError)
+        } catch (error: any) {
+            console.error('PDF generation error:', error)
+            alert(error.message || 'An error occurred while generating the PDF. Please try again.')
         } finally {
             setIsDownloading(false)
         }
