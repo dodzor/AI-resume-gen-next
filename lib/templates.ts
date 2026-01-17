@@ -567,9 +567,8 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         margin-bottom: 18px;
         text-transform: uppercase;
         letter-spacing: 2.5px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
+        /* Avoid flexbox - html2canvas has rendering issues with it */
+        display: block;
       }
       
       .section-content {
@@ -595,13 +594,11 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
       }
       
       /* Skills styles - tag-like display */
+      /* Avoid flexbox - html2canvas has rendering issues with it */
       .skills-list {
         list-style-type: none;
         margin-left: 0;
         padding-left: 0;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
       }
       
       .skills-list li {
@@ -609,10 +606,13 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         font-size: 12px;
         font-weight: 600;
         padding: 0px 14px 8px 14px;
+        margin-right: 8px;
+        margin-bottom: 8px;
         background: #1a1a2e;
         color: white;
         border-radius: 20px;
         letter-spacing: 0.3px;
+        vertical-align: top;
       }
       
       /* Education styles */

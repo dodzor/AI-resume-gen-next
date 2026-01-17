@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { generatePDF, generateFileName } from '../lib/pdfUtils'
+import { generateReactPDF, generateFileName } from '../lib/reactPdfUtils'
 import { validatePDFContent, handlePDFError, showPDFErrorAlert } from '../lib/pdfErrorHandler'
 import { getDisplayClassName, TemplateId } from '../lib/templates'
 import '../styles/resume-display.css'
@@ -27,17 +27,11 @@ export default function Result({ formData, generatedResume }: { formData: any, g
             // Generate filename from form data
             const fileName = generateFileName(formData)
             
-            // Generate and download PDF using utility functions with template
-            await generatePDF({
+            // Generate and download PDF using react-pdf
+            await generateReactPDF({
                 content: generatedResume,
                 fileName,
-                scale: 2,
-                backgroundColor: '#ffffff',
                 templateId,
-                formData: {
-                    email: formData.email,
-                    portfolioLink: formData.portfolioLink
-                }
             })
             
         } catch (error) {
