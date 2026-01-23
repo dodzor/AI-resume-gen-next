@@ -24,30 +24,73 @@ export default function Content() {
     const [isGenerating, setIsGenerating] = useState(false)
     const [generatedResume, setGeneratedResume] = useState('')
     const [isFormCompleted, setIsFormCompleted] = useState(false)
+    const [currentStep, setCurrentStep] = useState(1)
+    const [showPreview, setShowPreview] = useState(true)
   
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="text-center mb-10">
             <h1 className="text-4xl font-bold text-gray-800 mb-2">🤖 AI Resume Generator</h1>
             <p className="text-gray-600 text-lg">Create a professional resume in seconds with AI assistance</p>
           </div>
   
-          {/* <div className={`${isFormCompleted ? 'max-w-4xl mx-auto' : 'max-w-3xl mx-auto'}`}>*/}
-           <div className="max-w-5xl mx-auto">
-            <Form 
-              formData={formData}
-              setFormData={setFormData}
-              isGenerating={isGenerating}
-              setIsGenerating={setIsGenerating}
-              setGeneratedResume={setGeneratedResume}
-              isFormCompleted={isFormCompleted}
-              setIsFormCompleted={setIsFormCompleted}
-            />
-
-            {isFormCompleted && (
-              <Result formData={formData} generatedResume={generatedResume} />
+          <div className="max-w-5xl mx-auto">
+            {isFormCompleted ? (
+              // Full-width layout when form is completed
+              <div className="space-y-6">
+                <Form 
+                  formData={formData}
+                  setFormData={setFormData}
+                  isGenerating={isGenerating}
+                  setIsGenerating={setIsGenerating}
+                  setGeneratedResume={setGeneratedResume}
+                  isFormCompleted={isFormCompleted}
+                  setIsFormCompleted={setIsFormCompleted}
+                  currentStep={currentStep}
+                  setCurrentStep={setCurrentStep}
+                  showPreview={showPreview}
+                  setShowPreview={setShowPreview}
+                />
+                <Result 
+                  formData={formData} 
+                  generatedResume={generatedResume}
+                  currentStep={currentStep}
+                  showPreview={true}
+                />
+              </div>
+            ) : (
+              // Side-by-side layout during form filling
+              // <div className={`grid gap-6 ${showPreview ? 'lg:grid-cols-2' : ''}`}>
+              <div className="grid gap-6">
+                <div className={showPreview ? 'lg:order-1' : ''}>
+                  <Form 
+                    formData={formData}
+                    setFormData={setFormData}
+                    isGenerating={isGenerating}
+                    setIsGenerating={setIsGenerating}
+                    setGeneratedResume={setGeneratedResume}
+                    isFormCompleted={isFormCompleted}
+                    setIsFormCompleted={setIsFormCompleted}
+                    currentStep={currentStep}
+                    setCurrentStep={setCurrentStep}
+                    showPreview={showPreview}
+                    setShowPreview={setShowPreview}
+                  />
+                </div>
+                
+                {showPreview && (
+                  <div className="lg:order-2">
+                    <Result 
+                      formData={formData} 
+                      generatedResume={generatedResume}
+                      currentStep={currentStep}
+                      showPreview={showPreview}
+                    />
+                  </div>
+                )}
+              </div>
             )}
           </div>
   

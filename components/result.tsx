@@ -4,14 +4,29 @@ import { useState } from 'react'
 import { generateFileName } from '../lib/pdfUtils'
 import { validatePDFContent } from '../lib/pdfErrorHandler'
 import { getDisplayClassName, TemplateId } from '../lib/templates'
+import { generateSimplePreview } from '../lib/utils'
 import '../styles/resume-display.css'
 
-export default function Result({ formData, generatedResume }: { formData: any, generatedResume: string }) {
+interface ResultProps {
+    formData: any
+    generatedResume: string
+    currentStep?: number
+    showPreview?: boolean
+}
+
+export default function Result({ formData, generatedResume, currentStep, showPreview = true }: ResultProps) {
     const [isDownloading, setIsDownloading] = useState(false)
     
     // Get the template from formData, default to 'professional-blue'
     const templateId: TemplateId = formData.template || 'professional-blue'
     const displayClassName = getDisplayClassName(templateId)
+    
+    // Generate preview if no generated resume yet
+    const previewContent = generatedResume || generateSimplePreview(formData, currentStep)
+    const isPreview = !generatedResume
+    // Use template class if template is selected, even for preview
+    const shouldUseTemplateClass = !isPreview || (isPreview && formData.template)
+    const finalDisplayClassName = shouldUseTemplateClass ? displayClassName : ''
 
     const handleDownloadPDF = async () => {
         // Validate content before proceeding
@@ -64,17 +79,31 @@ export default function Result({ formData, generatedResume }: { formData: any, g
         }
     }
     
+    if (!showPreview && !generatedResume) {
+        return null
+    }
+
     return (
         <>
             <div className="bg-white rounded-xl shadow-lg p-8">
-                {/* <h2 className="text-2xl font-semibold text-gray-800 mb-6 flex items-center"> */}
-                    {/* <span className="bg-green-100 text-green-600 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">2</span> */}
-                    {/* Your Resume */}
-                {/* </h2> */}
+                {isPreview && (
+                    <div className="mb-4 flex items-center justify-between">
+                        <h2 className="text-xl font-semibold text-gray-800 flex items-center">
+                            <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                            </svg>
+                            Live Preview
+                        </h2>
+                        <span className="text-xs text-gray-500 bg-blue-50 px-3 py-1 rounded-full">
+                            {isPreview ? (formData.template ? 'Template Preview' : 'Simple Format') : 'Final Resume'}
+                        </span>
+                    </div>
+                )}
                 
                 <div className="min-h-[400px] bg-gray-50 rounded-lg p-6 border-2 border-dashed border-gray-300">
-                    {generatedResume ? (
-                        <div className={displayClassName} dangerouslySetInnerHTML={{ __html: generatedResume }} />
+                    {previewContent ? (
+                        <div className={finalDisplayClassName} dangerouslySetInnerHTML={{ __html: previewContent }} />
                     ) : (
                         <div className="flex items-center justify-center h-full">
                             <div className="text-center text-gray-500">

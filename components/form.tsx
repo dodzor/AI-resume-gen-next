@@ -11,6 +11,10 @@ interface FormProps {
   setGeneratedResume: (resume: string) => void
   isFormCompleted: boolean
   setIsFormCompleted: (completed: boolean) => void
+  currentStep?: number
+  setCurrentStep?: (step: number) => void
+  showPreview?: boolean
+  setShowPreview?: (show: boolean) => void
 }
 
 const STEPS = [
@@ -30,9 +34,20 @@ export default function Form({
   setIsGenerating, 
   setGeneratedResume,
   isFormCompleted,
-  setIsFormCompleted
+  setIsFormCompleted,
+  currentStep: externalCurrentStep,
+  setCurrentStep: setExternalCurrentStep,
+  showPreview: externalShowPreview,
+  setShowPreview: setExternalShowPreview
 }: FormProps) {
-    const [currentStep, setCurrentStep] = useState(1)
+    const [internalCurrentStep, setInternalCurrentStep] = useState(1)
+    const [internalShowPreview, setInternalShowPreview] = useState(true)
+    
+    // Use external state if provided, otherwise use internal state
+    const currentStep = externalCurrentStep ?? internalCurrentStep
+    const setCurrentStep = setExternalCurrentStep ?? setInternalCurrentStep
+    const showPreview = externalShowPreview ?? internalShowPreview
+    const setShowPreview = setExternalShowPreview ?? setInternalShowPreview
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target
@@ -330,7 +345,6 @@ export default function Form({
                                 name="portfolio"
                                 placeholder={`Mobile Banking Redesign — UI/UX, Figma, usability testing
 → Increased task success rate by 32%
-
 E-commerce Storefront — React, Tailwind, Stripe
 → 5k+ users, 99.9% uptime`}
                                 rows={7}
@@ -464,21 +478,41 @@ E-commerce Storefront — React, Tailwind, Stripe
 
                 {/* Navigation Buttons */}
                 <div className="flex justify-between items-center pt-6 border-t border-gray-200">
-                    <button
-                        type="button"
-                        onClick={prevStep}
-                        disabled={currentStep === 1}
-                        className={`px-6 py-3 rounded-lg font-medium transition duration-200 flex items-center space-x-2 ${
-                            currentStep === 1
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                        </svg>
-                        <span>Previous</span>
-                    </button>
+                    <div className="flex items-center space-x-3">
+                        <button
+                            type="button"
+                            onClick={prevStep}
+                            disabled={currentStep === 1}
+                            className={`px-6 py-3 rounded-lg font-medium transition duration-200 flex items-center space-x-2 ${
+                                currentStep === 1
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                            </svg>
+                            <span>Previous</span>
+                        </button>
+
+                        {!isFormCompleted && (
+                            <button
+                                type="button"
+                                onClick={() => setShowPreview(!showPreview)}
+                                className={`px-4 py-3 rounded-lg font-medium transition duration-200 flex items-center space-x-2 ${
+                                    showPreview
+                                        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                                <span>{showPreview ? 'Hide' : 'Show'} Preview</span>
+                            </button>
+                        )}
+                    </div>
 
                     <div className="text-sm text-gray-500">
                         Step {currentStep} of {STEPS.length}
