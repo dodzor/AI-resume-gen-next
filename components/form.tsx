@@ -42,6 +42,8 @@ export default function Form({
 }: FormProps) {
     const [internalCurrentStep, setInternalCurrentStep] = useState(1)
     const [internalShowPreview, setInternalShowPreview] = useState(true)
+
+    const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
     
     // Use external state if provided, otherwise use internal state
     const currentStep = externalCurrentStep ?? internalCurrentStep
@@ -143,6 +145,99 @@ export default function Form({
     const handleEditInfo = () => {
         setIsFormCompleted(false)
         setCurrentStep(1) // Reset to first step when editing
+    }
+
+    const handleGenerateSummary = async () => {
+        if (!formData.job?.trim()) {
+            alert('Please enter a target job description first.')
+            return
+        }
+
+        setIsGeneratingSummary(true)
+        
+        try {
+            const response = await fetch('/api/generate-summary', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: formData.name,
+                    email: formData.email,
+                    experience: formData.experience,
+                    education: formData.education,
+                    skills: formData.skills,
+                    job: formData.job,
+                }),
+            })
+    
+            const data = await response.json()
+        
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to generate summary')
+            }
+        
+            // Update formData with the generated summary
+            setFormData((prev: any) => ({
+                ...prev,
+                summary: data.summary
+            }))
+        } catch (error) {
+            console.error('Error generating summary:', error)
+            alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+        } finally {
+            setIsGeneratingSummary(false)
+        }
+    }
+
+    const handleModifySummary = async (modifyType: 'concise' | 'verbose' | 'senior') => {
+        if (!formData.summary?.trim()) {
+            alert('Please generate a summary first.')
+            return
+        }
+
+        if (!formData.job?.trim()) {
+            alert('Please enter a target job description first.')
+            return
+        }
+
+        setIsGeneratingSummary(true)
+        
+        try {
+            const response = await fetch('/api/generate-summary', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: formData.name,
+                    email: formData.email,
+                    experience: formData.experience,
+                    education: formData.education,
+                    skills: formData.skills,
+                    job: formData.job,
+                    existingSummary: formData.summary,
+                    modifyType: modifyType,
+                }),
+            })
+    
+            const data = await response.json()
+        
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to modify summary')
+            }
+        
+            // Update formData with the modified summary
+            setFormData((prev: any) => ({
+                ...prev,
+                summary: data.summary
+            }))
+        } catch (error) {
+            console.error('Error modifying summary:', error)
+            alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+        } finally {
+            setIsGeneratingSummary(false)
+        }
     }
 
     const ProgressIndicator = () => (
@@ -366,17 +461,110 @@ E-commerce Storefront — React, Tailwind, Stripe
                 )
             case 6:
                 return (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Target Job Description</label>
-                        <textarea 
-                            name="job" 
-                            placeholder="Senior Full Stack Developer position requiring expertise in modern web technologies, database design, and team collaboration. Looking for someone with 3+ years experience in React, Node.js, and cloud platforms."
-                            required
-                            rows={7}
-                            value={formData.job || ''}
-                            onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
-                        />
+                    // <div>
+                    //     <label className="block text-sm font-medium text-gray-700 mb-2">Target Job Description</label>
+                    //     <textarea 
+                    //         name="job" 
+                    //         placeholder="Senior Full Stack Developer position requiring expertise in modern web technologies, database design, and team collaboration. Looking for someone with 3+ years experience in React, Node.js, and cloud platforms."
+                    //         required
+                    //         rows={7}
+                    //         value={formData.job || ''}
+                    //         onChange={handleInputChange}
+                    //         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
+                    //     />
+                    // </div>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Target Job Description</label>
+                            <textarea 
+                                name="job" 
+                                placeholder="Senior Full Stack Developer position requiring expertise in modern web technologies, database design, and team collaboration. Looking for someone with 3+ years experience in React, Node.js, and cloud platforms."
+                                required
+                                rows={7}
+                                value={formData.job || ''}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
+                            />
+                        </div>
+                        <div className="space-y-3">
+                            <button
+                                type="button"
+                                onClick={handleGenerateSummary}
+                                disabled={isGeneratingSummary || !formData.job?.trim()}
+                                className={`w-full px-4 py-3 rounded-lg font-medium transition duration-200 flex items-center justify-center space-x-2 ${
+                                    isGeneratingSummary || !formData.job?.trim()
+                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                            >
+                                {isGeneratingSummary ? (
+                                    <>
+                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Generating Summary...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                        </svg>
+                                        <span>Generate Section</span>
+                                    </>
+                                )}
+                            </button>
+                            
+                            {formData.summary && (
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleModifySummary('concise')}
+                                        disabled={isGeneratingSummary}
+                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center space-x-1 ${
+                                            isGeneratingSummary
+                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        }`}
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                        <span>More Concise</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleModifySummary('verbose')}
+                                        disabled={isGeneratingSummary}
+                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center space-x-1 ${
+                                            isGeneratingSummary
+                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        }`}
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                                        </svg>
+                                        <span>More Verbose</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleModifySummary('senior')}
+                                        disabled={isGeneratingSummary}
+                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center space-x-1 ${
+                                            isGeneratingSummary
+                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        }`}
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                                        </svg>
+                                        <span>More Senior</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )
             case 7:
