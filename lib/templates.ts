@@ -287,6 +287,19 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         content: "";
       }
       
+      // /* Simple list styles (for formatted text content) */
+      // .simple-list {
+      //   list-style-type: disc;
+      //   margin-left: 20px;
+      //   margin-bottom: 10px;
+      // }
+      
+      // .simple-list li {
+      //   margin-bottom: 5px;
+      //   font-size: 13px;
+      //   color: #333333;
+      // }
+      
       /* Education styles */
       .education-entry {
         margin-bottom: 10px;
@@ -452,6 +465,19 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         color: #4a5568;
       }
       
+      /* Simple list styles (for formatted text content) */
+      // .simple-list {
+      //   list-style-type: disc;
+      //   margin-left: 20px;
+      //   margin-bottom: 10px;
+      // }
+      
+      // .simple-list li {
+      //   margin-bottom: 5px;
+      //   font-size: 14px;
+      //   color: #4a5568;
+      // }
+      
       /* Education styles */
       .education-entry {
         margin-bottom: 14px;
@@ -614,6 +640,19 @@ export function createPDFStylesheet(templateId: TemplateId = 'professional-blue'
         border-radius: 20px;
         letter-spacing: 0.3px;
       }
+      
+      /* Simple list styles (for formatted text content) */
+      // .simple-list {
+      //   list-style-type: disc;
+      //   margin-left: 20px;
+      //   margin-bottom: 10px;
+      // }
+      
+      // .simple-list li {
+      //   margin-bottom: 5px;
+      //   font-size: 13px;
+      //   color: #3d3d4e;
+      // }
       
       /* Education styles */
       .education-entry {

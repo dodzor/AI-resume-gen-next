@@ -103,7 +103,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                 
                 <div className="min-h-[400px] bg-gray-50 rounded-lg p-6 border-2 border-dashed border-gray-300">
                     {previewContent ? (
-                        <div className={finalDisplayClassName} dangerouslySetInnerHTML={{ __html: previewContent }} />
+                        <div id="resume-preview" className={finalDisplayClassName} dangerouslySetInnerHTML={{ __html: previewContent }} />
                     ) : (
                         <div className="flex items-center justify-center h-full">
                             <div className="text-center text-gray-500">

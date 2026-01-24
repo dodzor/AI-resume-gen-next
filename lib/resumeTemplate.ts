@@ -12,6 +12,7 @@ export function createResumePrompt(formData: {
   portfolio?: string;
   portfolioLink?: string;
   job: string;
+  summary?: string;
 }) {
   // Build contact info items
   const contactItems = [formData.email];
@@ -116,10 +117,13 @@ Generate a resume for:
 - Name: ${formData.name}
 ${contactData}
 - Target Job: ${formData.job}
+${formData.summary ? `- Summary (use this exact text): ${formData.summary}` : ''}
 - Experience: ${formData.experience}
 ${portfolioInstructions}
 - Education: ${formData.education}
 - Skills: ${formData.skills}
+
+${formData.summary ? 'IMPORTANT: Use the provided Summary text exactly as given. Do not modify or regenerate it.' : ''}
 
 Return ONLY the HTML structure above, filled with the appropriate content. Do not include any explanations, notes, or markdown formatting.`;
 }

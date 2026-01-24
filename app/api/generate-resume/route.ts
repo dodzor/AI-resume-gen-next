@@ -21,9 +21,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, phone, location, experience, education, skills, portfolio, portfolioLink, job } = body;
+    const { name, email, phone, location, experience, education, skills, portfolio, portfolioLink, job, summary } = body;
 
-    // Validate required fields (phone, location, portfolio, portfolioLink are optional)
+    // Validate required fields (phone, location, portfolio, portfolioLink, summary are optional)
     if (!name || !email || !experience || !education || !skills || !job) {
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -41,7 +41,8 @@ export async function POST(request: NextRequest) {
       skills,
       portfolio,
       portfolioLink,
-      job
+      job,
+      summary
     });
 
     console.log('Sending to OpenAI API:', { name, email, job: job.substring(0, 100) + '...' });

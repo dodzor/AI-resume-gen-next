@@ -55,12 +55,17 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
     html += `</header>`;
   }
 
-  // Summary (if we have enough data)
-  if (formData.job && (currentStep ? currentStep >= 6 : true)) {
+  // Summary (show if we have a generated summary OR if we're on step 6 or later)
+  const shouldShowSummary = formData.summary || (currentStep ? currentStep >= 6 : true);
+  if (formData.job && shouldShowSummary) {
     html += `<section class="resume-section ${sectionClass}">`;
     html += `<h2 class="section-title ${titleClass}">Summary</h2>`;
     html += `<div class="section-content ${contentClass}">`;
-    html += `<p>Professional summary will be generated based on your experience and target job.</p>`;
+    if (formData.summary) {
+      html += `<p>${escapeHtml(formData.summary)}</p>`;
+    } else {
+      html += `<p>Professional summary will be generated based on your experience and target job.</p>`;
+    }
     html += `</div></section>`;
   }
 
@@ -88,10 +93,10 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
     html += `<h2 class="section-title ${titleClass}">Skills</h2>`;
     html += `<div class="section-content ${contentClass}">`;
     // Format skills as a list
-    const skillsList = formData.skills.split(',').map(s => s.trim()).filter(Boolean);
+    const skillsList = formData.skills.split(',').map((s: string) => s.trim()).filter(Boolean);
     if (skillsList.length > 0) {
       html += `<ul class="skills-list">`;
-      skillsList.forEach(skill => {
+      skillsList.forEach((skill: string) => {
         html += `<li>${escapeHtml(skill)}</li>`;
       });
       html += `</ul>`;
