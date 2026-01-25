@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { TEMPLATES, TemplateId } from '../lib/templates'
+import { generateFileName } from '../lib/pdfUtils'
 
 interface FormProps {
   formData: any
@@ -111,6 +112,7 @@ export default function Form({
         setIsGenerating(true)
         
         try {
+            // First, generate the resume HTML
             const response = await fetch('/api/generate-resume', {
                 method: 'POST',
                 headers: {
@@ -125,11 +127,43 @@ export default function Form({
                 throw new Error(data.message || 'Failed to generate resume')
             }
         
-            // console.log('Generated resume:', data.resume)
+            // Set the generated resume
             setGeneratedResume(data.resume)
             setIsFormCompleted(true) // Mark form as completed
+
+            // Immediately download as PDF
+            const templateId: TemplateId = formData.template || 'professional-blue'
+            const fileName = generateFileName(formData)
+            
+            const pdfResponse = await fetch('/api/generate-pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: data.resume,
+                    templateId,
+                    fileName,
+                }),
+            })
+
+            if (!pdfResponse.ok) {
+                const errorData = await pdfResponse.json()
+                throw new Error(errorData.message || 'Failed to generate PDF')
+            }
+
+            // Get the PDF blob and trigger download
+            const blob = await pdfResponse.blob()
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = fileName
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
         } catch (error) {
-            console.error('Error generating resume:', error)
+            console.error('Error generating resume or PDF:', error)
             setGeneratedResume(`
                 <div class="text-red-600 p-4 border border-red-300 rounded-lg bg-red-50">
                 <h3 class="font-semibold mb-2">Error Generating Resume</h3>
@@ -727,22 +761,21 @@ E-commerce Storefront — React, Tailwind, Stripe
                             type="submit" 
                             onClick={handleSubmit}
                             disabled={isGenerating || !validateStep(currentStep)}
-                            className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3 px-8 rounded-lg hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition duration-200 shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                        >
+                            className="bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold py-3 px-8 rounded-lg hover:from-green-700 hover:to-emerald-700 transform hover:scale-105 transition duration-200 shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"                        >
                             {isGenerating ? (
                                 <>
                                     <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
-                                    <span>Generating...</span>
+                                    <span>Generating PDF...</span>
                                 </>
                             ) : (
                                 <>
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                     </svg>
-                                    <span>Generate Resume</span>
+                                    <span>Download to PDF</span>
                                 </>
                             )}
                         </button>
