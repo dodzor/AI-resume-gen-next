@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import { TEMPLATES, TemplateId } from '../lib/templates'
+
 import { generateFileName } from '../lib/pdfUtils'
+import { validatePDFContent } from '../lib/pdfErrorHandler'
+import { generateSimplePreview } from '../lib/utils'
 
 interface FormProps {
   formData: any
@@ -44,8 +47,9 @@ export default function Form({
     const [internalCurrentStep, setInternalCurrentStep] = useState(1)
     const [internalShowPreview, setInternalShowPreview] = useState(true)
 
-    const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
-    
+    const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)   
+    const [isDownloading, setIsDownloading] = useState(false)    
+
     // Use external state if provided, otherwise use internal state
     const currentStep = externalCurrentStep ?? internalCurrentStep
     const setCurrentStep = setExternalCurrentStep ?? setInternalCurrentStep
@@ -60,12 +64,85 @@ export default function Form({
         }))
     }
 
+    // Initialize experiences array if it doesn't exist
+    const getExperiences = () => {
+        if (formData.experiences && formData.experiences.length > 0) {
+            return formData.experiences
+        }
+        // Always return at least one empty experience entry
+        return [{ role: '', company: '', dates: '', description: '' }]
+    }
+    const experiences = getExperiences()
+
+    const handleExperienceChange = (index: number, field: string, value: string) => {
+        setFormData((prev: any) => {
+            const experiences = prev.experiences || []
+            const updatedExperiences = [...experiences]
+            if (!updatedExperiences[index]) {
+                updatedExperiences[index] = { role: '', company: '', dates: '', description: '' }
+            }
+            updatedExperiences[index] = {
+                ...updatedExperiences[index],
+                [field]: value
+            }
+            return {
+                ...prev,
+                experiences: updatedExperiences
+            }
+        })
+    }
+
+    const addExperience = () => {
+        setFormData((prev: any) => ({
+            ...prev,
+            experiences: [...(prev.experiences || []), { role: '', company: '', dates: '', description: '' }]
+        }))
+    }
+
+    const removeExperience = (index: number) => {
+        setFormData((prev: any) => {
+            const experiences = prev.experiences || []
+            const updatedExperiences = experiences.filter((_: any, i: number) => i !== index)
+            return {
+                ...prev,
+                experiences: updatedExperiences
+            }
+        })
+    }
+
+    // Convert experiences array to formatted string for API compatibility
+    const formatExperiencesForAPI = (experiences: any[]): string => {
+        if (!experiences || experiences.length === 0) return ''
+        return experiences
+            .filter(exp => exp.role?.trim() || exp.company?.trim() || exp.description?.trim())
+            .map(exp => {
+                const parts = []
+                if (exp.role && exp.company) {
+                    parts.push(`${exp.role} at ${exp.company}`)
+                } else if (exp.role) {
+                    parts.push(exp.role)
+                } else if (exp.company) {
+                    parts.push(exp.company)
+                }
+                if (exp.dates) {
+                    parts.push(`(${exp.dates})`)
+                }
+                const header = parts.length > 0 ? `• ${parts.join(' ')}` : '• Experience'
+                const description = exp.description ? exp.description.split('\n').map((line: string) => `  ${line}`).join('\n') : ''
+                return `${header}\n${description}`
+            })
+            .join('\n\n')
+    }
+
     const validateStep = (step: number): boolean => {
         switch (step) {
             case 1:
                 return formData.name?.trim() && formData.email?.trim()
             case 2:
-                return formData.experience?.trim()
+                const experiences = formData.experiences || []
+                return experiences.length > 0 && experiences.some((exp: any) => 
+                    (exp.role?.trim() || exp.company?.trim()) && exp.description?.trim()
+                )
             case 3:
                 return formData.education?.trim()
             case 4:
@@ -112,13 +189,19 @@ export default function Form({
         setIsGenerating(true)
         
         try {
+            // Convert experiences array to formatted string for API compatibility
+            const submitData = {
+                ...formData,
+                experience: formatExperiencesForAPI(formData.experiences || [])
+            }
+            
             // First, generate the resume HTML
             const response = await fetch('/api/generate-resume', {
                 method: 'POST',
                 headers: {
                 'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(formData),
+                body: JSON.stringify(submitData),
             })
     
             const data = await response.json()
@@ -176,9 +259,65 @@ export default function Form({
         }
     }
 
+    const handleDownloadPDF = async () => {
+        const previewContent = generateSimplePreview(formData, currentStep)
+        
+        // Validate content before proceeding
+        const validation = validatePDFContent(previewContent)
+        if (!validation.isValid) {
+            alert(validation.error)
+            return
+        }
+
+        setIsDownloading(true)
+
+        try {
+            // Generate filename from form data
+            const fileName = generateFileName(formData)
+            
+            // Get template ID
+            const templateId: TemplateId = formData.template || 'professional-blue'
+            
+            // Call the server-side PDF generation API
+            const response = await fetch('/api/generate-pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: previewContent,
+                    templateId,
+                    fileName,
+                }),
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.message || 'Failed to generate PDF')
+            }
+
+            // Get the PDF blob and trigger download
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = fileName
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+            
+        } catch (error: any) {
+            console.error('PDF generation error:', error)
+            alert(error.message || 'An error occurred while generating the PDF. Please try again.')
+        } finally {
+            setIsDownloading(false)
+        }
+    }
+
     const handleEditInfo = () => {
         setIsFormCompleted(false)
-        setCurrentStep(1) // Reset to first step when editing
+        setCurrentStep(7) // Reset to first step when editing
     }
 
     const handleGenerateSummary = async () => {
@@ -198,7 +337,7 @@ export default function Form({
                 body: JSON.stringify({
                     name: formData.name,
                     email: formData.email,
-                    experience: formData.experience,
+                    experience: formatExperiencesForAPI(formData.experiences || []),
                     education: formData.education,
                     skills: formData.skills,
                     job: formData.job,
@@ -246,7 +385,7 @@ export default function Form({
                 body: JSON.stringify({
                     name: formData.name,
                     email: formData.email,
-                    experience: formData.experience,
+                    experience: formatExperiencesForAPI(formData.experiences || []),
                     education: formData.education,
                     skills: formData.skills,
                     job: formData.job,
@@ -282,6 +421,7 @@ export default function Form({
                         <button
                             type="button"
                             onClick={() => goToStep(step.id)}
+                            title={step.title}
                             className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 ${
                                 step.id === currentStep
                                     ? 'bg-blue-600 text-white shadow-lg'
@@ -386,17 +526,94 @@ export default function Form({
                 )
             case 2:
                 return (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Work Experience</label>
-                        <textarea 
-                            name="experience" 
-                            placeholder="• Software Developer at Tech Corp (2020-2023)&#10;  - Built web applications using React and Node.js&#10;  - Improved system performance by 40%&#10;&#10;• Junior Developer at StartupXYZ (2019-2020)&#10;  - Developed mobile apps using React Native"
-                            required
-                            rows={8}
-                            value={formData.experience || ''}
-                            onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
-                        />
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <label className="block text-sm font-medium text-gray-700">Work Experience</label>
+                            <button
+                                type="button"
+                                onClick={addExperience}
+                                className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition duration-200 flex items-center space-x-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span>Add Experience</span>
+                            </button>
+                        </div>
+                        
+                        {experiences.map((exp: any, index: number) => (
+                            <div key={index} className="border border-gray-200 rounded-lg p-5 bg-gray-50">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-sm font-semibold text-gray-700">Experience #{index + 1}</h3>
+                                    {experiences.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => removeExperience(index)}
+                                            className="text-red-600 hover:text-red-700 transition duration-200"
+                                            title="Remove this experience"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    )}
+                                </div>
+                                
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Role / Job Title</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Software Developer"
+                                                value={exp.role || ''}
+                                                onChange={(e) => handleExperienceChange(index, 'role', e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Company</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Tech Corp"
+                                                value={exp.company || ''}
+                                                onChange={(e) => handleExperienceChange(index, 'company', e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Dates</label>
+                                        <input
+                                            type="text"
+                                            placeholder="2020-2023 or Jan 2020 - Present"
+                                            value={exp.dates || ''}
+                                            onChange={(e) => handleExperienceChange(index, 'dates', e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                                        <textarea
+                                            placeholder="Built web applications using React and Node.js&#10;Improved system performance by 40%&#10;Led a team of 3 developers"
+                                            rows={5}
+                                            value={exp.description || ''}
+                                            onChange={(e) => handleExperienceChange(index, 'description', e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
+                                        />
+                                        {/* <p className="mt-1 text-xs text-gray-500">Use bullet points to describe your responsibilities and achievements</p> */}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        
+                        {experiences.length === 0 && (
+                            <div className="text-center py-8 text-gray-500">
+                                <p>No work experience added yet. Click "Add Experience" to get started.</p>
+                            </div>
+                        )}
                     </div>
                 )
             case 3:
@@ -759,7 +976,8 @@ E-commerce Storefront — React, Tailwind, Stripe
                     ) : (
                         <button 
                             type="submit" 
-                            onClick={handleSubmit}
+                            // onClick={handleSubmit}
+                            onClick={handleDownloadPDF}
                             disabled={isGenerating || !validateStep(currentStep)}
                             className="bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold py-3 px-8 rounded-lg hover:from-green-700 hover:to-emerald-700 transform hover:scale-105 transition duration-200 shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"                        >
                             {isGenerating ? (

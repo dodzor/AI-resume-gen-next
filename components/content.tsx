@@ -12,7 +12,20 @@ export default function Content() {
       email: 'john.doe@example.com',
       phone: '',
       location: '',
-      experience: '• Software Developer at Tech Corp (2020-2023)\n  - Built web applications using React and Node.js\n  - Improved system performance by 40%\n\n• Junior Developer at StartupXYZ (2019-2020)\n  - Developed mobile apps using React Native',
+      experiences: [
+        {
+          role: 'Software Developer',
+          company: 'Tech Corp',
+          dates: '2020-2023',
+          description: 'Built web applications using React and Node.js.\nImproved system performance by 40%.\nLed a team of 3 developers.'
+        },
+        {
+          role: 'Junior Developer',
+          company: 'StartupXYZ',
+          dates: '2019-2020',
+          description: 'Developed mobile apps using React Native.\nCollaborated with cross-functional teams.'
+        }
+      ],
       education: '• Bachelor of Science in Computer Science\n  University of Technology (2015-2019)\n  - GPA: 3.8/4.0\n  - Relevant Coursework: Data Structures, Algorithms, Software Engineering\n\n• Certifications:\n  - AWS Certified Developer Associate (2022)\n  - Google Cloud Professional Developer (2021)',
       skills: 'JavaScript, React, Node.js, Python, SQL, Git, AWS, Docker, Agile, Problem Solving, Team Leadership',
       portfolio: '',

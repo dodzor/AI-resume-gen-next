@@ -74,7 +74,11 @@ REQUIRED STRUCTURE:
     <div class="section-content">
       <div class="job-entry">
         <h3 class="job-title">[Job Title], [Company] ([Years])</h3>
-        <p>[Job description and achievements]</p>
+        <ul class="simple-list">
+          <li>[Achievement or responsibility 1]</li>
+          <li>[Achievement or responsibility 2]</li>
+          <li>[Achievement or responsibility 3]</li>
+        </ul>
       </div>
       <!-- Repeat for each job -->
     </div>
@@ -104,13 +108,14 @@ ${portfolioSection}
 </div>
 
 IMPORTANT RULES:
-1. Use ONLY the classes specified above (resume-container, resume-header, name, contact-info, resume-section, section-title, section-content, job-entry, job-title, skills-list, education-entry, degree-title, school-info${portfolioClasses})
+1. Use ONLY the classes specified above (resume-container, resume-header, name, contact-info, resume-section, section-title, section-content, job-entry, job-title, simple-list, skills-list, education-entry, degree-title, school-info${portfolioClasses})
 2. Do NOT add any inline styles or additional CSS classes
 3. Do NOT use complex HTML elements (tables, divs with complex nesting, etc.)
 4. Keep the structure simple and flat
 5. Use semantic HTML tags (h1, h2, h3, p, ul, li, strong, a)
 6. In contact-info: separate items with " | " (pipe with spaces). IMPORTANT: Wrap email in <a href="mailto:email"> and wrap portfolio link in <a href="url">. Only include items that are provided.
-${formData.portfolio?.trim() ? '7. Include the Portfolio/Projects section between Work Experience and Skills' : '7. Do NOT include a Portfolio section if no portfolio data is provided'}
+7. For Work Experience: ALWAYS format job descriptions as bullet points using <ul class="simple-list"> with <li> items. Each bullet point should be a separate achievement or responsibility. Do NOT use <p> tags for job descriptions.
+${formData.portfolio?.trim() ? '8. Include the Portfolio/Projects section between Work Experience and Skills' : '8. Do NOT include a Portfolio section if no portfolio data is provided'}
 
 Generate a resume for:
 - Name: ${formData.name}

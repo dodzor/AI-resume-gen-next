@@ -70,7 +70,38 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
   }
 
   // Experience
-  if (formData.experience) {
+  if (formData.experiences && formData.experiences.length > 0) {
+    const validExperiences = formData.experiences.filter((exp: any) => exp.role?.trim() || exp.company?.trim() || exp.description?.trim())
+    
+    if (validExperiences.length > 0) {
+      html += `<section class="resume-section ${sectionClass}">`;
+      html += `<h2 class="section-title ${titleClass}">Work Experience</h2>`;
+      html += `<div class="section-content ${contentClass}">`;
+      
+      validExperiences.forEach((exp: any) => {
+        const parts = []
+        if (exp.role && exp.company) {
+          parts.push(`${escapeHtml(exp.role)} at ${escapeHtml(exp.company)}`)
+        } else if (exp.role) {
+          parts.push(escapeHtml(exp.role))
+        } else if (exp.company) {
+          parts.push(escapeHtml(exp.company))
+        }
+        if (exp.dates) {
+          parts.push(`(${escapeHtml(exp.dates)})`)
+        }
+        const header = parts.length > 0 ? parts.join(' ') : 'Experience'
+        html += `<div class="job-entry">`;
+        html += `<h3 class="job-title">${header}</h3>`;
+        if (exp.description) {
+          html += formatTextContent(exp.description);
+        }
+        html += `</div>`;
+      });
+      
+      html += `</div></section>`;
+    }
+  } else if (formData.experience) {
     html += `<section class="resume-section ${sectionClass}">`;
     html += `<h2 class="section-title ${titleClass}">Work Experience</h2>`;
     html += `<div class="section-content ${contentClass}">`;
@@ -111,7 +142,12 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
     html += `<section class="resume-section ${sectionClass}">`;
     html += `<h2 class="section-title ${titleClass}">Education</h2>`;
     html += `<div class="section-content ${contentClass}">`;
-    html += formatTextContent(formData.education);
+    // html += formatTextContent(formData.education);
+    html += `<div class="education-entry">
+        <h3 class="degree-title">${escapeHtml(formData.education.degree)}</h3>
+        <p class="school-info">${escapeHtml(formData.education.school)} (${escapeHtml(formData.education.years)})</p>
+        <p>${escapeHtml(formData.education.additionalDetails)}</p>
+      </div>`;
     html += `</div></section>`;
   }
 
@@ -163,7 +199,7 @@ function formatTextContent(text: string): string {
         inList = false;
       }
       if (trimmed) {
-        result += `<p>${line}</p>`;
+        result += `<p>• ${line}</p>`;
       } else if (index < lines.length - 1) {
         result += '<br>';
       }

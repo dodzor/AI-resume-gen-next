@@ -22,8 +22,10 @@ export default function Result({ formData, generatedResume, currentStep, showPre
     const displayClassName = getDisplayClassName(templateId)
     
     // Generate preview if no generated resume yet
-    const previewContent = generatedResume || generateSimplePreview(formData, currentStep)
-    const isPreview = !generatedResume
+    // const previewContent = generatedResume || generateSimplePreview(formData, currentStep)
+    const previewContent = generateSimplePreview(formData, currentStep)
+    // const isPreview = !generatedResume
+    const isPreview = true
     // Use template class if template is selected, even for preview
     const shouldUseTemplateClass = !isPreview || (isPreview && formData.template)
     const finalDisplayClassName = shouldUseTemplateClass ? displayClassName : ''
@@ -86,7 +88,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
     return (
         <>
             <div className="bg-white rounded-xl shadow-lg p-8">
-                {isPreview && (
+                {/* {isPreview && ( */}
                     <div className="mb-4 flex items-center justify-between">
                         <h2 className="text-xl font-semibold text-gray-800 flex items-center">
                             <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,11 +97,11 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                             </svg>
                             Live Preview
                         </h2>
-                        <span className="text-xs text-gray-500 bg-blue-50 px-3 py-1 rounded-full">
+                        {/* <span className="text-xs text-gray-500 bg-blue-50 px-3 py-1 rounded-full">
                             {isPreview ? (formData.template ? 'Template Preview' : 'Simple Format') : 'Final Resume'}
-                        </span>
+                        </span> */}
                     </div>
-                )}
+                {/* )} */}
                 
                 <div className="min-h-[400px] bg-gray-50 rounded-lg p-6 border-2 border-dashed border-gray-300">
                     {previewContent ? (
@@ -118,7 +120,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                 </div>
                 
                 {/* Download Button */}
-                {generatedResume && (
+                {/* {generatedResume && (
                     <div className="mt-6 text-center">
                         <button 
                             onClick={handleDownloadPDF}
@@ -143,7 +145,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                             )}
                         </button>
                     </div>
-                )}
+                )} */}
             </div>
         </>
     )
