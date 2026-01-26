@@ -46,6 +46,7 @@ export default function Form({
 }: FormProps) {
     const [internalCurrentStep, setInternalCurrentStep] = useState(1)
     const [internalShowPreview, setInternalShowPreview] = useState(true)
+    const [maxStepReached, setMaxStepReached] = useState(1)
 
     const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)   
     const [isDownloading, setIsDownloading] = useState(false)    
@@ -374,7 +375,9 @@ export default function Form({
 
     const nextStep = () => {
         if (validateStep(currentStep) && currentStep < STEPS.length) {
-            setCurrentStep(currentStep + 1)
+            const nextStepNum = currentStep + 1
+            setCurrentStep(nextStepNum)
+            setMaxStepReached(prev => Math.max(prev, nextStepNum))
         }
     }
 
@@ -385,9 +388,11 @@ export default function Form({
     }
 
     const goToStep = (step: number) => {
-        // Allow going to previous steps or next step if current is valid
-        if (step < currentStep || (step === currentStep + 1 && validateStep(currentStep))) {
+        // Allow going to any step that has been completed (step <= maxStepReached)
+        // Or allow going to the next step if current step is valid
+        if (step <= maxStepReached || (step === currentStep + 1 && validateStep(currentStep))) {
             setCurrentStep(step)
+            setMaxStepReached(prev => Math.max(prev, step))
         }
     }
 
@@ -634,13 +639,13 @@ export default function Form({
                             className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 ${
                                 step.id === currentStep
                                     ? 'bg-blue-600 text-white shadow-lg'
-                                    : step.id < currentStep
+                                    : step.id <= maxStepReached
                                     ? 'bg-green-500 text-white cursor-pointer hover:bg-green-600'
                                     : validateStep(currentStep) && step.id === currentStep + 1
                                     ? 'bg-gray-200 text-gray-600 cursor-pointer hover:bg-gray-300'
                                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                             }`}
-                            disabled={step.id > currentStep + 1 || (step.id === currentStep + 1 && !validateStep(currentStep))}
+                            disabled={step.id > maxStepReached + 1 || (step.id === currentStep + 1 && !validateStep(currentStep))}
                         >
                             {step.id < currentStep ? (
                                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -652,7 +657,7 @@ export default function Form({
                         </button>
                         {index < STEPS.length - 1 && (
                             <div className={`w-16 h-1 mx-1 rounded-full transition-all duration-200 ${
-                                step.id < currentStep ? 'bg-green-500' : 'bg-gray-200'
+                                step.id <= maxStepReached ? 'bg-green-500' : 'bg-gray-200'
                             }`} />
                         )}
                     </div>
