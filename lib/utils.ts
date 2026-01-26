@@ -138,17 +138,63 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
   }
 
   // Education
-  if (formData.education) {
+  if (formData.educationEntries && formData.educationEntries.length > 0) {
+    const validEntries = formData.educationEntries.filter((entry: any) => entry.degree?.trim() || entry.school?.trim())
+    
+    if (validEntries.length > 0) {
+      html += `<section class="resume-section ${sectionClass}">`;
+      html += `<h2 class="section-title ${titleClass}">Education</h2>`;
+      html += `<div class="section-content ${contentClass}">`;
+      
+      validEntries.forEach((entry: any) => {
+        html += `<div class="education-entry">`;
+        if (entry.degree) {
+          html += `<h3 class="degree-title">${escapeHtml(entry.degree)}</h3>`;
+        }
+        if (entry.school || entry.dates) {
+          const schoolParts = []
+          if (entry.school) schoolParts.push(escapeHtml(entry.school))
+          if (entry.dates) schoolParts.push(escapeHtml(entry.dates))
+          html += `<p class="school-info">${schoolParts.join(' — ')}</p>`;
+        }
+        if (entry.gpa) {
+          html += `<p>GPA: ${escapeHtml(entry.gpa)}</p>`;
+        }
+        if (entry.coursework) {
+          html += `<p>Relevant Coursework: ${escapeHtml(entry.coursework)}</p>`;
+        }
+        html += `</div>`;
+      });
+      
+      html += `</div></section>`;
+    }
+  } else if (formData.education) {
     html += `<section class="resume-section ${sectionClass}">`;
     html += `<h2 class="section-title ${titleClass}">Education</h2>`;
     html += `<div class="section-content ${contentClass}">`;
-    // html += formatTextContent(formData.education);
-    html += `<div class="education-entry">
-        <h3 class="degree-title">${escapeHtml(formData.education.degree)}</h3>
-        <p class="school-info">${escapeHtml(formData.education.school)} (${escapeHtml(formData.education.years)})</p>
-        <p>${escapeHtml(formData.education.additionalDetails)}</p>
-      </div>`;
+    html += formatTextContent(formData.education);
     html += `</div></section>`;
+  }
+
+  // Certifications (separate section)
+  if (formData.certifications && formData.certifications.length > 0) {
+    const validCerts = formData.certifications.filter((cert: any) => cert.name?.trim())
+    
+    if (validCerts.length > 0) {
+      html += `<section class="resume-section ${sectionClass}">`;
+      html += `<h2 class="section-title ${titleClass}">Certifications</h2>`;
+      html += `<div class="section-content ${contentClass}">`;
+      
+      validCerts.forEach((cert: any) => {
+        if (cert.name && cert.dates) {
+          html += `<p>${escapeHtml(cert.name)} (${escapeHtml(cert.dates)})</p>`;
+        } else if (cert.name) {
+          html += `<p>${escapeHtml(cert.name)}</p>`;
+        }
+      });
+      
+      html += `</div></section>`;
+    }
   }
 
   html += `</div>`;

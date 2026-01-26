@@ -26,7 +26,25 @@ export default function Content() {
           description: 'Developed mobile apps using React Native.\nCollaborated with cross-functional teams.'
         }
       ],
-      education: '• Bachelor of Science in Computer Science\n  University of Technology (2015-2019)\n  - GPA: 3.8/4.0\n  - Relevant Coursework: Data Structures, Algorithms, Software Engineering\n\n• Certifications:\n  - AWS Certified Developer Associate (2022)\n  - Google Cloud Professional Developer (2021)',
+      educationEntries: [
+        {
+          degree: 'Bachelor of Science in Computer Science',
+          school: 'University of Technology',
+          dates: '2015–2019',
+          gpa: '3.8 / 4.0',
+          coursework: 'Data Structures, Algorithms, Software Engineering'
+        }
+      ],
+      certifications: [
+        {
+          name: 'AWS Certified Developer – Associate',
+          dates: '2022'
+        },
+        {
+          name: 'Google Cloud Professional Developer',
+          dates: '2021'
+        }
+      ],
       skills: 'JavaScript, React, Node.js, Python, SQL, Git, AWS, Docker, Agile, Problem Solving, Team Leadership',
       portfolio: '',
       portfolioLink: '',

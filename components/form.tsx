@@ -110,6 +110,97 @@ export default function Form({
         })
     }
 
+    // Initialize education array if it doesn't exist
+    const getEducationEntries = () => {
+        if (formData.educationEntries && formData.educationEntries.length > 0) {
+            return formData.educationEntries
+        }
+        // Always return at least one empty education entry
+        return [{ degree: '', school: '', dates: '', gpa: '', coursework: '' }]
+    }
+    const educationEntries = getEducationEntries()
+
+    const handleEducationChange = (index: number, field: string, value: string) => {
+        setFormData((prev: any) => {
+            const educationEntries = prev.educationEntries || []
+            const updatedEntries = [...educationEntries]
+            if (!updatedEntries[index]) {
+                updatedEntries[index] = { degree: '', school: '', dates: '', gpa: '', coursework: '' }
+            }
+            updatedEntries[index] = {
+                ...updatedEntries[index],
+                [field]: value
+            }
+            return {
+                ...prev,
+                educationEntries: updatedEntries
+            }
+        })
+    }
+
+    const addEducation = () => {
+        setFormData((prev: any) => ({
+            ...prev,
+            educationEntries: [...(prev.educationEntries || []), { degree: '', school: '', dates: '', gpa: '', coursework: '' }]
+        }))
+    }
+
+    const removeEducation = (index: number) => {
+        setFormData((prev: any) => {
+            const educationEntries = prev.educationEntries || []
+            const updatedEntries = educationEntries.filter((_: any, i: number) => i !== index)
+            return {
+                ...prev,
+                educationEntries: updatedEntries
+            }
+        })
+    }
+
+    // Initialize certifications array if it doesn't exist
+    const getCertifications = () => {
+        if (formData.certifications && formData.certifications.length > 0) {
+            return formData.certifications
+        }
+        return []
+    }
+    const certifications = getCertifications()
+
+    const handleCertificationChange = (index: number, field: string, value: string) => {
+        setFormData((prev: any) => {
+            const certifications = prev.certifications || []
+            const updatedCertifications = [...certifications]
+            if (!updatedCertifications[index]) {
+                updatedCertifications[index] = { name: '', dates: '' }
+            }
+            updatedCertifications[index] = {
+                ...updatedCertifications[index],
+                [field]: value
+            }
+            return {
+                ...prev,
+                certifications: updatedCertifications
+            }
+        })
+    }
+
+    const addCertification = () => {
+        setFormData((prev: any) => ({
+            ...prev,
+            certifications: [...(prev.certifications || []), { name: '', dates: '' }]
+        }))
+    }
+
+    const removeCertification = (index: number) => {
+        setFormData((prev: any) => {
+            const certifications = prev.certifications || []
+            const updatedCertifications = certifications.filter((_: any, i: number) => i !== index)
+            return {
+                ...prev,
+                certifications: updatedCertifications
+            }
+        })
+    }
+
     // Convert experiences array to formatted string for API compatibility
     const formatExperiencesForAPI = (experiences: any[]): string => {
         if (!experiences || experiences.length === 0) return ''
@@ -134,6 +225,52 @@ export default function Form({
             .join('\n\n')
     }
 
+    // Convert education entries and certifications to formatted string for API compatibility
+    const formatEducationForAPI = (educationEntries: any[], certifications: any[]): string => {
+        const parts: string[] = []
+        
+        // Format education entries
+        const validEntries = educationEntries?.filter((entry: any) => entry.degree?.trim() || entry.school?.trim()) || []
+        if (validEntries.length > 0) {
+            validEntries.forEach((entry: any) => {
+                const entryParts: string[] = []
+                if (entry.degree) {
+                    entryParts.push(entry.degree)
+                }
+                if (entry.school || entry.dates) {
+                    const schoolParts = []
+                    if (entry.school) schoolParts.push(entry.school)
+                    if (entry.dates) schoolParts.push(entry.dates)
+                    entryParts.push(schoolParts.join(' — '))
+                }
+                if (entry.gpa) {
+                    entryParts.push(`GPA: ${entry.gpa}`)
+                }
+                if (entry.coursework) {
+                    entryParts.push(`Relevant Coursework: ${entry.coursework}`)
+                }
+                if (entryParts.length > 0) {
+                    parts.push(entryParts.join('\n'))
+                }
+            })
+        }
+        
+        // Format certifications as separate section
+        const validCerts = certifications?.filter((cert: any) => cert.name?.trim()) || []
+        if (validCerts.length > 0) {
+            parts.push('Certifications')
+            validCerts.forEach((cert: any) => {
+                if (cert.name && cert.dates) {
+                    parts.push(`${cert.name} (${cert.dates})`)
+                } else if (cert.name) {
+                    parts.push(cert.name)
+                }
+            })
+        }
+        
+        return parts.join('\n\n')
+    }
+
     const validateStep = (step: number): boolean => {
         switch (step) {
             case 1:
@@ -144,7 +281,10 @@ export default function Form({
                     (exp.role?.trim() || exp.company?.trim()) && exp.description?.trim()
                 )
             case 3:
-                return formData.education?.trim()
+                const educationEntries = formData.educationEntries || []
+                return educationEntries.length > 0 && educationEntries.some((entry: any) => 
+                    entry.degree?.trim() || entry.school?.trim()
+                )
             case 4:
                 return formData.skills?.trim()
             case 5:
@@ -189,10 +329,11 @@ export default function Form({
         setIsGenerating(true)
         
         try {
-            // Convert experiences array to formatted string for API compatibility
+            // Convert experiences and education arrays to formatted strings for API compatibility
             const submitData = {
                 ...formData,
-                experience: formatExperiencesForAPI(formData.experiences || [])
+                experience: formatExperiencesForAPI(formData.experiences || []),
+                education: formatEducationForAPI(formData.educationEntries || [], formData.certifications || [])
             }
             
             // First, generate the resume HTML
@@ -338,7 +479,7 @@ export default function Form({
                     name: formData.name,
                     email: formData.email,
                     experience: formatExperiencesForAPI(formData.experiences || []),
-                    education: formData.education,
+                    education: formatEducationForAPI(formData.educationEntries || [], formData.certifications || []),
                     skills: formData.skills,
                     job: formData.job,
                 }),
@@ -386,7 +527,7 @@ export default function Form({
                     name: formData.name,
                     email: formData.email,
                     experience: formatExperiencesForAPI(formData.experiences || []),
-                    education: formData.education,
+                    education: formatEducationForAPI(formData.educationEntries || [], formData.certifications || []),
                     skills: formData.skills,
                     job: formData.job,
                     existingSummary: formData.summary,
@@ -618,17 +759,175 @@ export default function Form({
                 )
             case 3:
                 return (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Education</label>
-                        <textarea 
-                            name="education" 
-                            placeholder="• Bachelor of Science in Computer Science&#10;  University of Technology (2015-2019)&#10;  - GPA: 3.8/4.0&#10;  - Relevant Coursework: Data Structures, Algorithms, Software Engineering&#10;&#10;• Certifications:&#10;  - AWS Certified Developer Associate (2022)&#10;  - Google Cloud Professional Developer (2021)"
-                            required
-                            rows={8}
-                            value={formData.education || ''}
-                            onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
-                        />
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <label className="block text-sm font-medium text-gray-700">Education</label>
+                            <button
+                                type="button"
+                                onClick={addEducation}
+                                className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition duration-200 flex items-center space-x-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span>Add Education</span>
+                            </button>
+                        </div>
+                        
+                        {educationEntries.map((entry: any, index: number) => (
+                            <div key={index} className="border border-gray-200 rounded-lg p-5 bg-gray-50">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-sm font-semibold text-gray-700">Education #{index + 1}</h3>
+                                    {educationEntries.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => removeEducation(index)}
+                                            className="text-red-600 hover:text-red-700 transition duration-200"
+                                            title="Remove this education entry"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    )}
+                                </div>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Degree</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Bachelor of Science in Computer Science"
+                                            value={entry.degree || ''}
+                                            onChange={(e) => handleEducationChange(index, 'degree', e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                        />
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">School / Institution</label>
+                                            <input
+                                                type="text"
+                                                placeholder="University of Technology"
+                                                value={entry.school || ''}
+                                                onChange={(e) => handleEducationChange(index, 'school', e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Dates</label>
+                                            <input
+                                                type="text"
+                                                placeholder="2015-2019"
+                                                value={entry.dates || ''}
+                                                onChange={(e) => handleEducationChange(index, 'dates', e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="block text-sm font-medium text-gray-700">GPA</label>
+                                            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">Optional</span>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="3.8 / 4.0"
+                                            value={entry.gpa || ''}
+                                            onChange={(e) => handleEducationChange(index, 'gpa', e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                        />
+                                        <p className="mt-1 text-xs text-gray-500">If your GPA is strong, including it is a good call.</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="block text-sm font-medium text-gray-700">Relevant Coursework</label>
+                                            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">Optional</span>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="Data Structures, Algorithms, Software Engineering"
+                                            value={entry.coursework || ''}
+                                            onChange={(e) => handleEducationChange(index, 'coursework', e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        
+                        {educationEntries.length === 0 && (
+                            <div className="text-center py-8 text-gray-500">
+                                <p>No education entries added yet. Click "Add Education" to get started.</p>
+                            </div>
+                        )}
+
+                        {/* Certifications Section */}
+                        <div className="mt-8 pt-6 border-t border-gray-200">
+                            <div className="flex items-center justify-between mb-4">
+                                <label className="block text-sm font-medium text-gray-700">Certifications</label>
+                                <button
+                                    type="button"
+                                    onClick={addCertification}
+                                    className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition duration-200 flex items-center space-x-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    <span>Add Certification</span>
+                                </button>
+                            </div>
+                            
+                            {certifications.map((cert: any, index: number) => (
+                                <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50 mb-3">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h4 className="text-sm font-semibold text-gray-700">Certification #{index + 1}</h4>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeCertification(index)}
+                                            className="text-red-600 hover:text-red-700 transition duration-200"
+                                            title="Remove this certification"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Certification Name</label>
+                                            <input
+                                                type="text"
+                                                placeholder="AWS Certified Developer – Associate"
+                                                value={cert.name || ''}
+                                                onChange={(e) => handleCertificationChange(index, 'name', e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                            <input
+                                                type="text"
+                                                placeholder="2022"
+                                                value={cert.dates || ''}
+                                                onChange={(e) => handleCertificationChange(index, 'dates', e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            
+                            {certifications.length === 0 && (
+                                <div className="text-center py-4 text-gray-500 text-sm">
+                                    <p>No certifications added yet. Click "Add Certification" to add one.</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )
             case 4:
@@ -644,6 +943,9 @@ export default function Form({
                             onChange={handleInputChange}
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
                         />
+                        <p className="mt-2 text-xs text-gray-500">
+                            Add your skills in a comma-separated list.
+                        </p>
                     </div>
                 )
             case 5:
