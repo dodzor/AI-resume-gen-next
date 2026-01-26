@@ -70,18 +70,18 @@ export default function Content() {
     const [showPreview, setShowPreview] = useState(true)
   
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-        <div className="max-w-6xl mx-auto">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="max-w-[1920px] mx-auto">
           {/* Header */}
-          <div className="text-center mb-10">
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">🤖 AI Resume Generator</h1>
-            <p className="text-gray-600 text-lg">Create a professional resume in seconds with AI assistance</p>
+          <div className="text-center py-6 px-4 sm:px-6">
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-2">🤖 AI Resume Generator</h1>
+            <p className="text-gray-600 text-base sm:text-lg">Create a professional resume in seconds with AI assistance</p>
           </div>
   
-          <div className="max-w-5xl mx-auto">
+          <div className="px-4 sm:px-6 pb-6">
             {isFormCompleted ? (
               // Full-width layout when form is completed
-              <div className="space-y-6">
+              <div className="max-w-5xl mx-auto space-y-6">
                 <Form 
                   formData={formData}
                   setFormData={setFormData}
@@ -103,33 +103,38 @@ export default function Content() {
                 />
               </div>
             ) : (
-              // Side-by-side layout during form filling
-              // <div className={`grid gap-6 ${showPreview ? 'lg:grid-cols-2' : ''}`}>
-              <div className="grid gap-6">
-                <div className={showPreview ? 'lg:order-1' : ''}>
-                  <Form 
-                    formData={formData}
-                    setFormData={setFormData}
-                    isGenerating={isGenerating}
-                    setIsGenerating={setIsGenerating}
-                    setGeneratedResume={setGeneratedResume}
-                    isFormCompleted={isFormCompleted}
-                    setIsFormCompleted={setIsFormCompleted}
-                    currentStep={currentStep}
-                    setCurrentStep={setCurrentStep}
-                    showPreview={showPreview}
-                    setShowPreview={setShowPreview}
-                  />
+              // Responsive side-by-side layout during form filling
+              <div className={`grid gap-4 sm:gap-6 ${showPreview ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} ${showPreview ? 'lg:h-[calc(100vh-220px)]' : ''}`}>
+                {/* Form Section - Left on desktop, top on mobile */}
+                <div className={`${showPreview ? 'lg:order-1' : ''} ${showPreview ? 'lg:flex lg:flex-col lg:min-h-0 lg:overflow-hidden' : ''}`}>
+                  <div className={`${showPreview ? 'lg:flex-1 lg:overflow-y-auto lg:pr-2 lg:-mr-2 custom-scrollbar' : ''}`}>
+                    <Form 
+                      formData={formData}
+                      setFormData={setFormData}
+                      isGenerating={isGenerating}
+                      setIsGenerating={setIsGenerating}
+                      setGeneratedResume={setGeneratedResume}
+                      isFormCompleted={isFormCompleted}
+                      setIsFormCompleted={setIsFormCompleted}
+                      currentStep={currentStep}
+                      setCurrentStep={setCurrentStep}
+                      showPreview={showPreview}
+                      setShowPreview={setShowPreview}
+                    />
+                  </div>
                 </div>
                 
+                {/* Preview Section - Right on desktop, bottom on mobile */}
                 {showPreview && (
-                  <div className="lg:order-2">
-                    <Result 
-                      formData={formData} 
-                      generatedResume={generatedResume}
-                      currentStep={currentStep}
-                      showPreview={showPreview}
-                    />
+                  <div className="lg:order-2 lg:flex lg:flex-col lg:min-h-0 lg:overflow-hidden">
+                    <div className="lg:flex-1 lg:overflow-y-auto lg:pr-2 lg:-mr-2 custom-scrollbar">
+                      <Result 
+                        formData={formData} 
+                        generatedResume={generatedResume}
+                        currentStep={currentStep}
+                        showPreview={showPreview}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
@@ -137,7 +142,7 @@ export default function Content() {
           </div>
   
           {/* Footer */}
-          <div className="text-center mt-12 text-gray-500 text-sm">
+          <div className="text-center py-6 px-4 text-gray-500 text-sm">
             <p>Powered by AI • Generate professional resumes in seconds</p>
           </div>
         </div>
