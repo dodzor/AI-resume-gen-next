@@ -110,7 +110,34 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
   }
 
   // Portfolio (if provided)
-  if (formData.portfolio) {
+  if (formData.portfolioProjects && formData.portfolioProjects.length > 0) {
+    const validProjects = formData.portfolioProjects.filter((project: any) => project.name?.trim() || project.outcome?.trim())
+    
+    if (validProjects.length > 0) {
+      html += `<section class="resume-section ${sectionClass}">`;
+      html += `<h2 class="section-title ${titleClass}">Portfolio / Projects</h2>`;
+      html += `<div class="section-content ${contentClass}">`;
+      
+      validProjects.forEach((project: any) => {
+        if (project.name || project.toolsSkills || project.outcome) {
+          const parts = []
+          if (project.name && project.toolsSkills) {
+            parts.push(`${escapeHtml(project.name)} — ${escapeHtml(project.toolsSkills)}`)
+          } else if (project.name) {
+            parts.push(escapeHtml(project.name))
+          } else if (project.toolsSkills) {
+            parts.push(escapeHtml(project.toolsSkills))
+          }
+          if (project.outcome) {
+            parts.push(`→ ${escapeHtml(project.outcome)}`)
+          }
+          html += `<p>${parts.join('<br>')}</p>`;
+        }
+      });
+      
+      html += `</div></section>`;
+    }
+  } else if (formData.portfolio) {
     html += `<section class="resume-section ${sectionClass}">`;
     html += `<h2 class="section-title ${titleClass}">Portfolio / Projects</h2>`;
     html += `<div class="section-content ${contentClass}">`;

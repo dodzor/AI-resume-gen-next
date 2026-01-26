@@ -46,7 +46,18 @@ export default function Content() {
         }
       ],
       skills: 'JavaScript, React, Node.js, Python, SQL, Git, AWS, Docker, Agile, Problem Solving, Team Leadership',
-      portfolio: '',
+      portfolioProjects: [
+        {
+          name: 'Mobile Banking Redesign',
+          toolsSkills: 'UI/UX, Figma, usability testing',
+          outcome: 'Increased task success rate by 32%'
+        },
+        {
+          name: 'E-commerce Storefront',
+          toolsSkills: 'React, Tailwind, Stripe',
+          outcome: '5k+ users, 99.9% uptime'
+        }
+      ],
       portfolioLink: '',
       job: 'Senior Full Stack Developer position requiring expertise in modern web technologies, database design, and team collaboration. Looking for someone with 3+ years experience in React, Node.js, and cloud platforms.',
       template: 'professional-blue' as const
