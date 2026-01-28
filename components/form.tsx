@@ -49,7 +49,8 @@ export default function Form({
     const [maxStepReached, setMaxStepReached] = useState(1)
 
     const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)   
-    const [isDownloading, setIsDownloading] = useState(false)    
+    const [isDownloading, setIsDownloading] = useState(false)
+    const [improvingExperienceIndex, setImprovingExperienceIndex] = useState<number | null>(null)    
 
     // Use external state if provided, otherwise use internal state
     const currentStep = externalCurrentStep ?? internalCurrentStep
@@ -627,6 +628,44 @@ export default function Form({
         }
     }
 
+    const handleImproveExperience = async (index: number) => {
+        const experience = experiences[index]
+        if (!experience?.description?.trim()) {
+            alert('Please enter a description first.')
+            return
+        }
+
+        setImprovingExperienceIndex(index)
+        
+        try {
+            const response = await fetch('/api/improve-experience', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    description: experience.description,
+                    role: experience.role,
+                    company: experience.company,
+                }),
+            })
+    
+            const data = await response.json()
+        
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to improve description')
+            }
+        
+            // Update the experience description with the improved version
+            handleExperienceChange(index, 'description', data.improvedDescription)
+        } catch (error) {
+            console.error('Error improving experience:', error)
+            alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+        } finally {
+            setImprovingExperienceIndex(null)
+        }
+    }
+
     const ProgressIndicator = () => (
         <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
@@ -817,6 +856,33 @@ export default function Form({
                                             onChange={(e) => handleExperienceChange(index, 'description', e.target.value)}
                                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => handleImproveExperience(index)}
+                                            disabled={improvingExperienceIndex === index || !exp.description?.trim()}
+                                            className={`mt-2 px-4 py-2 text-sm font-medium rounded-lg transition duration-200 flex items-center space-x-2 ${
+                                                improvingExperienceIndex === index || !exp.description?.trim()
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-purple-600 text-white hover:bg-purple-700'
+                                            }`}
+                                        >
+                                            {improvingExperienceIndex === index ? (
+                                                <>
+                                                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    <span>Improving...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                                    </svg>
+                                                    <span>Improve with AI</span>
+                                                </>
+                                            )}
+                                        </button>
                                         {/* <p className="mt-1 text-xs text-gray-500">Use bullet points to describe your responsibilities and achievements</p> */}
                                     </div>
                                 </div>
