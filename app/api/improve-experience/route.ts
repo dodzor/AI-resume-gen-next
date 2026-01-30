@@ -30,9 +30,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const systemMessage = 'You are a professional resume writer specializing in transforming vague, task-based job descriptions into impactful, results-driven bullet points.';
+    const systemMessage = 'You are a professional resume writer specializing in transforming vague, task-based job descriptions into impactful, concrete bullet points that avoid buzzwords and clichés.';
     
-    const prompt = `Transform the following job description into impactful, results-driven bullet points. Convert vague, task-based statements into bullets that show impact, results, or value, not just what the person was responsible for.
+    const prompt = `Transform the following job description into impactful, concrete bullet points. Convert vague, task-based statements into bullets that show impact, results, or value, not just what the person was responsible for.
 
 Format: Action verb + what you did + how + result/impact
 
@@ -45,13 +45,44 @@ Requirements:
 - Transform each vague statement into a bullet point that shows impact, results, or value
 - Use the format: Action verb + what you did + how + result/impact
 - Focus on quantifiable results, improvements, or achievements when possible
-- Use strong action verbs (e.g., "Developed", "Implemented", "Led", "Optimized", "Increased", "Reduced")
+- Use strong action verbs (e.g., "Developed", "Implemented", "Led", "Optimized", "Increased", "Reduced", "Built", "Delivered", "Launched", "Automated", "Scaled")
 - If specific metrics aren't available, focus on the impact or value delivered
 - Maintain the same number of bullet points or consolidate if appropriate
 - Each bullet should be concise but impactful
 - Return the improved description as a plain text list with each bullet on a new line
 - Do not add any markdown formatting, numbering, or additional text
 - Do not include explanations or notes
+
+CRITICAL: Avoid ALL buzzwords and clichés. Never use these terms:
+
+Personality Buzzwords (show outcomes instead):
+- Dynamic, Passionate, Motivated, Hard-working, Dedicated, Results-driven, Detail-oriented, Fast learner, Self-starter, Proactive, Go-getter, Enthusiastic, Driven, Accomplished
+
+Skill & Ability Clichés (state what you did and at what level):
+- Adept at, Skilled in, Expertise in, Knowledgeable in, Familiar with, Proficient in, Experienced in (without context), Strong understanding of, proven track record
+
+"Problem Solving" & Thinking Clichés (describe the problem solved and result):
+- Problem solver, Critical thinker, Strategic thinker, Analytical mindset, Think outside the box, Innovative thinker
+
+Team & Collaboration Clichés (mention who you worked with and what changed):
+- Team player, Works well independently or in a team, Excellent communicator, Cross-functional collaboration, Stakeholder management
+
+Leadership & Management Clichés (show scale: number of people, decisions, outcomes):
+- Natural leader, People person, Hands-on manager, Visionary, Thought leader, Change agent
+
+Tech-Specific Buzzwords (explain how it was optimized or scaled):
+- Cutting-edge technology, Scalable solutions, Best practices, Robust architecture, High-performance systems, Optimized workflows
+
+Marketing / Business Buzzwords (use plain language + metrics):
+- Synergy, Value-added, Leveraged, Disruptive, End-to-end, Customer-centric, Go-to-market, KPI-driven
+
+Soft Skills Without Proof (tie them to a concrete situation):
+- Multitasker, Time management, Adaptable, Resilient, Stress-resistant
+
+Phrases Recruiters Ignore (use better verbs instead):
+- Responsible for, In charge of, Tasked with, Assisted with (without outcome), Worked on
+
+Instead of buzzwords, use concrete language that shows what was accomplished, who was involved, what changed, and measurable outcomes.
 
 Return ONLY the improved bullet points, one per line, without any prefixes, numbering, or formatting.`;
 

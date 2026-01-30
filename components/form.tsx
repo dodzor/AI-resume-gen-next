@@ -1107,7 +1107,7 @@ export default function Form({
                         <label className="block text-sm font-medium text-gray-700 mb-2">Skills</label>
                         <textarea 
                             name="skills" 
-                            placeholder="JavaScript, React, Node.js, Python, SQL, Git, AWS, Docker, Agile, Problem Solving, Team Leadership"
+                            placeholder="JavaScript, React, Node.js, Python, SQL, Git, AWS, Docker, Agile, Team Leadership"
                             required
                             rows={6}
                             value={formData.skills || ''}
