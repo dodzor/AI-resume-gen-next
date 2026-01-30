@@ -50,7 +50,8 @@ export default function Form({
 
     const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)   
     const [isDownloading, setIsDownloading] = useState(false)
-    const [improvingExperienceIndex, setImprovingExperienceIndex] = useState<number | null>(null)    
+    const [improvingExperienceIndex, setImprovingExperienceIndex] = useState<number | null>(null)
+    const [rewritingBullet, setRewritingBullet] = useState<{ experienceIndex: number; bulletIndex: number } | null>(null)    
 
     // Use external state if provided, otherwise use internal state
     const currentStep = externalCurrentStep ?? internalCurrentStep
@@ -666,6 +667,78 @@ export default function Form({
         }
     }
 
+    // Parse description into bullet points
+    const parseBullets = (description: string): string[] => {
+        if (!description?.trim()) return []
+        // Split by newlines and filter out empty lines
+        return description.split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .map(line => {
+                // Remove bullet point symbols if present
+                return line.replace(/^[-*•]\s*/, '').trim()
+            })
+    }
+
+    // Handle rewriting a single bullet point
+    const handleRewriteBullet = async (experienceIndex: number, bulletIndex: number) => {
+        const experience = experiences[experienceIndex]
+        if (!experience?.description?.trim()) {
+            alert('Please enter a description first.')
+            return
+        }
+
+        const bullets = parseBullets(experience.description)
+        if (bulletIndex >= bullets.length || bulletIndex < 0) {
+            alert('Invalid bullet point index.')
+            return
+        }
+
+        const bulletToRewrite = bullets[bulletIndex]
+        if (!bulletToRewrite?.trim()) {
+            alert('This bullet point is empty.')
+            return
+        }
+
+        setRewritingBullet({ experienceIndex, bulletIndex })
+        
+        try {
+            const response = await fetch('/api/rewrite-bullet', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    bullet: bulletToRewrite,
+                    role: experience.role,
+                    company: experience.company,
+                    allBullets: bullets,
+                }),
+            })
+    
+            const data = await response.json()
+        
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to rewrite bullet')
+            }
+        
+            // Update the specific bullet point in the description
+            const updatedBullets = [...bullets]
+            updatedBullets[bulletIndex] = data.rewrittenBullet
+            
+            // Reconstruct the description with newlines
+            const updatedDescription = updatedBullets.join('\n')
+            
+            // Update the experience description
+            handleExperienceChange(experienceIndex, 'description', updatedDescription)
+        } catch (error) {
+            console.error('Error rewriting bullet:', error)
+            alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+        } finally {
+            setRewritingBullet(null)
+        }
+    }
+
     const ProgressIndicator = () => (
         <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
@@ -858,6 +931,48 @@ Led a team of 3 developers.`}
                                             onChange={(e) => handleExperienceChange(index, 'description', e.target.value)}
                                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
                                         />
+                                        
+                                        {/* Display bullet points with rewrite buttons */}
+                                        {exp.description?.trim() && (() => {
+                                            const bullets = parseBullets(exp.description)
+                                            return bullets.length > 0 ? (
+                                                <div className="mt-3 space-y-2">
+                                                    {bullets.map((bullet, bulletIndex) => (
+                                                        <div key={bulletIndex} className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                                                            <span className="flex-1 text-sm text-gray-700">{bullet}</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRewriteBullet(index, bulletIndex)}
+                                                                disabled={rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex}
+                                                                className={`flex-shrink-0 px-3 py-1 text-xs font-medium rounded transition duration-200 flex items-center space-x-1 ${
+                                                                    rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex
+                                                                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                                }`}
+                                                            >
+                                                                {rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex ? (
+                                                                    <>
+                                                                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                        </svg>
+                                                                        <span>Rewriting...</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                                        </svg>
+                                                                        <span>Rewrite</span>
+                                                                    </>
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : null
+                                        })()}
+                                        
                                         <button
                                             type="button"
                                             onClick={() => handleImproveExperience(index)}
