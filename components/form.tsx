@@ -27,7 +27,7 @@ const STEPS = [
   { id: 3, title: 'Education', description: 'Your educational background' },
   { id: 4, title: 'Skills', description: 'Your technical and soft skills' },
   { id: 5, title: 'Portfolio', description: 'Your projects and work samples (optional)' },
-  { id: 6, title: 'Target Job', description: 'Job you\'re applying for' },
+  { id: 6, title: 'Summary', description: 'A summary of your work experience, education, and skills tailored to the job you\'re applying for' },
   { id: 7, title: 'Template', description: 'Choose your resume style' }
 ]
 
@@ -850,7 +850,9 @@ export default function Form({
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                                         <textarea
-                                            placeholder="Built web applications using React and Node.js&#10;Improved system performance by 40%&#10;Led a team of 3 developers"
+                                            placeholder={`Built web applications using React and Node.js. 
+Improved system performance by 40%. 
+Led a team of 3 developers.`}
                                             rows={5}
                                             value={exp.description || ''}
                                             onChange={(e) => handleExperienceChange(index, 'description', e.target.value)}
@@ -1308,6 +1310,22 @@ export default function Form({
                             />
                         </div>
                         <div className="space-y-3">
+                        {formData.summary && (
+                            <>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Summary</label>
+                                        <textarea 
+                                            name="summary" 
+                                            placeholder={formData.summary}
+                                            rows={6}
+                                            value={formData.summary || ''}
+                                            onChange={handleInputChange}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
+                                        />
+                                    </div>
+                                    </>
+                            )}
+
                             <button
                                 type="button"
                                 onClick={handleGenerateSummary}
@@ -1331,59 +1349,59 @@ export default function Form({
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                                         </svg>
-                                        <span>Generate Section</span>
+                                        <span>{formData.summary ? 'Regenerate Summary' : 'Generate Summary'}</span>
                                     </>
                                 )}
                             </button>
                             
                             {formData.summary && (
-                                <div className="grid grid-cols-3 gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleModifySummary('concise')}
-                                        disabled={isGeneratingSummary}
-                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center space-x-1 ${
-                                            isGeneratingSummary
-                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                        }`}
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                        </svg>
-                                        <span>More Concise</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleModifySummary('verbose')}
-                                        disabled={isGeneratingSummary}
-                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center space-x-1 ${
-                                            isGeneratingSummary
-                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                        }`}
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
-                                        </svg>
-                                        <span>More Verbose</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleModifySummary('senior')}
-                                        disabled={isGeneratingSummary}
-                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center space-x-1 ${
-                                            isGeneratingSummary
-                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                        }`}
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
-                                        </svg>
-                                        <span>More Senior</span>
-                                    </button>
-                                </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleModifySummary('concise')}
+                                            disabled={isGeneratingSummary}
+                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center space-x-1 ${
+                                                isGeneratingSummary
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                            }`}
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                            <span>More Concise</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleModifySummary('verbose')}
+                                            disabled={isGeneratingSummary}
+                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center space-x-1 ${
+                                                isGeneratingSummary
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                            }`}
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                                            </svg>
+                                            <span>More Verbose</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleModifySummary('senior')}
+                                            disabled={isGeneratingSummary}
+                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center space-x-1 ${
+                                                isGeneratingSummary
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                            }`}
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                                            </svg>
+                                            <span>More Senior</span>
+                                        </button>
+                                    </div>
                             )}
                         </div>
                     </div>
