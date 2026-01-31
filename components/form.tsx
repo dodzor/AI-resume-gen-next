@@ -50,7 +50,7 @@ export default function Form({
 
     const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)   
     const [isDownloading, setIsDownloading] = useState(false)
-    const [improvingExperienceIndex, setImprovingExperienceIndex] = useState<number | null>(null)
+    const [improvingExperienceIndex, setImprovingExperienceIndex] = useState<number | null>(null)    
     const [rewritingBullet, setRewritingBullet] = useState<{ experienceIndex: number; bulletIndex: number } | null>(null)    
 
     // Use external state if provided, otherwise use internal state
@@ -668,27 +668,70 @@ export default function Form({
     }
 
     // Parse description into bullet points
+    // Preserves empty lines to maintain UI structure
     const parseBullets = (description: string): string[] => {
-        if (!description?.trim()) return []
-        // Split by newlines and filter out empty lines
+        if (!description) return []
+        // Split by newlines and preserve all lines (including empty ones)
         return description.split('\n')
-            .map(line => line.trim())
-            .filter(line => line.length > 0)
             .map(line => {
-                // Remove bullet point symbols if present
-                return line.replace(/^[-*•]\s*/, '').trim()
+                // Remove bullet point symbols if present at the start, but preserve all other content including spaces
+                return line.replace(/^[-*•]\s*/, '')
             })
+        // Don't filter out empty lines - preserve structure for UI
+    }
+
+    // Handle updating a single bullet point
+    const handleBulletChange = (experienceIndex: number, bulletIndex: number, value: string) => {
+        console.log('handleBulletChange', experienceIndex, bulletIndex, value)
+        const experience = experiences[experienceIndex]
+        const bullets = parseBullets(experience.description || '')
+        
+        // Ensure we have enough bullets
+        while (bullets.length <= bulletIndex) {
+            bullets.push('')
+        }
+        
+        bullets[bulletIndex] = value
+        
+        // Reconstruct the description with newlines (keep all bullets, including empty ones)
+        const updatedDescription = bullets.join('\n')
+        handleExperienceChange(experienceIndex, 'description', updatedDescription)
+    }
+
+    // Handle adding a new bullet point
+    const handleAddBullet = (experienceIndex: number) => {
+        const experience = experiences[experienceIndex]
+        const bullets = parseBullets(experience.description || '')
+        bullets.push('')
+        
+        // Reconstruct the description with newlines
+        const updatedDescription = bullets.join('\n')
+        handleExperienceChange(experienceIndex, 'description', updatedDescription)
+    }
+
+    // Handle removing a bullet point
+    const handleRemoveBullet = (experienceIndex: number, bulletIndex: number) => {
+        const experience = experiences[experienceIndex]
+        const bullets = parseBullets(experience.description || '')
+        
+        if (bullets.length <= 1) {
+            // If only one bullet, just clear it
+            handleExperienceChange(experienceIndex, 'description', '')
+            return
+        }
+        
+        bullets.splice(bulletIndex, 1)
+        
+        // Reconstruct the description with newlines
+        const updatedDescription = bullets.join('\n')
+        handleExperienceChange(experienceIndex, 'description', updatedDescription)
     }
 
     // Handle rewriting a single bullet point
     const handleRewriteBullet = async (experienceIndex: number, bulletIndex: number) => {
         const experience = experiences[experienceIndex]
-        if (!experience?.description?.trim()) {
-            alert('Please enter a description first.')
-            return
-        }
-
-        const bullets = parseBullets(experience.description)
+        const bullets = parseBullets(experience.description || '')
+        
         if (bulletIndex >= bullets.length || bulletIndex < 0) {
             alert('Invalid bullet point index.')
             return
@@ -722,15 +765,8 @@ export default function Form({
                 throw new Error(data.message || 'Failed to rewrite bullet')
             }
         
-            // Update the specific bullet point in the description
-            const updatedBullets = [...bullets]
-            updatedBullets[bulletIndex] = data.rewrittenBullet
-            
-            // Reconstruct the description with newlines
-            const updatedDescription = updatedBullets.join('\n')
-            
-            // Update the experience description
-            handleExperienceChange(experienceIndex, 'description', updatedDescription)
+            // Update the specific bullet point
+            handleBulletChange(experienceIndex, bulletIndex, data.rewrittenBullet)
         } catch (error) {
             console.error('Error rewriting bullet:', error)
             alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
@@ -922,30 +958,30 @@ export default function Form({
                                     
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                                        <textarea
-                                            placeholder={`Built web applications using React and Node.js. 
-Improved system performance by 40%. 
-Led a team of 3 developers.`}
-                                            rows={5}
-                                            value={exp.description || ''}
-                                            onChange={(e) => handleExperienceChange(index, 'description', e.target.value)}
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
-                                        />
                                         
-                                        {/* Display bullet points with rewrite buttons */}
-                                        {exp.description?.trim() && (() => {
-                                            const bullets = parseBullets(exp.description)
-                                            return bullets.length > 0 ? (
-                                                <div className="mt-3 space-y-2">
-                                                    {bullets.map((bullet, bulletIndex) => (
-                                                        <div key={bulletIndex} className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
-                                                            <span className="flex-1 text-sm text-gray-700">{bullet}</span>
+                                        {/* Individual input fields for each bullet point */}
+                                        {(() => {
+                                            const bullets = parseBullets(exp.description || '')
+                                            // Ensure at least one input field is always shown
+                                            const displayBullets = bullets.length > 0 ? bullets : ['']
+                                            
+                                            return (
+                                                <div className="space-y-2">
+                                                    {displayBullets.map((bullet, bulletIndex) => (
+                                                        <div key={bulletIndex} className="flex items-center gap-2">
+                                                            <textarea
+                                                                cols={2}
+                                                                placeholder={`Bullet point ${bulletIndex + 1} (e.g., Built web applications using React and Node.js)`}
+                                                                value={bullet}
+                                                                onChange={(e) => handleBulletChange(index, bulletIndex, e.target.value)}
+                                                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                                            />
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleRewriteBullet(index, bulletIndex)}
-                                                                disabled={rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex}
-                                                                className={`flex-shrink-0 px-3 py-1 text-xs font-medium rounded transition duration-200 flex items-center space-x-1 ${
-                                                                    rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex
+                                                                disabled={rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex || !bullet.trim()}
+                                                                className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded transition duration-200 flex items-center space-x-1 ${
+                                                                    rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex || !bullet.trim()
                                                                         ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                                                         : 'bg-blue-600 text-white hover:bg-blue-700'
                                                                 }`}
@@ -967,17 +1003,41 @@ Led a team of 3 developers.`}
                                                                     </>
                                                                 )}
                                                             </button>
+                                                            {displayBullets.length > 1 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRemoveBullet(index, bulletIndex)}
+                                                                    className="flex-shrink-0 px-2 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition duration-200"
+                                                                    title="Remove this bullet point"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                                    </svg>
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     ))}
+                                                    
+                                                    {/* Add new bullet button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleAddBullet(index)}
+                                                        className="w-full px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition duration-200 flex items-center justify-center space-x-2"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                                        </svg>
+                                                        <span>Add Bullet Point</span>
+                                                    </button>
                                                 </div>
-                                            ) : null
+                                            )
                                         })()}
                                         
                                         <button
                                             type="button"
                                             onClick={() => handleImproveExperience(index)}
                                             disabled={improvingExperienceIndex === index || !exp.description?.trim()}
-                                            className={`mt-2 px-4 py-2 text-sm font-medium rounded-lg transition duration-200 flex items-center space-x-2 ${
+                                            className={`w-full px-4 py-3 rounded-lg font-medium transition duration-200 flex items-center justify-center space-x-2 bg-purple-600 text-white hover:bg-purple-700 ${
                                                 improvingExperienceIndex === index || !exp.description?.trim()
                                                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                                     : 'bg-purple-600 text-white hover:bg-purple-700'
@@ -996,7 +1056,7 @@ Led a team of 3 developers.`}
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                                                     </svg>
-                                                    <span>Improve with AI</span>
+                                                    <span>Improve description</span>
                                                 </>
                                             )}
                                         </button>
@@ -1448,7 +1508,7 @@ Led a team of 3 developers.`}
                                 className={`w-full px-4 py-3 rounded-lg font-medium transition duration-200 flex items-center justify-center space-x-2 ${
                                     isGeneratingSummary || !formData.job?.trim()
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                        : 'bg-purple-600 text-white hover:bg-purple-700'
                                 }`}
                             >
                                 {isGeneratingSummary ? (
