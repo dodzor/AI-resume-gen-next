@@ -22,13 +22,14 @@ interface FormProps {
 }
 
 const STEPS = [
-  { id: 1, title: 'Personal Info', description: 'Basic information about you' },
-  { id: 2, title: 'Experience', description: 'Your work history' },
-  { id: 3, title: 'Education', description: 'Your educational background' },
-  { id: 4, title: 'Skills', description: 'Your technical and soft skills' },
-  { id: 5, title: 'Portfolio', description: 'Your projects and work samples (optional)' },
-  { id: 6, title: 'Summary', description: 'A summary of your work experience, education, and skills tailored to the job you\'re applying for' },
-  { id: 7, title: 'Template', description: 'Choose your resume style' }
+  { id: 1, title: 'Target Job Description', description: 'Analyze the job description to determine the CV tone' },
+  { id: 2, title: 'Personal Info', description: 'Basic information about you' },
+  { id: 3, title: 'Experience', description: 'Your work history' },
+  { id: 4, title: 'Education', description: 'Your educational background' },
+  { id: 5, title: 'Skills', description: 'Your technical and soft skills' },
+  { id: 6, title: 'Portfolio', description: 'Your projects and work samples (optional)' },
+  { id: 7, title: 'Summary', description: 'A summary of your work experience, education, and skills tailored to the job you\'re applying for' },
+  { id: 8, title: 'Template', description: 'Choose your resume style' }
 ]
 
 export default function Form({ 
@@ -51,7 +52,9 @@ export default function Form({
     const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)   
     const [isDownloading, setIsDownloading] = useState(false)
     const [improvingExperienceIndex, setImprovingExperienceIndex] = useState<number | null>(null)    
-    const [rewritingBullet, setRewritingBullet] = useState<{ experienceIndex: number; bulletIndex: number } | null>(null)    
+    const [rewritingBullet, setRewritingBullet] = useState<{ experienceIndex: number; bulletIndex: number } | null>(null)
+    const [isAnalyzingJobDescription, setIsAnalyzingJobDescription] = useState(false)
+    const [analyzedTone, setAnalyzedTone] = useState<string | null>(formData.tone || null)    
 
     // Use external state if provided, otherwise use internal state
     const currentStep = externalCurrentStep ?? internalCurrentStep
@@ -344,24 +347,26 @@ export default function Form({
     const validateStep = (step: number): boolean => {
         switch (step) {
             case 1:
-                return formData.name?.trim() && formData.email?.trim()
+                return formData.job?.trim() && formData.tone
             case 2:
+                return formData.name?.trim() && formData.email?.trim()
+            case 3:
                 const experiences = formData.experiences || []
                 return experiences.length > 0 && experiences.some((exp: any) => 
                     (exp.role?.trim() || exp.company?.trim()) && exp.description?.trim()
                 )
-            case 3:
+            case 4:
                 const educationEntries = formData.educationEntries || []
                 return educationEntries.length > 0 && educationEntries.some((entry: any) => 
                     entry.degree?.trim() || entry.school?.trim()
                 )
-            case 4:
-                return formData.skills?.trim()
             case 5:
-                return true // Portfolio is optional
+                return formData.skills?.trim()
             case 6:
-                return formData.job?.trim()
+                return true // Portfolio is optional
             case 7:
+                return formData.job?.trim()
+            case 8:
                 return !!formData.template
             default:
                 return false
@@ -533,7 +538,56 @@ export default function Form({
 
     const handleEditInfo = () => {
         setIsFormCompleted(false)
-        setCurrentStep(7) // Reset to first step when editing
+        setCurrentStep(8) // Reset to template step when editing
+    }
+
+    const handleAnalyzeJobDescription = async () => {
+        if (!formData.job?.trim()) {
+            alert('Please enter a job description first.')
+            return
+        }
+
+        setIsAnalyzingJobDescription(true)
+        setAnalyzedTone(null)
+        
+        try {
+            const response = await fetch('/api/analyze-job-description', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    job: formData.job,
+                }),
+            })
+    
+            const data = await response.json()
+        
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to analyze job description')
+            }
+        
+            // Update formData with the analyzed tone
+            const tone = data.tone || 'mid'
+            setAnalyzedTone(tone)
+            setFormData((prev: any) => ({
+                ...prev,
+                tone: tone
+            }))
+        } catch (error) {
+            console.error('Error analyzing job description:', error)
+            alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+        } finally {
+            setIsAnalyzingJobDescription(false)
+        }
+    }
+
+    const handleToneChange = (tone: 'junior' | 'mid' | 'senior') => {
+        setFormData((prev: any) => ({
+            ...prev,
+            tone: tone
+        }))
+        setAnalyzedTone(tone)
     }
 
     const handleGenerateSummary = async () => {
@@ -828,6 +882,79 @@ export default function Form({
                 return (
                     <div className="space-y-4">
                         <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Target Job Description</label>
+                            <textarea 
+                                name="job" 
+                                placeholder="Senior Full Stack Developer position requiring expertise in modern web technologies, database design, and team collaboration. Looking for someone with 3+ years experience in React, Node.js, and cloud platforms."
+                                required
+                                rows={7}
+                                value={formData.job || ''}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
+                            />
+                        </div>
+                        
+                        <button
+                            type="button"
+                            onClick={handleAnalyzeJobDescription}
+                            disabled={isAnalyzingJobDescription || !formData.job?.trim()}
+                            className={`w-full px-4 py-3 rounded-lg font-medium transition duration-200 flex items-center justify-center space-x-2 ${
+                                isAnalyzingJobDescription || !formData.job?.trim()
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    : 'bg-purple-600 text-white hover:bg-purple-700'
+                            }`}
+                        >
+                            {isAnalyzingJobDescription ? (
+                                <>
+                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span>Analyzing Job Description...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                                    </svg>
+                                    <span>Analyze Job Description</span>
+                                </>
+                            )}
+                        </button>
+
+                        {(analyzedTone || formData.tone) && (
+                            <div className="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p className="text-sm text-gray-700">
+                                    Based on my analysis, you are applying to a <strong className="text-gray-900">{(analyzedTone || formData.tone)}</strong> role.
+                                </p>
+                                
+                                <div className="flex items-center space-x-4">
+                                    <label className="text-sm font-medium text-gray-700">CV Tone:</label>
+                                    <div className="flex items-center space-x-2">
+                                        {(['junior', 'mid', 'senior'] as const).map((tone) => (
+                                            <button
+                                                key={tone}
+                                                type="button"
+                                                onClick={() => handleToneChange(tone)}
+                                                className={`px-4 py-2 rounded-lg text-sm font-medium transition duration-200 ${
+                                                    (formData.tone || analyzedTone) === tone
+                                                        ? 'bg-blue-600 text-white shadow-md'
+                                                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                {tone.charAt(0).toUpperCase() + tone.slice(1)}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )
+            case 2:
+                return (
+                    <div className="space-y-4">
+                        <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
                             <input 
                                 name="name" 
@@ -886,7 +1013,7 @@ export default function Form({
                         </div>
                     </div>
                 )
-            case 2:
+            case 3:
                 return (
                     <div className="space-y-6">
                         <div className="flex items-center justify-between">
@@ -1073,7 +1200,7 @@ export default function Form({
                         )}
                     </div>
                 )
-            case 3:
+            case 4:
                 return (
                     <div className="space-y-6">
                         <div className="flex items-center justify-between">
@@ -1278,7 +1405,7 @@ export default function Form({
                         </div>
                     </div>
                 )
-            case 4:
+            case 5:
                 return (
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Skills</label>
@@ -1296,7 +1423,7 @@ export default function Form({
                         </p>
                     </div>
                 )
-            case 5:
+            case 6:
                 return (
                     <div className="space-y-4">
                         <div>
@@ -1457,33 +1584,9 @@ export default function Form({
 
                     </div>
                 )
-            case 6:
+            case 7:
                 return (
-                    // <div>
-                    //     <label className="block text-sm font-medium text-gray-700 mb-2">Target Job Description</label>
-                    //     <textarea 
-                    //         name="job" 
-                    //         placeholder="Senior Full Stack Developer position requiring expertise in modern web technologies, database design, and team collaboration. Looking for someone with 3+ years experience in React, Node.js, and cloud platforms."
-                    //         required
-                    //         rows={7}
-                    //         value={formData.job || ''}
-                    //         onChange={handleInputChange}
-                    //         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
-                    //     />
-                    // </div>
                     <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Target Job Description</label>
-                            <textarea 
-                                name="job" 
-                                placeholder="Senior Full Stack Developer position requiring expertise in modern web technologies, database design, and team collaboration. Looking for someone with 3+ years experience in React, Node.js, and cloud platforms."
-                                required
-                                rows={7}
-                                value={formData.job || ''}
-                                onChange={handleInputChange}
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
-                            />
-                        </div>
                         <div className="space-y-3">
                         {formData.summary && (
                             <>
@@ -1581,7 +1684,7 @@ export default function Form({
                         </div>
                     </div>
                 )
-            case 7:
+            case 8:
                 return (
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-4">Choose a Resume Template</label>

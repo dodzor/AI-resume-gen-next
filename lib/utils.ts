@@ -55,8 +55,8 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
     html += `</header>`;
   }
 
-  // Summary (show if we have a generated summary OR if we're on step 6 or later)
-  const shouldShowSummary = formData.summary || (currentStep ? currentStep >= 6 : true);
+  // Summary (show if we have a generated summary OR if we're on step 7 or later)
+  const shouldShowSummary = formData.summary || (currentStep ? currentStep >= 7 : true);
   if (formData.job && shouldShowSummary) {
     html += `<section class="resume-section ${sectionClass}">`;
     html += `<h2 class="section-title ${titleClass}">Summary</h2>`;
