@@ -608,6 +608,38 @@ export default function Form({
         return matches ? matches.length : 0
     }
 
+    const isKeywordInSkills = (keyword: string): boolean => {
+        if (!formData.skills) return false
+        const skillsLower = formData.skills.toLowerCase()
+        const keywordLower = keyword.toLowerCase()
+        
+        // Split skills by comma and check for exact match (case-insensitive)
+        const skillsList = skillsLower.split(',').map((s: string) => s.trim())
+        return skillsList.some((skill: string) => skill === keywordLower)
+    }
+
+    const addKeywordToSkills = (keyword: string) => {
+        if (isKeywordInSkills(keyword)) return // Don't add if already present
+        
+        setFormData((prev: any) => {
+            const currentSkills = prev.skills || ''
+            const trimmedSkills = currentSkills.trim()
+            
+            // Add keyword with proper comma separation
+            if (trimmedSkills) {
+                return {
+                    ...prev,
+                    skills: `${trimmedSkills}, ${keyword}`
+                }
+            } else {
+                return {
+                    ...prev,
+                    skills: keyword
+                }
+            }
+        })
+    }
+
     const handleGenerateSummary = async () => {
         if (!formData.job?.trim()) {
             alert('Please enter a target job description first.')
@@ -1461,20 +1493,67 @@ export default function Form({
                 )
             case 5:
                 return (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Skills</label>
-                        <textarea 
-                            name="skills" 
-                            placeholder="JavaScript, React, Node.js, Python, SQL, Git, AWS, Docker, Agile, Team Leadership"
-                            required
-                            rows={6}
-                            value={formData.skills || ''}
-                            onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
-                        />
-                        <p className="mt-2 text-xs text-gray-500">
-                            Add your skills in a comma-separated list.
-                        </p>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Skills</label>
+                            <textarea 
+                                name="skills" 
+                                placeholder="JavaScript, React, Node.js, Python, SQL, Git, AWS, Docker, Agile, Team Leadership"
+                                required
+                                rows={6}
+                                value={formData.skills || ''}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
+                            />
+                            <p className="mt-2 text-xs text-gray-500">
+                                Add your skills in a comma-separated list.
+                            </p>
+                        </div>
+
+                        {formData.keywords && formData.keywords.length > 0 && (
+                            <div className="mt-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Suggested Keywords from Job Description
+                                </label>
+                                <div className="flex flex-wrap gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                    {formData.keywords
+                                        .map((keyword: string) => ({
+                                            keyword,
+                                            count: countKeywordOccurrences(keyword),
+                                            isAdded: isKeywordInSkills(keyword)
+                                        }))
+                                        .sort((a: { keyword: string; count: number; isAdded: boolean }, b: { keyword: string; count: number; isAdded: boolean }) => {
+                                            // Sort: added keywords first, then by count
+                                            if (a.isAdded !== b.isAdded) {
+                                                return a.isAdded ? 1 : -1
+                                            }
+                                            return b.count - a.count
+                                        })
+                                        .map((item: { keyword: string; count: number; isAdded: boolean }, index: number) => (
+                                            <button
+                                                key={index}
+                                                type="button"
+                                                onClick={() => !item.isAdded && addKeywordToSkills(item.keyword)}
+                                                disabled={item.isAdded}
+                                                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                                                    item.isAdded
+                                                        ? 'bg-green-100 border border-green-300 text-green-700 cursor-default'
+                                                        : 'bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400 cursor-pointer active:scale-95'
+                                                }`}
+                                                title={item.isAdded ? 'Already in your skills' : `Click to add "${item.keyword}" (appears ${item.count} time${item.count !== 1 ? 's' : ''} in job description)`}
+                                            >
+                                                {item.keyword}
+                                                {item.isAdded && (
+                                                    <span className="ml-1.5">✓</span>
+                                                )}
+                                            </button>
+                                        ))}
+                                </div>
+                                <p className="mt-2 text-xs text-gray-500">
+                                    Click on keywords to add them to your skills. Green badges indicate keywords already in your list.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )
             case 6:
