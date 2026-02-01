@@ -640,6 +640,18 @@ export default function Form({
         })
     }
 
+    const calculateKeywordCoverage = () => {
+        if (!formData.keywords || formData.keywords.length === 0) {
+            return { matched: 0, total: 0, percentage: 0 }
+        }
+        
+        const matched = formData.keywords.filter((keyword: string) => isKeywordInSkills(keyword)).length
+        const total = formData.keywords.length
+        const percentage = total > 0 ? Math.round((matched / total) * 100) : 0
+        
+        return { matched, total, percentage }
+    }
+
     const handleGenerateSummary = async () => {
         if (!formData.job?.trim()) {
             alert('Please enter a target job description first.')
@@ -1511,10 +1523,62 @@ export default function Form({
                         </div>
 
                         {formData.keywords && formData.keywords.length > 0 && (
-                            <div className="mt-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Suggested Keywords from Job Description
-                                </label>
+                            <>
+                                {(() => {
+                                    const coverage = calculateKeywordCoverage()
+                                    return (
+                                        <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-2">
+                                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                    </svg>
+                                                    <label className="block text-sm font-semibold text-gray-800">
+                                                        Keyword Coverage
+                                                    </label>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-2xl font-bold text-blue-700">
+                                                        {coverage.percentage}%
+                                                    </div>
+                                                    <div className="text-xs text-gray-600">
+                                                        {coverage.matched} of {coverage.total} keywords
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Progress Bar */}
+                                            <div className="w-full bg-gray-200 rounded-full h-3 mb-2 overflow-hidden">
+                                                <div 
+                                                    className={`h-3 rounded-full transition-all duration-500 ease-out ${
+                                                        coverage.percentage >= 80 
+                                                            ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
+                                                            : coverage.percentage >= 50 
+                                                            ? 'bg-gradient-to-r from-yellow-400 to-orange-400' 
+                                                            : 'bg-gradient-to-r from-blue-400 to-blue-500'
+                                                    }`}
+                                                    style={{ width: `${coverage.percentage}%` }}
+                                                />
+                                            </div>
+                                            
+                                            {/* Status Message */}
+                                            <p className="text-xs text-gray-600 mt-2">
+                                                {coverage.percentage === 100 
+                                                    ? '🎉 Perfect! All keywords are covered.' 
+                                                    : coverage.percentage >= 80 
+                                                    ? 'Great! You have strong keyword coverage.' 
+                                                    : coverage.percentage >= 50 
+                                                    ? 'Good start! Add more keywords to improve your match.' 
+                                                    : 'Add keywords below to improve your resume match.'}
+                                            </p>
+                                        </div>
+                                    )
+                                })()}
+                                
+                                <div className="mt-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Suggested Keywords from Job Description
+                                    </label>
                                 <div className="flex flex-wrap gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                                     {formData.keywords
                                         .map((keyword: string) => ({
@@ -1552,7 +1616,8 @@ export default function Form({
                                 <p className="mt-2 text-xs text-gray-500">
                                     Click on keywords to add them to your skills. Green badges indicate keywords already in your list.
                                 </p>
-                            </div>
+                                </div>
+                            </>
                         )}
                     </div>
                 )

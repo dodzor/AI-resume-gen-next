@@ -74,8 +74,9 @@ Job Title: ${title}
 Job Description:
 ${job}
 
-Return a comma-separated list of most important keywords that are relevant to a resume. List them in order of importance, the keywords that occur the most often should be listed first.
-Do not include explanations or additional text, just the keywords separated by commas. Don't include any other text, explanations, or formatting.`;
+Return a comma-separated list of most important keywords that are relevant to a resume.
+Do not include explanations or additional text, just the keywords separated by commas. 
+Don't include any other text, explanations, or formatting.`;
 
     console.log('Analyzing job description for seniority level and keywords');
 
