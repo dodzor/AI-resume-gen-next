@@ -22,7 +22,7 @@ interface FormProps {
 }
 
 const STEPS = [
-  { id: 1, title: 'Target Job Description', description: 'Analyze the job description to determine the CV tone' },
+  { id: 1, title: 'Target Job', description: 'Analyze the job description to determine the CV tone and extract important keywords' },
   { id: 2, title: 'Personal Info', description: 'Basic information about you' },
   { id: 3, title: 'Experience', description: 'Your work history' },
   { id: 4, title: 'Education', description: 'Your educational background' },
@@ -347,7 +347,7 @@ export default function Form({
     const validateStep = (step: number): boolean => {
         switch (step) {
             case 1:
-                return formData.job?.trim() && formData.tone
+                return formData.jobTitle?.trim() && formData.job?.trim() && formData.tone
             case 2:
                 return formData.name?.trim() && formData.email?.trim()
             case 3:
@@ -542,8 +542,8 @@ export default function Form({
     }
 
     const handleAnalyzeJobDescription = async () => {
-        if (!formData.job?.trim()) {
-            alert('Please enter a job description first.')
+        if (!formData.jobTitle?.trim() || !formData.job?.trim()) {
+            alert('Please enter both job title and description first.')
             return
         }
 
@@ -557,6 +557,7 @@ export default function Form({
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                    title: formData.jobTitle,
                     job: formData.job,
                 }),
             })
@@ -567,12 +568,14 @@ export default function Form({
                 throw new Error(data.message || 'Failed to analyze job description')
             }
         
-            // Update formData with the analyzed tone
+            // Update formData with the analyzed tone and keywords
             const tone = data.tone || 'mid'
+            const keywords = data.keywords || []
             setAnalyzedTone(tone)
             setFormData((prev: any) => ({
                 ...prev,
-                tone: tone
+                tone: tone,
+                keywords: keywords
             }))
         } catch (error) {
             console.error('Error analyzing job description:', error)
@@ -882,10 +885,23 @@ export default function Form({
                 return (
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Target Job Description</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                            <input 
+                                name="jobTitle" 
+                                type="text"
+                                placeholder="Senior Full Stack Developer"
+                                required
+                                value={formData.jobTitle || ''}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                            />
+                        </div>
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                             <textarea 
                                 name="job" 
-                                placeholder="Senior Full Stack Developer position requiring expertise in modern web technologies, database design, and team collaboration. Looking for someone with 3+ years experience in React, Node.js, and cloud platforms."
+                                placeholder="Position requiring expertise in modern web technologies, database design, and team collaboration. Looking for someone with 3+ years experience in React, Node.js, and cloud platforms."
                                 required
                                 rows={7}
                                 value={formData.job || ''}
@@ -897,9 +913,9 @@ export default function Form({
                         <button
                             type="button"
                             onClick={handleAnalyzeJobDescription}
-                            disabled={isAnalyzingJobDescription || !formData.job?.trim()}
+                            disabled={isAnalyzingJobDescription || !formData.jobTitle?.trim() || !formData.job?.trim()}
                             className={`w-full px-4 py-3 rounded-lg font-medium transition duration-200 flex items-center justify-center space-x-2 ${
-                                isAnalyzingJobDescription || !formData.job?.trim()
+                                isAnalyzingJobDescription || !formData.jobTitle?.trim() || !formData.job?.trim()
                                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                     : 'bg-purple-600 text-white hover:bg-purple-700'
                             }`}
@@ -947,6 +963,22 @@ export default function Form({
                                         ))}
                                     </div>
                                 </div>
+
+                                {formData.keywords && formData.keywords.length > 0 && (
+                                    <div className="mt-4 pt-4 border-t border-blue-200">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Extracted Keywords:</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {formData.keywords.map((keyword: string, index: number) => (
+                                                <span
+                                                    key={index}
+                                                    className="px-3 py-1 bg-white border border-blue-300 text-blue-700 rounded-full text-xs font-medium"
+                                                >
+                                                    {keyword}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
