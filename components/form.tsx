@@ -593,6 +593,21 @@ export default function Form({
         setAnalyzedTone(tone)
     }
 
+    const countKeywordOccurrences = (keyword: string): number => {
+        const title = formData.jobTitle || ''
+        const description = formData.job || ''
+        const combinedText = `${title} ${description}`
+        const keywordLower = keyword.toLowerCase()
+        
+        // Escape special regex characters in the keyword
+        const escapedKeyword = keywordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        
+        // Use word boundaries to match whole words only (case-insensitive)
+        const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'gi')
+        const matches = combinedText.match(regex)
+        return matches ? matches.length : 0
+    }
+
     const handleGenerateSummary = async () => {
         if (!formData.job?.trim()) {
             alert('Please enter a target job description first.')
@@ -968,14 +983,21 @@ export default function Form({
                                     <div className="mt-4 pt-4 border-t border-blue-200">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Extracted Keywords:</label>
                                         <div className="flex flex-wrap gap-2">
-                                            {formData.keywords.map((keyword: string, index: number) => (
-                                                <span
-                                                    key={index}
-                                                    className="px-3 py-1 bg-white border border-blue-300 text-blue-700 rounded-full text-xs font-medium"
-                                                >
-                                                    {keyword}
-                                                </span>
-                                            ))}
+                                            {formData.keywords
+                                                .map((keyword: string) => ({
+                                                    keyword,
+                                                    count: countKeywordOccurrences(keyword)
+                                                }))
+                                                .filter((item: { keyword: string; count: number }) => item.count > 0)
+                                                .sort((a: { keyword: string; count: number }, b: { keyword: string; count: number }) => b.count - a.count)
+                                                .map((item: { keyword: string; count: number }, index: number) => (
+                                                    <span
+                                                        key={index}
+                                                        className="px-3 py-1 bg-white border border-blue-300 text-blue-700 rounded-full text-xs font-medium"
+                                                    >
+                                                        {item.keyword} ({item.count})
+                                                    </span>
+                                                ))}
                                         </div>
                                     </div>
                                 )}
