@@ -60,23 +60,31 @@ Based on your analysis, determine if this is a:
 
 Return ONLY one word: "junior", "mid", or "senior". Do not include any other text, explanations, or formatting.`;
 
-    // Second, extract keywords
-    const keywordsPrompt = `Extract the most important keywords from the following job posting. Focus on:
-- Technical skills and technologies
-- Tools and frameworks
-- Methodologies and processes
-- Domain-specific terms
-- Required qualifications
-- Key responsibilities
+    // Second, extract keywords with categories
+    const keywordsPrompt = `Extract the most important keywords from the following job posting and categorize them. Focus on:
+- Technical skills and technologies (programming languages, technologies, platforms)
+- Tools and frameworks (development tools, libraries, frameworks)
+- Methodologies and processes (Agile, Scrum, DevOps, etc.)
+- Domain-specific terms (industry-specific knowledge)
+- Required qualifications (certifications, degrees, specific requirements)
+- Key responsibilities (action verbs, responsibilities mentioned)
 
 Job Title: ${title}
 
 Job Description:
 ${job}
 
-Return a comma-separated list of most important keywords that are relevant to a resume.
-Do not include explanations or additional text, just the keywords separated by commas. 
-Don't include any other text, explanations, or formatting.`;
+Return the keywords in the following JSON format:
+{
+  "technicalSkills": ["keyword1", "keyword2", ...],
+  "toolsFrameworks": ["keyword1", "keyword2", ...],
+  "methodologies": ["keyword1", "keyword2", ...],
+  "domainTerms": ["keyword1", "keyword2", ...],
+  "qualifications": ["keyword1", "keyword2", ...],
+  "responsibilities": ["keyword1", "keyword2", ...]
+}
+
+Only include keywords that are relevant to a resume. Return ONLY valid JSON, no other text or explanations.`;
 
     console.log('Analyzing job description for seniority level and keywords');
 
@@ -110,7 +118,8 @@ Don't include any other text, explanations, or formatting.`;
           }
         ],
         temperature: 0.3,
-        max_tokens: 200
+        max_tokens: 500,
+        response_format: { type: "json_object" }
       })
     ]);
 
@@ -148,31 +157,76 @@ Don't include any other text, explanations, or formatting.`;
       tone = 'mid'; // Default to mid if unclear
     }
 
-    // Get keywords and clean them up
+    // Get keywords and parse JSON
     let keywordsText = keywordsCompletion.choices[0].message.content.trim();
     console.log('Keywords text:', keywordsText);
-    // Remove any markdown formatting or quotes
-    keywordsText = keywordsText.replace(/^["']|["']$/g, '');
-    keywordsText = keywordsText.replace(/^```[\w]*\n?|\n?```$/g, '');
-    // Remove any points
-    keywordsText = keywordsText.replace(/^[-*•]\s+/gm, '');
-    keywordsText = keywordsText.replace(/^\d+\.\s+/gm, '');
-
-    console.log('Keywords text after cleaning:', keywordsText);
     
-    // Split by comma and clean each keyword
-    const keywords = keywordsText
-      .split(',')
-      .map(k => k.trim())
-      .filter(k => k.length > 0)
-    //   .slice(0, 20); // Limit to 20 keywords
+    // Remove markdown code blocks if present
+    keywordsText = keywordsText.replace(/^```json\s*|\s*```$/g, '');
+    keywordsText = keywordsText.replace(/^```\s*|\s*```$/g, '');
+    
+    let categorizedKeywords;
+    try {
+      categorizedKeywords = JSON.parse(keywordsText);
+      console.log('Categorized keywords:', categorizedKeywords);
+    } catch (error) {
+      console.error('Failed to parse keywords JSON:', error);
+      // Fallback: try to extract JSON from the response
+      const jsonMatch = keywordsText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        categorizedKeywords = JSON.parse(jsonMatch[0]);
+      } else {
+        // Ultimate fallback: return empty categories
+        categorizedKeywords = {
+          technicalSkills: [],
+          toolsFrameworks: [],
+          methodologies: [],
+          domainTerms: [],
+          qualifications: [],
+          responsibilities: []
+        };
+      }
+    }
 
-    console.log('Job description analysis completed successfully. Tone:', tone, 'Keywords:', keywords.length);
+    // Ensure all categories exist and are arrays
+    const keywords = {
+      technicalSkills: Array.isArray(categorizedKeywords.technicalSkills) 
+        ? categorizedKeywords.technicalSkills.filter((k: string) => k && k.trim().length > 0)
+        : [],
+      toolsFrameworks: Array.isArray(categorizedKeywords.toolsFrameworks)
+        ? categorizedKeywords.toolsFrameworks.filter((k: string) => k && k.trim().length > 0)
+        : [],
+      methodologies: Array.isArray(categorizedKeywords.methodologies)
+        ? categorizedKeywords.methodologies.filter((k: string) => k && k.trim().length > 0)
+        : [],
+      domainTerms: Array.isArray(categorizedKeywords.domainTerms)
+        ? categorizedKeywords.domainTerms.filter((k: string) => k && k.trim().length > 0)
+        : [],
+      qualifications: Array.isArray(categorizedKeywords.qualifications)
+        ? categorizedKeywords.qualifications.filter((k: string) => k && k.trim().length > 0)
+        : [],
+      responsibilities: Array.isArray(categorizedKeywords.responsibilities)
+        ? categorizedKeywords.responsibilities.filter((k: string) => k && k.trim().length > 0)
+        : []
+    };
+
+    // Create a flat list of all keywords for backward compatibility
+    const allKeywords = [
+      ...keywords.technicalSkills,
+      ...keywords.toolsFrameworks,
+      ...keywords.methodologies,
+      ...keywords.domainTerms,
+      ...keywords.qualifications,
+      ...keywords.responsibilities
+    ];
+
+    console.log('Job description analysis completed successfully. Tone:', tone, 'Total keywords:', allKeywords.length);
 
     return NextResponse.json({
       success: true,
       tone: tone,
-      keywords: keywords
+      keywords: allKeywords, // Keep for backward compatibility
+      keywordsByCategory: keywords // New categorized structure
     });
 
   } catch (error: any) {
