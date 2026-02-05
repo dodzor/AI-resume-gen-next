@@ -109,7 +109,6 @@ Return ONLY the modified summary text, without any markdown formatting, quotes, 
     based on the following information. Do not include any other text or formatting in your response:
 
 ${name ? `Candidate Name: ${name}` : ''}
-${email ? `Email: ${email}` : ''}
 ${experience ? `Work Experience:\n${experience}` : ''}
 ${education ? `Education:\n${education}` : ''}
 ${skills ? `Skills: ${skills}` : ''}

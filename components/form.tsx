@@ -54,7 +54,11 @@ export default function Form({
     const [improvingExperienceIndex, setImprovingExperienceIndex] = useState<number | null>(null)    
     const [rewritingBullet, setRewritingBullet] = useState<{ experienceIndex: number; bulletIndex: number } | null>(null)
     const [isAnalyzingJobDescription, setIsAnalyzingJobDescription] = useState(false)
-    const [analyzedTone, setAnalyzedTone] = useState<string | null>(formData.tone || null)    
+    const [analyzedTone, setAnalyzedTone] = useState<string | null>(formData.tone || null)
+    // Track selected keywords for each bullet: key = `${experienceIndex}-${bulletIndex}`
+    const [selectedKeywords, setSelectedKeywords] = useState<Record<string, string[]>>({})
+    // Track expanded state for showing all keywords: key = `${experienceIndex}-${bulletIndex}`
+    const [expandedKeywords, setExpandedKeywords] = useState<Record<string, boolean>>({})    
 
     // Use external state if provided, otherwise use internal state
     const currentStep = externalCurrentStep ?? internalCurrentStep
@@ -836,6 +840,32 @@ export default function Form({
         // Reconstruct the description with newlines (keep all bullets, including empty ones)
         const updatedDescription = bullets.join('\n')
         handleExperienceChange(experienceIndex, 'description', updatedDescription)
+        
+        // Auto-select/deselect keywords based on what's detected in the text
+        if (formData.keywords && formData.keywords.length > 0) {
+            const detectedKeywords = detectKeywordsInText(value)
+            const key = `${experienceIndex}-${bulletIndex}`
+            setSelectedKeywords((prev) => {
+                const current = prev[key] || []
+                // Set selected keywords to exactly match detected keywords
+                // This will auto-select new keywords and deselect removed ones
+                const detectedSet = new Set(detectedKeywords)
+                const currentSet = new Set(current)
+                
+                // Only update if there's a difference (to avoid unnecessary re-renders)
+                const hasChanges = detectedKeywords.length !== current.length ||
+                    detectedKeywords.some(k => !currentSet.has(k)) ||
+                    current.some(k => !detectedSet.has(k))
+                
+                if (hasChanges) {
+                    return {
+                        ...prev,
+                        [key]: detectedKeywords
+                    }
+                }
+                return prev
+            })
+        }
     }
 
     // Handle adding a new bullet point
@@ -867,6 +897,84 @@ export default function Form({
         handleExperienceChange(experienceIndex, 'description', updatedDescription)
     }
 
+    // Get keywords that could be relevant for a bullet point
+    const getRelevantKeywordsForBullet = (bulletText: string): string[] => {
+        if (!formData.keywords || formData.keywords.length === 0) {
+            return []
+        }
+        
+        const bulletLower = bulletText.toLowerCase()
+        
+        // Return keywords that are not already in the bullet point
+        // This helps the AI know which keywords to potentially incorporate
+        // return formData.keywords.filter((keyword: string) => {
+        //     const keywordLower = keyword.toLowerCase()
+        //     // Check if keyword is not already in the bullet (case-insensitive)
+        //     return !bulletLower.includes(keywordLower)
+        // })
+        return formData.keywords
+    }
+
+    // Detect which keywords are present in the bullet text
+    const detectKeywordsInText = (text: string): string[] => {
+        if (!formData.keywords || formData.keywords.length === 0 || !text.trim()) {
+            return []
+        }
+        
+        const textLower = text.toLowerCase()
+        const detectedKeywords: string[] = []
+        
+        formData.keywords.forEach((keyword: string) => {
+            const keywordLower = keyword.toLowerCase()
+            // Use word boundaries to match whole words (case-insensitive)
+            const escapedKeyword = keywordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'i')
+            if (regex.test(textLower)) {
+                detectedKeywords.push(keyword)
+            }
+        })
+        
+        return detectedKeywords
+    }
+
+    // Get selected keywords for a specific bullet
+    const getSelectedKeywords = (experienceIndex: number, bulletIndex: number): string[] => {
+        const key = `${experienceIndex}-${bulletIndex}`
+        return selectedKeywords[key] || []
+    }
+
+    // Toggle keyword selection for a specific bullet
+    const toggleKeywordSelection = (experienceIndex: number, bulletIndex: number, keyword: string) => {
+        const key = `${experienceIndex}-${bulletIndex}`
+        setSelectedKeywords((prev) => {
+            const current = prev[key] || []
+            const isSelected = current.includes(keyword)
+            
+            if (isSelected) {
+                // Remove keyword
+                return {
+                    ...prev,
+                    [key]: current.filter((k: string) => k !== keyword)
+                }
+            } else {
+                // Add keyword
+                return {
+                    ...prev,
+                    [key]: [...current, keyword]
+                }
+            }
+        })
+    }
+
+    // Toggle expanded state for showing all keywords
+    const toggleExpandedKeywords = (experienceIndex: number, bulletIndex: number) => {
+        const key = `${experienceIndex}-${bulletIndex}`
+        setExpandedKeywords((prev) => ({
+            ...prev,
+            [key]: !prev[key]
+        }))
+    }
+
     // Handle rewriting a single bullet point
     const handleRewriteBullet = async (experienceIndex: number, bulletIndex: number) => {
         const experience = experiences[experienceIndex]
@@ -886,6 +994,12 @@ export default function Form({
         setRewritingBullet({ experienceIndex, bulletIndex })
         
         try {
+            // Get selected keywords for this bullet, or fall back to all relevant keywords if none selected
+            const selected = getSelectedKeywords(experienceIndex, bulletIndex)
+            const keywordsToUse = selected.length > 0 
+                ? selected 
+                : getRelevantKeywordsForBullet(bulletToRewrite)
+            
             const response = await fetch('/api/rewrite-bullet', {
                 method: 'POST',
                 headers: {
@@ -896,6 +1010,7 @@ export default function Form({
                     role: experience.role,
                     company: experience.company,
                     allBullets: bullets,
+                    keywords: keywordsToUse,
                 }),
             })
     
@@ -907,6 +1022,15 @@ export default function Form({
         
             // Update the specific bullet point
             handleBulletChange(experienceIndex, bulletIndex, data.rewrittenBullet)
+            
+            // If no keywords were pre-selected and the API returned incorporated keywords, auto-select them
+            if (selected.length === 0 && data.incorporatedKeywords && Array.isArray(data.incorporatedKeywords) && data.incorporatedKeywords.length > 0) {
+                const key = `${experienceIndex}-${bulletIndex}`
+                setSelectedKeywords((prev) => ({
+                    ...prev,
+                    [key]: data.incorporatedKeywords
+                }))
+            }
         } catch (error) {
             console.error('Error rewriting bullet:', error)
             alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
@@ -1216,56 +1340,121 @@ export default function Form({
                                             
                                             return (
                                                 <div className="space-y-2">
-                                                    {displayBullets.map((bullet, bulletIndex) => (
-                                                        <div key={bulletIndex} className="flex items-center gap-2">
-                                                            <textarea
-                                                                cols={2}
-                                                                placeholder={`Bullet point ${bulletIndex + 1} (e.g., Built web applications using React and Node.js)`}
-                                                                value={bullet}
-                                                                onChange={(e) => handleBulletChange(index, bulletIndex, e.target.value)}
-                                                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleRewriteBullet(index, bulletIndex)}
-                                                                disabled={rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex || !bullet.trim()}
-                                                                className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded transition duration-200 flex items-center space-x-1 ${
-                                                                    rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex || !bullet.trim()
-                                                                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                                                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                                                                }`}
-                                                            >
-                                                                {rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex ? (
-                                                                    <>
-                                                                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                                        </svg>
-                                                                        <span>Rewriting...</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                                                        </svg>
-                                                                        <span>Rewrite</span>
-                                                                    </>
+                                                    {displayBullets.map((bullet, bulletIndex) => {
+                                                        const relevantKeywords = bullet.trim() ? getRelevantKeywordsForBullet(bullet) : (formData.keywords || [])
+                                                        const hasKeywords = formData.keywords && formData.keywords.length > 0
+                                                        const showKeywordPreview = hasKeywords && relevantKeywords.length > 0
+                                                        const selected = getSelectedKeywords(index, bulletIndex)
+                                                        const isExpanded = expandedKeywords[`${index}-${bulletIndex}`] || false
+                                                        const displayKeywords = isExpanded ? relevantKeywords : relevantKeywords.slice(0, 6)
+                                                        const hasMore = relevantKeywords.length > 6
+                                                        
+                                                        return (
+                                                            <div key={bulletIndex} className="space-y-1">
+                                                                {showKeywordPreview && (
+                                                                    <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                                                                        <span className="text-gray-500 font-medium">Keywords to incorporate:</span>
+                                                                        {displayKeywords.map((keyword: string, kwIndex: number) => {
+                                                                            const isSelected = selected.includes(keyword)
+                                                                            return (
+                                                                                <button
+                                                                                    key={kwIndex}
+                                                                                    type="button"
+                                                                                    onClick={() => toggleKeywordSelection(index, bulletIndex, keyword)}
+                                                                                    className={`px-2 py-0.5 rounded text-xs transition-all duration-200 cursor-pointer ${
+                                                                                        isSelected
+                                                                                            ? 'bg-blue-600 border border-blue-700 text-white font-medium'
+                                                                                            : 'bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100'
+                                                                                    }`}
+                                                                                    title={isSelected ? 'Click to deselect' : 'Click to select this keyword'}
+                                                                                >
+                                                                                    {keyword}
+                                                                                    {isSelected && (
+                                                                                        <span className="ml-1">✓</span>
+                                                                                    )}
+                                                                                </button>
+                                                                            )
+                                                                        })}
+                                                                        {hasMore && !isExpanded && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => toggleExpandedKeywords(index, bulletIndex)}
+                                                                                className="text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                                                                                title="Click to show all keywords"
+                                                                            >
+                                                                                +{relevantKeywords.length - 6} more
+                                                                            </button>
+                                                                        )}
+                                                                        {isExpanded && hasMore && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => toggleExpandedKeywords(index, bulletIndex)}
+                                                                                className="text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                                                                                title="Click to show fewer keywords"
+                                                                            >
+                                                                                Show less
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
                                                                 )}
-                                                            </button>
-                                                            {displayBullets.length > 1 && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleRemoveBullet(index, bulletIndex)}
-                                                                    className="flex-shrink-0 px-2 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition duration-200"
-                                                                    title="Remove this bullet point"
-                                                                >
-                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                                                                    </svg>
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    ))}
+                                                                <div className="flex items-center gap-2">
+                                                                    <textarea
+                                                                        cols={2}
+                                                                        placeholder={`Bullet point ${bulletIndex + 1} (e.g., Built web applications using React and Node.js)`}
+                                                                        value={bullet}
+                                                                        onChange={(e) => handleBulletChange(index, bulletIndex, e.target.value)}
+                                                                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                                                    />
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleRewriteBullet(index, bulletIndex)}
+                                                                            disabled={rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex || !bullet.trim()}
+                                                                            className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded transition duration-200 flex items-center space-x-1 ${
+                                                                                rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex || !bullet.trim()
+                                                                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                                                    : 'bg-purple-600 text-white hover:bg-purple-700'
+                                                                            }`}
+                                                                            title={hasKeywords && selected.length > 0
+                                                                                ? `Rewrite with ${selected.length} selected keyword${selected.length !== 1 ? 's' : ''}`
+                                                                                : hasKeywords && relevantKeywords.length > 0
+                                                                                ? `Rewrite with ${relevantKeywords.length} relevant keyword${relevantKeywords.length !== 1 ? 's' : ''} (select keywords above to customize)`
+                                                                                : 'Rewrite this bullet point'}
+                                                                        >
+                                                                            {rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex ? (
+                                                                                <>
+                                                                                    <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                                    </svg>
+                                                                                    <span>Rewriting...</span>
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                                                    </svg>
+                                                                                    <span>Rewrite</span>
+                                                                                </>
+                                                                            )}
+                                                                        </button>
+                                                                        {displayBullets.length > 1 && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRemoveBullet(index, bulletIndex)}
+                                                                                className="flex-shrink-0 px-2 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition duration-200"
+                                                                                title="Remove this bullet point"
+                                                                            >
+                                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                                                </svg>
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
                                                     
                                                     {/* Add new bullet button */}
                                                     <button
@@ -1282,7 +1471,7 @@ export default function Form({
                                             )
                                         })()}
                                         
-                                        <button
+                                        {/* <button
                                             type="button"
                                             onClick={() => handleImproveExperience(index)}
                                             disabled={improvingExperienceIndex === index || !exp.description?.trim()}
@@ -1308,7 +1497,7 @@ export default function Form({
                                                     <span>Improve description</span>
                                                 </>
                                             )}
-                                        </button>
+                                        </button> */}
                                         {/* <p className="mt-1 text-xs text-gray-500">Use bullet points to describe your responsibilities and achievements</p> */}
                                     </div>
                                 </div>

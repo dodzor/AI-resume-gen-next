@@ -17,14 +17,16 @@ export default function Content() {
           role: 'Software Developer',
           company: 'Tech Corp',
           dates: '2020-2023',
-          description: 'Built web applications using React and Node.js.\nImproved system performance by 40%.\nLed a team of 3 developers.'
+          // description: 'Built web applications using React and Node.js.\nImproved system performance by 40%.\nLed a team of 3 developers.'
+          description: ''
         },
-        {
-          role: 'Junior Developer',
-          company: 'StartupXYZ',
-          dates: '2019-2020',
-          description: 'Developed mobile apps using React Native.\nCollaborated with cross-functional teams.'
-        }
+        // {
+          // role: 'Junior Developer',
+          // company: 'StartupXYZ',
+          // dates: '2019-2020',
+          // description: 'Developed mobile apps using React Native.\nCollaborated with cross-functional teams.'
+          // description: ''
+        // }
       ],
       educationEntries: [
         {

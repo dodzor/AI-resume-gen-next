@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { bullet, role, company, allBullets } = body;
+    const { bullet, role, company, allBullets, keywords } = body;
 
     // Validate required fields
     if (!bullet || !bullet.trim()) {
@@ -36,6 +36,13 @@ export async function POST(request: NextRequest) {
       ? `\n\nOther bullet points in this role for context:\n${allBullets.map((b: string, i: number) => `${i + 1}. ${b}`).join('\n')}`
       : '';
 
+    // Prepare keywords information
+    const keywordsInfo = keywords && Array.isArray(keywords) && keywords.length > 0
+      ? `\n\nIMPORTANT: The following keywords from the job description should be naturally incorporated into the rewritten bullet point if they are relevant to this work. 
+      Only include keywords that make sense in context - do not force them in unnaturally:\n${keywords.map((k: string) => `- ${k}`).join('\n')}\n\n
+      When incorporating keywords, ensure they flow naturally within the sentence and maintain the bullet point's clarity and impact.`
+      : '';
+
     const prompt = `Rewrite the following single bullet point to make it more impactful and concrete. Convert any vague, task-based statements into a bullet that shows impact, results, or value, not just what the person was responsible for.
 
 Format: Action verb + what you did + how + result/impact
@@ -43,7 +50,7 @@ Format: Action verb + what you did + how + result/impact
 Bullet point to rewrite:
 ${bullet}
 ${role ? `Role: ${role}` : ''}
-${company ? `Company: ${company}` : ''}${contextInfo}
+${company ? `Company: ${company}` : ''}${contextInfo}${keywordsInfo}
 
 Requirements:
 - Transform the bullet point to show impact, results, or value
@@ -52,6 +59,7 @@ Requirements:
 - Use strong action verbs (e.g., "Developed", "Implemented", "Led", "Optimized", "Increased", "Reduced", "Built", "Delivered", "Launched", "Automated", "Scaled")
 - If specific metrics aren't available, focus on the impact or value delivered
 - Keep it concise but impactful
+${keywords && Array.isArray(keywords) && keywords.length > 0 ? `- Naturally incorporate relevant keywords from the job description when they fit the context\n- Prioritize keywords that are directly related to the work described in the bullet point\n${keywords.map((k: string) => `- ${k}`).join('\n')}` : ''}
 - Return ONLY the rewritten bullet point, without any prefixes, numbering, or formatting
 - Do not include explanations or notes
 - Do not add bullet point symbols (•, -, *)
@@ -131,11 +139,28 @@ Return ONLY the rewritten bullet point as a single line of text, without any pre
     // Remove any leading/trailing whitespace
     rewrittenBullet = rewrittenBullet.trim();
 
-    console.log('Bullet point rewritten successfully');
+    // Detect which keywords were actually incorporated into the rewritten bullet
+    const incorporatedKeywords: string[] = [];
+    if (keywords && Array.isArray(keywords) && keywords.length > 0) {
+      const rewrittenLower = rewrittenBullet.toLowerCase();
+      keywords.forEach((keyword: string) => {
+        const keywordLower = keyword.toLowerCase();
+        // Check if keyword appears in the rewritten bullet (case-insensitive, whole word match)
+        // Use word boundaries to match whole words
+        const escapedKeyword = keywordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
+        if (regex.test(rewrittenLower)) {
+          incorporatedKeywords.push(keyword);
+        }
+      });
+    }
+
+    console.log('Bullet point rewritten successfully. Incorporated keywords:', incorporatedKeywords.length);
 
     return NextResponse.json({
       success: true,
-      rewrittenBullet: rewrittenBullet
+      rewrittenBullet: rewrittenBullet,
+      incorporatedKeywords: incorporatedKeywords
     });
 
   } catch (error: any) {
