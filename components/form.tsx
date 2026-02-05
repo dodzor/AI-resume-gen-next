@@ -58,7 +58,13 @@ export default function Form({
     // Track selected keywords for each bullet: key = `${experienceIndex}-${bulletIndex}`
     const [selectedKeywords, setSelectedKeywords] = useState<Record<string, string[]>>({})
     // Track expanded state for showing all keywords: key = `${experienceIndex}-${bulletIndex}`
-    const [expandedKeywords, setExpandedKeywords] = useState<Record<string, boolean>>({})    
+    const [expandedKeywords, setExpandedKeywords] = useState<Record<string, boolean>>({})
+    // Track which bullet just got rewritten to show tooltip: key = `${experienceIndex}-${bulletIndex}`
+    const [showRewriteTooltip, setShowRewriteTooltip] = useState<Record<string, boolean>>({})
+    // Track info icon hover state: key = `${experienceIndex}-${bulletIndex}`
+    const [showInfoTooltip, setShowInfoTooltip] = useState<Record<string, boolean>>({})
+    // Track tooltip positions: key = `${experienceIndex}-${bulletIndex}`
+    const [tooltipPositions, setTooltipPositions] = useState<Record<string, { top: number; right: number }>>({})    
 
     // Use external state if provided, otherwise use internal state
     const currentStep = externalCurrentStep ?? internalCurrentStep
@@ -1031,6 +1037,22 @@ export default function Form({
                     [key]: data.incorporatedKeywords
                 }))
             }
+            
+            // Show tooltip after successful rewrite
+            const key = `${experienceIndex}-${bulletIndex}`
+            setShowRewriteTooltip((prev) => ({
+                ...prev,
+                [key]: true
+            }))
+            
+            // Auto-hide tooltip after 5 seconds
+            setTimeout(() => {
+                setShowRewriteTooltip((prev) => {
+                    const updated = { ...prev }
+                    delete updated[key]
+                    return updated
+                })
+            }, 5000)
         } catch (error) {
             console.error('Error rewriting bullet:', error)
             alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
@@ -1277,7 +1299,7 @@ export default function Form({
                         </div>
                         
                         {experiences.map((exp: any, index: number) => (
-                            <div key={index} className="border border-gray-200 rounded-lg p-5 bg-gray-50">
+                            <div key={index} className="border border-gray-200 rounded-lg p-5 bg-gray-50" style={{ overflow: 'visible' }}>
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-sm font-semibold text-gray-700">Experience #{index + 1}</h3>
                                     {experiences.length > 1 && (
@@ -1397,7 +1419,7 @@ export default function Form({
                                                                         )}
                                                                     </div>
                                                                 )}
-                                                                <div className="flex items-center gap-2">
+                                                                <div className="flex items-center gap-2" style={{ overflow: 'visible' }}>
                                                                     <textarea
                                                                         cols={2}
                                                                         placeholder={`Bullet point ${bulletIndex + 1} (e.g., Built web applications using React and Node.js)`}
@@ -1406,38 +1428,149 @@ export default function Form({
                                                                         className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
                                                                     />
                                                                     <div className="flex flex-col gap-1">
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleRewriteBullet(index, bulletIndex)}
-                                                                            disabled={rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex || !bullet.trim()}
-                                                                            className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded transition duration-200 flex items-center space-x-1 ${
-                                                                                rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex || !bullet.trim()
-                                                                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                                                                    : 'bg-purple-600 text-white hover:bg-purple-700'
-                                                                            }`}
-                                                                            title={hasKeywords && selected.length > 0
-                                                                                ? `Rewrite with ${selected.length} selected keyword${selected.length !== 1 ? 's' : ''}`
-                                                                                : hasKeywords && relevantKeywords.length > 0
-                                                                                ? `Rewrite with ${relevantKeywords.length} relevant keyword${relevantKeywords.length !== 1 ? 's' : ''} (select keywords above to customize)`
-                                                                                : 'Rewrite this bullet point'}
-                                                                        >
-                                                                            {rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex ? (
-                                                                                <>
-                                                                                    <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                                                    </svg>
-                                                                                    <span>Rewriting...</span>
-                                                                                </>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                                                                    </svg>
-                                                                                    <span>Rewrite</span>
-                                                                                </>
+                                                                        <div className="flex items-center gap-1 relative" style={{ overflow: 'visible' }}>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRewriteBullet(index, bulletIndex)}
+                                                                                disabled={rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex || !bullet.trim()}
+                                                                                className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded transition duration-200 flex items-center space-x-1 ${
+                                                                                    rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex || !bullet.trim()
+                                                                                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                                                        : 'bg-purple-600 text-white hover:bg-purple-700'
+                                                                                }`}
+                                                                                title={hasKeywords && selected.length > 0
+                                                                                    ? `Rewrite with ${selected.length} selected keyword${selected.length !== 1 ? 's' : ''}`
+                                                                                    : hasKeywords && relevantKeywords.length > 0
+                                                                                    ? `Rewrite with ${relevantKeywords.length} relevant keyword${relevantKeywords.length !== 1 ? 's' : ''} (select keywords above to customize)`
+                                                                                    : 'Rewrite this bullet point'}
+                                                                            >
+                                                                                {rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex ? (
+                                                                                    <>
+                                                                                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                                        </svg>
+                                                                                        <span>Rewriting...</span>
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                                                        </svg>
+                                                                                        <span>Rewrite</span>
+                                                                                    </>
+                                                                                )}
+                                                                            </button>
+                                                                            
+                                                                            {/* Info Icon */}
+                                                                            <button
+                                                                                type="button"
+                                                                                onMouseEnter={(e) => {
+                                                                                    const key = `${index}-${bulletIndex}`
+                                                                                    setShowInfoTooltip((prev) => ({ ...prev, [key]: true }))
+                                                                                    // Store button position for tooltip positioning
+                                                                                    const rect = e.currentTarget.getBoundingClientRect()
+                                                                                    setTooltipPositions((prev) => ({
+                                                                                        ...prev,
+                                                                                        [key]: { 
+                                                                                            top: rect.bottom + 4, 
+                                                                                            right: window.innerWidth - rect.right 
+                                                                                        }
+                                                                                    }))
+                                                                                }}
+                                                                                onMouseLeave={() => {
+                                                                                    const key = `${index}-${bulletIndex}`
+                                                                                    setShowInfoTooltip((prev) => {
+                                                                                        const updated = { ...prev }
+                                                                                        delete updated[key]
+                                                                                        return updated
+                                                                                    })
+                                                                                    setTooltipPositions((prev) => {
+                                                                                        const updated = { ...prev }
+                                                                                        delete updated[key]
+                                                                                        return updated
+                                                                                    })
+                                                                                }}
+                                                                                className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-700 flex items-center justify-center transition duration-200"
+                                                                                title="Learn about the rewrite format"
+                                                                            >
+                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                                                </svg>
+                                                                            </button>
+                                                                            
+                                                                            {/* Info Tooltip (persistent on hover) - using fixed positioning */}
+                                                                            {showInfoTooltip[`${index}-${bulletIndex}`] && (() => {
+                                                                                const key = `${index}-${bulletIndex}`
+                                                                                const position = tooltipPositions[key]
+                                                                                return (
+                                                                                    <div 
+                                                                                        className="fixed w-80 bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-[9999] pointer-events-auto"
+                                                                                        style={{ 
+                                                                                            maxWidth: 'min(320px, calc(100vw - 2rem))',
+                                                                                            top: position ? `${position.top}px` : 'auto',
+                                                                                            right: position ? `${position.right}px` : '1rem',
+                                                                                            bottom: position ? 'auto' : '1rem'
+                                                                                        }}
+                                                                                    >
+                                                                                        <h4 className="font-semibold text-sm text-gray-900 mb-2">Why this format?</h4>
+                                                                                        <p className="text-xs text-gray-700 mb-3">
+                                                                                            We use the format: <strong>Action verb + what you did + how + result/impact</strong>
+                                                                                        </p>
+                                                                                        <p className="text-xs text-gray-600 mb-2">
+                                                                                            Recruiters think in terms of:
+                                                                                        </p>
+                                                                                        <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                                                                                            <li><strong>Impact</strong> - What changed or improved?</li>
+                                                                                            <li><strong>Results</strong> - What were the measurable outcomes?</li>
+                                                                                            <li><strong>Scale</strong> - How many people/systems/projects?</li>
+                                                                                            <li><strong>Improvement</strong> - What got better?</li>
+                                                                                        </ul>
+                                                                                        <p className="text-xs text-gray-600 mt-3">
+                                                                                            This format helps your resume pass ATS systems and catch recruiters' attention.
+                                                                                        </p>
+                                                                                    </div>
+                                                                                )
+                                                                            })()}
+                                                                            
+                                                                            {/* Post-rewrite Tooltip */}
+                                                                            {showRewriteTooltip[`${index}-${bulletIndex}`] && (
+                                                                                <div className="absolute right-0 top-full mt-1 w-80 bg-blue-50 border border-blue-200 rounded-lg shadow-lg p-4 z-50 transition-all duration-300 opacity-100">
+                                                                                    <div className="flex items-start justify-between">
+                                                                                        <div className="flex-1">
+                                                                                            <h4 className="font-semibold text-sm text-blue-900 mb-2 flex items-center gap-2">
+                                                                                                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                                                                </svg>
+                                                                                                Rewritten with impact-focused format
+                                                                                            </h4>
+                                                                                            <p className="text-xs text-blue-800 mb-2">
+                                                                                                Format: <strong>Action verb + what you did + how + result/impact</strong>
+                                                                                            </p>
+                                                                                            <p className="text-xs text-blue-700">
+                                                                                                Recruiters focus on: Impact, Results, Scale, Improvement
+                                                                                            </p>
+                                                                                        </div>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => {
+                                                                                                const key = `${index}-${bulletIndex}`
+                                                                                                setShowRewriteTooltip((prev) => {
+                                                                                                    const updated = { ...prev }
+                                                                                                    delete updated[key]
+                                                                                                    return updated
+                                                                                                })
+                                                                                            }}
+                                                                                            className="flex-shrink-0 ml-2 text-blue-600 hover:text-blue-800"
+                                                                                        >
+                                                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                                                            </svg>
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
                                                                             )}
-                                                                        </button>
+                                                                        </div>
                                                                         {displayBullets.length > 1 && (
                                                                             <button
                                                                                 type="button"
@@ -2186,12 +2319,12 @@ export default function Form({
     }
 
     return (
-        <div className="bg-white rounded-xl shadow-lg p-8">
+        <div className="bg-white rounded-xl shadow-lg p-8" style={{ overflow: 'visible' }}>
             <ProgressIndicator />
     
-            <div className="space-y-6">
+            <div className="space-y-6" style={{ overflow: 'visible' }}>
                 {/* Step Content */}
-                <div className="min-h-[300px]">
+                <div className="min-h-[300px]" style={{ overflow: 'visible' }}>
                     {renderStepContent()}
                 </div>
 
