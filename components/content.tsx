@@ -1,6 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useMutation } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
 import Result from './result'
 import Form from './form'
 
@@ -62,7 +65,10 @@ export default function Content() {
       ],
       portfolioLink: '',
       job: 'Senior Full Stack Developer position requiring expertise in modern web technologies, database design, and team collaboration. Looking for someone with 3+ years experience in React, Node.js, and cloud platforms.',
-      template: 'professional-blue' as const
+      template: 'professional-blue' as const,
+      jobTitle: '',
+      tone: '',
+      summary: ''
     })
     
     const [isGenerating, setIsGenerating] = useState(false)
@@ -70,6 +76,101 @@ export default function Content() {
     const [isFormCompleted, setIsFormCompleted] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
     const [showPreview, setShowPreview] = useState(true)
+    
+    // Convex mutations for auto-save
+    const saveResume = useMutation(api.resumes.saveResume)
+    const [currentResumeId, setCurrentResumeId] = useState<Id<'resumes'> | null>(null)
+    const [isSaving, setIsSaving] = useState(false)
+    const [lastSaved, setLastSaved] = useState<Date | null>(null)
+    const [hasStartedEditing, setHasStartedEditing] = useState(false)
+    
+    // Ref to track if this is the initial mount (skip auto-save on mount)
+    const isInitialMount = useRef(true)
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    
+    // Auto-save function - memoized with useCallback
+    const handleAutoSave = useCallback(async () => {
+      console.log('handleAutoSave called', { formData, currentResumeId })
+      
+      // Mark that editing has started
+      setHasStartedEditing(true)
+      
+      // Don't save if form is empty or missing required fields
+      if (!formData.name || !formData.email) {
+        console.log('Skipping save - missing required fields')
+        return
+      }
+      
+      try {
+        setIsSaving(true)
+        console.log('Saving resume...', formData)
+        const resumeId = await saveResume({
+          resumeId: currentResumeId ?? undefined,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone || undefined,
+          location: formData.location || undefined,
+          experiences: formData.experiences || [],
+          educationEntries: formData.educationEntries || [],
+          certifications: formData.certifications || [],
+          skills: formData.skills || '',
+          portfolioProjects: formData.portfolioProjects || [],
+          portfolioLink: formData.portfolioLink || undefined,
+          job: formData.job || undefined,
+          jobTitle: formData.jobTitle || undefined,
+          template: formData.template || undefined,
+          tone: formData.tone || undefined,
+          summary: formData.summary || undefined,
+          generatedResume: generatedResume || undefined,
+        })
+        
+        setCurrentResumeId(resumeId)
+        setLastSaved(new Date())
+      } catch (error) {
+        console.error('Failed to auto-save resume:', error)
+        // Silently fail for auto-save - user can manually save if needed
+      } finally {
+        setIsSaving(false)
+      }
+    }, [formData, generatedResume, currentResumeId, saveResume])
+    
+    // Auto-save effect with 2 second debounce
+    useEffect(() => {
+      console.log('Auto-save useEffect triggered', { 
+        isInitialMount: isInitialMount.current,
+        formDataName: formData.name,
+        formDataEmail: formData.email 
+      })
+      
+      // Skip on initial mount
+      if (isInitialMount.current) {
+        console.log('Skipping initial mount')
+        isInitialMount.current = false
+        return
+      }
+      
+      console.log('Setting up auto-save timeout (2 seconds)')
+      
+      // Clear any existing timeout
+      if (saveTimeoutRef.current) {
+        console.log('Clearing existing timeout')
+        clearTimeout(saveTimeoutRef.current)
+      }
+      
+      // Set new timeout for 2 seconds
+      saveTimeoutRef.current = setTimeout(() => {
+        console.log('Timeout fired - calling handleAutoSave')
+        handleAutoSave()
+      }, 2000)
+      
+      // Cleanup timeout on unmount or when dependencies change
+      return () => {
+        if (saveTimeoutRef.current) {
+          console.log('Cleaning up timeout')
+          clearTimeout(saveTimeoutRef.current)
+        }
+      }
+    }, [formData, generatedResume, handleAutoSave]) // Watch formData and generatedResume directly
   
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -78,6 +179,22 @@ export default function Content() {
           <div className="text-center py-6 px-4 sm:px-6">
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-2">🤖 AI Resume Generator</h1>
             <p className="text-gray-600 text-base sm:text-lg">Create a professional resume in seconds with AI assistance</p>
+            {/* Auto-save status indicator */}
+            {hasStartedEditing && (
+              <div className="mt-2 text-sm text-gray-500">
+                {isSaving ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="animate-spin">💾</span>
+                    <span>Saving...</span>
+                  </span>
+                ) : lastSaved ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span>✓</span>
+                    <span>Saved {lastSaved.toLocaleTimeString()}</span>
+                  </span>
+                ) : null}
+              </div>
+            )}
           </div>
   
           <div className="px-4 sm:px-6 pb-6">
