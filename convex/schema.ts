@@ -54,6 +54,17 @@ export default defineSchema({
     tone: v.optional(v.string()), // 'junior' | 'mid' | 'senior'
     summary: v.optional(v.string()), // AI-generated summary
     
+    // Keywords
+    keywords: v.optional(v.array(v.string())), // Flat array of keywords (for backward compatibility)
+    keywordsByCategory: v.optional(v.object({
+      technicalSkills: v.array(v.string()),
+      toolsFrameworks: v.array(v.string()),
+      methodologies: v.array(v.string()),
+      domainTerms: v.array(v.string()),
+      qualifications: v.array(v.string()),
+      responsibilities: v.array(v.string()),
+    })),
+    
     // Generated Resume (HTML string)
     generatedResume: v.optional(v.string()),
     

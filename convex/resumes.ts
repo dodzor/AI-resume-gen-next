@@ -38,6 +38,15 @@ export const saveResume = mutation({
     template: v.optional(v.string()),
     tone: v.optional(v.string()),
     summary: v.optional(v.string()),
+    keywords: v.optional(v.array(v.string())),
+    keywordsByCategory: v.optional(v.object({
+      technicalSkills: v.array(v.string()),
+      toolsFrameworks: v.array(v.string()),
+      methodologies: v.array(v.string()),
+      domainTerms: v.array(v.string()),
+      qualifications: v.array(v.string()),
+      responsibilities: v.array(v.string()),
+    })),
     generatedResume: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
