@@ -19,6 +19,7 @@ interface FormProps {
   setCurrentStep?: (step: number) => void
   showPreview?: boolean
   setShowPreview?: (show: boolean) => void
+  onSave?: () => Promise<void>
 }
 
 const STEPS = [
@@ -36,14 +37,15 @@ export default function Form({
   formData, 
   setFormData, 
   isGenerating, 
-  setIsGenerating, 
+  setIsGenerating,
   setGeneratedResume,
   isFormCompleted,
   setIsFormCompleted,
   currentStep: externalCurrentStep,
   setCurrentStep: setExternalCurrentStep,
   showPreview: externalShowPreview,
-  setShowPreview: setExternalShowPreview
+  setShowPreview: setExternalShowPreview,
+  onSave
 }: FormProps) {
     const [internalCurrentStep, setInternalCurrentStep] = useState(1)
     const [internalShowPreview, setInternalShowPreview] = useState(true)
@@ -390,24 +392,36 @@ export default function Form({
         }))
     }
 
-    const nextStep = () => {
+    const nextStep = async () => {
         if (validateStep(currentStep) && currentStep < STEPS.length) {
+            // Save before navigating to next step
+            if (onSave) {
+                await onSave()
+            }
             const nextStepNum = currentStep + 1
             setCurrentStep(nextStepNum)
             setMaxStepReached(prev => Math.max(prev, nextStepNum))
         }
     }
 
-    const prevStep = () => {
+    const prevStep = async () => {
         if (currentStep > 1) {
+            // Save before navigating to previous step
+            if (onSave) {
+                await onSave()
+            }
             setCurrentStep(currentStep - 1)
         }
     }
 
-    const goToStep = (step: number) => {
+    const goToStep = async (step: number) => {
         // Allow going to any step that has been completed (step <= maxStepReached)
         // Or allow going to the next step if current step is valid
         if (step <= maxStepReached || (step === currentStep + 1 && validateStep(currentStep))) {
+            // Save before navigating to step
+            if (onSave) {
+                await onSave()
+            }
             setCurrentStep(step)
             setMaxStepReached(prev => Math.max(prev, step))
         }
@@ -1065,6 +1079,9 @@ export default function Form({
         <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
                 {STEPS.map((step, index) => (
+                    console.log('step', step),
+                    console.log('currentStep', currentStep),
+                    console.log('maxStepReached', maxStepReached),
                     <div key={step.id} className="flex items-center">
                         <button
                             type="button"

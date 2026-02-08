@@ -64,85 +64,20 @@ export default function Content() {
     const [lastSaved, setLastSaved] = useState<Date | null>(null)
     const [hasStartedEditing, setHasStartedEditing] = useState(false)
     
-    // Loading and auto-save control
+    // Loading control
     const [isLoadingResume, setIsLoadingResume] = useState(true)
-    const [hasUserEdited, setHasUserEdited] = useState(false)
     const [loadedResumeData, setLoadedResumeData] = useState<any>(null)
     
-    // Refs for auto-save control
+    // Refs for loading control
     const isInitialMount = useRef(true)
-    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const isLoadingFromConvex = useRef(false)
     
-    // Helper function to check if formData has changed from loaded data
-    const hasFormDataChanged = useCallback(() => {
-      if (!loadedResumeData) return true // If no loaded data, consider it changed
-      
-      // Deep comparison of key fields
-      const current = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        location: formData.location,
-        experiences: JSON.stringify(formData.experiences),
-        educationEntries: JSON.stringify(formData.educationEntries),
-        certifications: JSON.stringify(formData.certifications),
-        skills: formData.skills,
-        portfolioProjects: JSON.stringify(formData.portfolioProjects),
-        portfolioLink: formData.portfolioLink,
-        job: formData.job,
-        jobTitle: formData.jobTitle,
-        template: formData.template,
-        tone: formData.tone,
-        summary: formData.summary,
-        keywords: JSON.stringify(formData.keywords || []),
-        keywordsByCategory: JSON.stringify(formData.keywordsByCategory || {}),
-        generatedResume: generatedResume
-      }
-      
-      const loaded = {
-        name: loadedResumeData.name || '',
-        email: loadedResumeData.email || '',
-        phone: loadedResumeData.phone || '',
-        location: loadedResumeData.location || '',
-        experiences: JSON.stringify(loadedResumeData.experiences || []),
-        educationEntries: JSON.stringify(loadedResumeData.educationEntries || []),
-        certifications: JSON.stringify(loadedResumeData.certifications || []),
-        skills: loadedResumeData.skills || '',
-        portfolioProjects: JSON.stringify(loadedResumeData.portfolioProjects || []),
-        portfolioLink: loadedResumeData.portfolioLink || '',
-        job: loadedResumeData.job || '',
-        jobTitle: loadedResumeData.jobTitle || '',
-        template: loadedResumeData.template || '',
-        tone: loadedResumeData.tone || '',
-        summary: loadedResumeData.summary || '',
-        keywords: JSON.stringify(loadedResumeData.keywords || []),
-        keywordsByCategory: JSON.stringify(loadedResumeData.keywordsByCategory || {}),
-        generatedResume: loadedResumeData.generatedResume || ''
-      }
-      
-      return JSON.stringify(current) !== JSON.stringify(loaded)
-    }, [formData, generatedResume, loadedResumeData])
-    
-    // Auto-save function - memoized with useCallback
-    const handleAutoSave = useCallback(async () => {
+    // Save function - called when user navigates steps
+    const handleSave = useCallback(async () => {
       // Don't save if still loading from Convex
       if (isLoadingFromConvex.current) {
         return
       }
-      
-      // Don't save if user hasn't edited yet
-      if (!hasUserEdited) {
-        return
-      }
-      
-      // Don't save if form hasn't actually changed
-      if (!hasFormDataChanged()) {
-        return
-      }
-      
-      // Mark that editing has started
-      setHasStartedEditing(true)
       
       // Don't save if form is empty or missing required fields
       if (!formData.name || !formData.email) {
@@ -175,6 +110,7 @@ export default function Content() {
         
         setCurrentResumeId(resumeId)
         setLastSaved(new Date())
+        setHasStartedEditing(true)
         
         // Update localStorage
         if (resumeId) {
@@ -187,12 +123,12 @@ export default function Content() {
           })
         }
       } catch (error) {
-        console.error('Failed to auto-save resume:', error)
-        // Silently fail for auto-save - user can manually save if needed
+        console.error('Failed to save resume:', error)
+        alert('Failed to save resume. Please try again.')
       } finally {
         setIsSaving(false)
       }
-    }, [formData, generatedResume, currentResumeId, saveResume, hasUserEdited, hasFormDataChanged])
+    }, [formData, generatedResume, currentResumeId, saveResume])
     
     // Load resume on mount
     useEffect(() => {
@@ -301,7 +237,6 @@ export default function Content() {
         setTimeout(() => {
           isLoadingFromConvex.current = false
           setIsLoadingResume(false)
-          setHasUserEdited(false) // Reset user edit flag
         }, 100)
       } else if (currentResumeId === null && resumes && resumes.length === 0) {
         // No resumes exist
@@ -310,45 +245,13 @@ export default function Content() {
       }
     }, [currentResumeId, getResume, resumes])
     
-    // Track user edits
-    useEffect(() => {
-      if (!isLoadingFromConvex.current && !isInitialMount.current) {
-        setHasUserEdited(true)
-      }
-    }, [formData, generatedResume])
     
-    // Auto-save effect with 2 second debounce
+    // Mark initial mount as complete
     useEffect(() => {
-      // Skip on initial mount or while loading
-      if (isInitialMount.current || isLoadingFromConvex.current) {
-        if (isInitialMount.current) {
-          isInitialMount.current = false
-        }
-        return
+      if (isInitialMount.current) {
+        isInitialMount.current = false
       }
-      
-      // Only auto-save if user has edited
-      if (!hasUserEdited) {
-        return
-      }
-      
-      // Clear any existing timeout
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
-      
-      // Set new timeout for 2 seconds
-      saveTimeoutRef.current = setTimeout(() => {
-        handleAutoSave()
-      }, 2000)
-      
-      // Cleanup timeout on unmount or when dependencies change
-      return () => {
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current)
-        }
-      }
-    }, [formData, generatedResume, handleAutoSave, hasUserEdited])
+    }, [])
     
     // Handler for creating new resume
     const handleCreateNew = useCallback(() => {
@@ -357,7 +260,6 @@ export default function Content() {
       setGeneratedResume('')
       setCurrentResumeId(null)
       setLoadedResumeData(null)
-      setHasUserEdited(false)
       localStorage.removeItem(LAST_EDITED_RESUME_KEY)
       isLoadingFromConvex.current = false
       setIsLoadingResume(false)
@@ -368,7 +270,6 @@ export default function Content() {
       setCurrentResumeId(resumeId)
       isLoadingFromConvex.current = true
       setIsLoadingResume(true)
-      setHasUserEdited(false)
     }, [])
     
     // Get current resume data for switcher
@@ -451,6 +352,7 @@ export default function Content() {
                       setCurrentStep={setCurrentStep}
                       showPreview={showPreview}
                       setShowPreview={setShowPreview}
+                      onSave={handleSave}
                     />
                 <Result 
                   formData={formData} 
@@ -477,6 +379,7 @@ export default function Content() {
                       setCurrentStep={setCurrentStep}
                       showPreview={showPreview}
                       setShowPreview={setShowPreview}
+                      onSave={handleSave}
                     />
                   </div>
                 </div>

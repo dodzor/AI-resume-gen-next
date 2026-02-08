@@ -52,11 +52,6 @@ export default function ResumeSwitcher({
         <div className="text-sm text-gray-600">
           <span className="font-medium">Editing:</span>{' '}
           <span className="text-gray-800">{currentResume.name}</span>
-          {currentResume.updatedAt && (
-            <span className="text-gray-500 ml-2">
-              • Last saved {new Date(currentResume.updatedAt).toLocaleTimeString()}
-            </span>
-          )}
         </div>
         <div className="flex gap-2">
           <button
