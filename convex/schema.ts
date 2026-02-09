@@ -69,6 +69,7 @@ export default defineSchema({
     generatedResume: v.optional(v.string()),
     
     // Metadata
+    maxStepReached: v.optional(v.number()), // Last completed step (1-8)
     createdAt: v.number(),
     updatedAt: v.number(),
   })

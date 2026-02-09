@@ -48,6 +48,7 @@ export const saveResume = mutation({
       responsibilities: v.array(v.string()),
     })),
     generatedResume: v.optional(v.string()),
+    maxStepReached: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     // Get authenticated user

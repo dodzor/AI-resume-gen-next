@@ -67,10 +67,13 @@ export default function Content() {
     // Loading control
     const [isLoadingResume, setIsLoadingResume] = useState(true)
     const [loadedResumeData, setLoadedResumeData] = useState<any>(null)
+
+    const [maxStepReached, setMaxStepReached] = useState<number>(1) // Track the maximum step reached in the form
     
     // Refs for loading control
     const isInitialMount = useRef(true)
     const isLoadingFromConvex = useRef(false)
+    const lastLoadedResumeId = useRef<string | null>(null)
     
     // Save function - called when user navigates steps
     const handleSave = useCallback(async () => {
@@ -106,6 +109,7 @@ export default function Content() {
           keywords: formData.keywords || undefined,
           keywordsByCategory: formData.keywordsByCategory || undefined,
           generatedResume: generatedResume || undefined,
+          maxStepReached: maxStepReached || undefined,
         })
         
         setCurrentResumeId(resumeId)
@@ -128,7 +132,7 @@ export default function Content() {
       } finally {
         setIsSaving(false)
       }
-    }, [formData, generatedResume, currentResumeId, saveResume])
+    }, [formData, generatedResume, currentResumeId, maxStepReached, saveResume])
     
     // Load resume on mount
     useEffect(() => {
@@ -168,6 +172,8 @@ export default function Content() {
             // No resumes exist - start with empty form
             setFormData(getDefaultFormData())
             setCurrentResumeId(null)
+            setCurrentStep(1)
+            setMaxStepReached(1)
             isLoadingFromConvex.current = false
             setIsLoadingResume(false)
           }
@@ -186,6 +192,9 @@ export default function Content() {
     // Load resume data when currentResumeId or getResume result changes
     useEffect(() => {
       if (currentResumeId && getResume) {
+        // Check if we're actually switching to a different resume
+        const isSwitchingResume = lastLoadedResumeId.current !== currentResumeId
+        
         isLoadingFromConvex.current = true
         
         // Map Convex resume to form data
@@ -230,6 +239,23 @@ export default function Content() {
           _id: currentResumeId
         })
         
+        // Only restore step position when actually switching resumes, not when navigating
+        if (isSwitchingResume) {
+          // Restore maxStepReached and set currentStep to next step
+          const savedMaxStep = getResume.maxStepReached || 0
+          setMaxStepReached(savedMaxStep)
+          // Set currentStep to maxStepReached or 8 if it's greater than 8
+          const nextStep = savedMaxStep >= 8 ? 8 : savedMaxStep
+          setCurrentStep(nextStep)
+        } else {
+          // Just restore maxStepReached without changing currentStep
+          const savedMaxStep = getResume.maxStepReached || 0
+          setMaxStepReached(savedMaxStep)
+        }
+        
+        // Update the last loaded resume ID
+        lastLoadedResumeId.current = currentResumeId
+        
         // Update localStorage
         localStorage.setItem(LAST_EDITED_RESUME_KEY, currentResumeId)
         
@@ -260,6 +286,9 @@ export default function Content() {
       setGeneratedResume('')
       setCurrentResumeId(null)
       setLoadedResumeData(null)
+      setCurrentStep(1)
+      setMaxStepReached(1)
+      lastLoadedResumeId.current = null
       localStorage.removeItem(LAST_EDITED_RESUME_KEY)
       isLoadingFromConvex.current = false
       setIsLoadingResume(false)
@@ -379,6 +408,8 @@ export default function Content() {
                       setCurrentStep={setCurrentStep}
                       showPreview={showPreview}
                       setShowPreview={setShowPreview}
+                      maxStepReached={maxStepReached}
+                      setMaxStepReached={setMaxStepReached}
                       onSave={handleSave}
                     />
                   </div>

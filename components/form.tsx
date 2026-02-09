@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { TEMPLATES, TemplateId } from '../lib/templates'
 
 import { generateFileName } from '../lib/pdfUtils'
@@ -19,6 +19,8 @@ interface FormProps {
   setCurrentStep?: (step: number) => void
   showPreview?: boolean
   setShowPreview?: (show: boolean) => void
+  maxStepReached?: number
+  setMaxStepReached?: (step: number) => void
   onSave?: () => Promise<void>
 }
 
@@ -45,18 +47,20 @@ export default function Form({
   setCurrentStep: setExternalCurrentStep,
   showPreview: externalShowPreview,
   setShowPreview: setExternalShowPreview,
+  maxStepReached: externalMaxStepReached,
+  setMaxStepReached: setExternalMaxStepReached,
   onSave
 }: FormProps) {
     const [internalCurrentStep, setInternalCurrentStep] = useState(1)
     const [internalShowPreview, setInternalShowPreview] = useState(true)
-    const [maxStepReached, setMaxStepReached] = useState(1)
+    const [internalMaxStepReached, setInternalMaxStepReached] = useState(1)
 
     const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)   
     const [isDownloading, setIsDownloading] = useState(false)
     const [improvingExperienceIndex, setImprovingExperienceIndex] = useState<number | null>(null)    
     const [rewritingBullet, setRewritingBullet] = useState<{ experienceIndex: number; bulletIndex: number } | null>(null)
     const [isAnalyzingJobDescription, setIsAnalyzingJobDescription] = useState(false)
-    const [analyzedTone, setAnalyzedTone] = useState<string | null>(formData.tone || null)
+    const [analyzedTone, setAnalyzedTone] = useState<string | null>(null)
     // Track selected keywords for each bullet: key = `${experienceIndex}-${bulletIndex}`
     const [selectedKeywords, setSelectedKeywords] = useState<Record<string, string[]>>({})
     // Track expanded state for showing all keywords: key = `${experienceIndex}-${bulletIndex}`
@@ -71,8 +75,22 @@ export default function Form({
     // Use external state if provided, otherwise use internal state
     const currentStep = externalCurrentStep ?? internalCurrentStep
     const setCurrentStep = setExternalCurrentStep ?? setInternalCurrentStep
+    const maxStepReached = externalMaxStepReached ?? internalMaxStepReached
+    const setMaxStepReached = setExternalMaxStepReached ?? setInternalMaxStepReached
     const showPreview = externalShowPreview ?? internalShowPreview
     const setShowPreview = setExternalShowPreview ?? setInternalShowPreview
+
+    // Sync maxStepReached with currentStep - ensures it's always at least equal to currentStep
+    useEffect(() => {
+        const currentMax = externalMaxStepReached ?? internalMaxStepReached
+        if (currentStep > currentMax) {
+            if (setExternalMaxStepReached) {
+                setExternalMaxStepReached(currentStep)
+            } else {
+                setInternalMaxStepReached(currentStep)
+            }
+        }
+    }, [currentStep, externalMaxStepReached, internalMaxStepReached, setExternalMaxStepReached])
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target
@@ -385,6 +403,17 @@ export default function Form({
         }
     }
 
+    // Check if all steps from currentStep to targetStep (inclusive) are valid
+    const areAllStepsValid = (fromStep: number, toStep: number): boolean => {
+        if (fromStep > toStep) return false
+        for (let step = fromStep; step <= toStep; step++) {
+            if (!validateStep(step)) {
+                return false
+            }
+        }
+        return true
+    }
+
     const handleTemplateSelect = (templateId: TemplateId) => {
         setFormData((prev: any) => ({
             ...prev,
@@ -400,7 +429,11 @@ export default function Form({
             }
             const nextStepNum = currentStep + 1
             setCurrentStep(nextStepNum)
-            setMaxStepReached(prev => Math.max(prev, nextStepNum))
+            if (setExternalMaxStepReached) {
+                setExternalMaxStepReached(Math.max(externalMaxStepReached ?? 1, nextStepNum))
+            } else {
+                setInternalMaxStepReached(prev => Math.max(prev, nextStepNum))
+            }
         }
     }
 
@@ -416,14 +449,27 @@ export default function Form({
 
     const goToStep = async (step: number) => {
         // Allow going to any step that has been completed (step <= maxStepReached)
-        // Or allow going to the next step if current step is valid
-        if (step <= maxStepReached || (step === currentStep + 1 && validateStep(currentStep))) {
+        // Or allow going forward:
+        //   - If on maxStepReached: can jump to any forward step if all steps are valid
+        //   - Otherwise: can only go to maxStepReached + 1 if current step is valid
+        const canGoToStep = step <= maxStepReached || 
+            (currentStep === maxStepReached && step > currentStep && areAllStepsValid(currentStep, step)) ||
+            (currentStep < maxStepReached && step === maxStepReached + 1 && validateStep(currentStep))
+        
+        if (canGoToStep) {
             // Save before navigating to step
             if (onSave) {
                 await onSave()
             }
             setCurrentStep(step)
-            setMaxStepReached(prev => Math.max(prev, step))
+            // Only update maxStepReached if moving forward beyond it
+            if (step > maxStepReached) {
+                if (setExternalMaxStepReached) {
+                    setExternalMaxStepReached(step)
+                } else {
+                    setInternalMaxStepReached(step)
+                }
+            }
         }
     }
 
@@ -1075,28 +1121,44 @@ export default function Form({
         }
     }
 
-    const ProgressIndicator = () => (
-        <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-                {STEPS.map((step, index) => (
-                    console.log('step', step),
-                    console.log('currentStep', currentStep),
-                    console.log('maxStepReached', maxStepReached),
-                    <div key={step.id} className="flex items-center">
-                        <button
-                            type="button"
-                            onClick={() => goToStep(step.id)}
-                            title={step.title}
-                            className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 ${
-                                step.id === currentStep
-                                    ? 'bg-blue-600 text-white shadow-lg'
-                                    : step.id <= maxStepReached
-                                    ? 'bg-green-500 text-white cursor-pointer hover:bg-green-600'
-                                    : validateStep(currentStep) && step.id === currentStep + 1
-                                    ? 'bg-gray-200 text-gray-600 cursor-pointer hover:bg-gray-300'
-                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                            }`}
-                            disabled={step.id > maxStepReached + 1 || (step.id === currentStep + 1 && !validateStep(currentStep))}
+    const ProgressIndicator = () => {
+        // Helper function to determine if a step is accessible
+        const isStepAccessible = (stepId: number): boolean => {
+            // All steps up to maxStepReached are always accessible
+            if (stepId <= maxStepReached) {
+                return true
+            }
+            // Forward navigation rules
+            if (currentStep === maxStepReached && areAllStepsValid(currentStep, stepId)) {
+                return true
+            }
+            if (currentStep < maxStepReached && stepId === maxStepReached + 1 && validateStep(currentStep)) {
+                return true
+            }
+            return false
+        }
+
+        return (
+            <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                    {STEPS.map((step, index) => {
+                        const isAccessible = isStepAccessible(step.id)
+                        return (
+                            <div key={step.id} className="flex items-center">
+                                <button
+                                    type="button"
+                                    onClick={() => goToStep(step.id)}
+                                    title={step.title}
+                                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 ${
+                                        step.id === currentStep
+                                            ? 'bg-blue-600 text-white shadow-lg'
+                                            : step.id <= maxStepReached
+                                            ? 'bg-green-500 text-white cursor-pointer hover:bg-green-600'
+                                            : isAccessible
+                                            ? 'bg-gray-200 text-gray-600 cursor-pointer hover:bg-gray-300'
+                                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                    disabled={!isAccessible}
                         >
                             {step.id < currentStep ? (
                                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -1112,7 +1174,8 @@ export default function Form({
                             }`} />
                         )}
                     </div>
-                ))}
+                    )
+                    })}
             </div>
             <div className="text-center">
                 <h2 className="text-2xl font-semibold text-gray-800 mb-2">
@@ -1123,7 +1186,8 @@ export default function Form({
                 </p>
             </div>
         </div>
-    )
+        )
+    }
 
     const renderStepContent = () => {
         switch (currentStep) {
@@ -2409,7 +2473,8 @@ export default function Form({
                             // onClick={handleSubmit}
                             onClick={handleDownloadPDF}
                             disabled={isGenerating || !validateStep(currentStep)}
-                            className="bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold py-3 px-8 rounded-lg hover:from-green-700 hover:to-emerald-700 transform hover:scale-105 transition duration-200 shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"                        >
+                            className="bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold py-3 px-8 rounded-lg hover:from-green-700 hover:to-emerald-700 transform hover:scale-105 transition duration-200 shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                        >
                             {isGenerating ? (
                                 <>
                                     <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
