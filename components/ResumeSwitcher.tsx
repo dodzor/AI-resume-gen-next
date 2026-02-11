@@ -8,6 +8,7 @@ interface Resume {
   _creationTime: number
   name: string
   email: string
+  jobTitle?: string
   updatedAt: number
 }
 
@@ -51,7 +52,7 @@ export default function ResumeSwitcher({
       <div className="flex items-center gap-3">
         <div className="text-sm text-gray-600">
           <span className="font-medium">Editing:</span>{' '}
-          <span className="text-gray-800">{currentResume.name}</span>
+          <span className="text-gray-800">{currentResume.jobTitle || 'Untitled Resume'}</span>
         </div>
         <div className="flex gap-2">
           <button
@@ -99,9 +100,9 @@ export default function ResumeSwitcher({
                         : 'hover:bg-gray-50 text-gray-700'
                     }`}
                   >
-                    <div className="font-medium">{resume.name}</div>
+                    <div className="font-medium">{resume.jobTitle || 'Untitled Resume'}</div>
                     <div className="text-xs text-gray-500 mt-0.5">
-                      {resume.email} • {new Date(resume.updatedAt).toLocaleDateString()}
+                      {new Date(resume.updatedAt).toLocaleDateString()}
                     </div>
                   </button>
                 )

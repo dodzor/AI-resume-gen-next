@@ -83,11 +83,6 @@ export default function Content() {
         return
       }
       
-      // Don't save if form is empty or missing required fields
-      if (!formData.name || !formData.email) {
-        return
-      }
-      
       try {
         setIsSaving(true)
         const resumeId = await saveResume({
