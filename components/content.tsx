@@ -49,6 +49,7 @@ export default function Content() {
     const [isFormCompleted, setIsFormCompleted] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
     const [showPreview, setShowPreview] = useState(true)
+    const [showForm, setShowForm] = useState(true)
     
     // Resume management state
     const [currentResumeId, setCurrentResumeId] = useState<Id<'resumes'> | null>(null)
@@ -369,61 +370,69 @@ export default function Content() {
             ) : isFormCompleted ? (
               // Full-width layout when form is completed
               <div className="max-w-5xl mx-auto space-y-6">
-                    <Form 
-                      formData={formData}
-                      setFormData={setFormData}
-                      isGenerating={isGenerating}
-                      setIsGenerating={setIsGenerating}
-                      setGeneratedResume={setGeneratedResume}
-                      isFormCompleted={isFormCompleted}
-                      setIsFormCompleted={setIsFormCompleted}
-                      currentStep={currentStep}
-                      setCurrentStep={setCurrentStep}
-                      showPreview={showPreview}
-                      setShowPreview={setShowPreview}
-                      onSave={handleSave}
-                    />
+                    {showForm && (
+                      <Form 
+                        formData={formData}
+                        setFormData={setFormData}
+                        isGenerating={isGenerating}
+                        setIsGenerating={setIsGenerating}
+                        setGeneratedResume={setGeneratedResume}
+                        isFormCompleted={isFormCompleted}
+                        setIsFormCompleted={setIsFormCompleted}
+                        currentStep={currentStep}
+                        setCurrentStep={setCurrentStep}
+                        showPreview={showPreview}
+                        setShowPreview={setShowPreview}
+                        onSave={handleSave}
+                      />
+                    )}
                 <Result 
                   formData={formData} 
                   generatedResume={generatedResume}
                   currentStep={currentStep}
                   showPreview={true}
+                  showForm={showForm}
+                  setShowForm={setShowForm}
                 />
               </div>
             ) : (
               // Responsive side-by-side layout during form filling
-              <div className={`grid gap-4 sm:gap-6 ${showPreview ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} ${showPreview ? 'lg:h-[calc(100vh-220px)]' : ''}`}>
+              <div className={`grid gap-4 sm:gap-6 ${showForm && showPreview ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} ${showPreview ? 'lg:h-[calc(100vh-220px)]' : ''}`}>
                 {/* Form Section - Left on desktop, top on mobile */}
-                <div className={`${showPreview ? 'lg:order-1' : ''} ${showPreview ? 'lg:flex lg:flex-col lg:min-h-0 lg:overflow-hidden' : ''}`}>
-                  <div className={`${showPreview ? 'lg:flex-1 lg:overflow-y-auto lg:pr-2 lg:-mr-2 custom-scrollbar' : ''}`}>
-                    <Form 
-                      formData={formData}
-                      setFormData={setFormData}
-                      isGenerating={isGenerating}
-                      setIsGenerating={setIsGenerating}
-                      setGeneratedResume={setGeneratedResume}
-                      isFormCompleted={isFormCompleted}
-                      setIsFormCompleted={setIsFormCompleted}
-                      currentStep={currentStep}
-                      setCurrentStep={setCurrentStep}
-                      showPreview={showPreview}
-                      setShowPreview={setShowPreview}
-                      maxStepReached={maxStepReached}
-                      setMaxStepReached={setMaxStepReached}
-                      onSave={handleSave}
-                    />
+                {showForm && (
+                  <div className={`${showPreview ? 'lg:order-1' : ''} ${showPreview ? 'lg:flex lg:flex-col lg:min-h-0 lg:overflow-hidden' : ''}`}>
+                    <div className={`${showPreview ? 'lg:flex-1 lg:overflow-y-auto lg:pr-2 lg:-mr-2 custom-scrollbar' : ''}`}>
+                      <Form 
+                        formData={formData}
+                        setFormData={setFormData}
+                        isGenerating={isGenerating}
+                        setIsGenerating={setIsGenerating}
+                        setGeneratedResume={setGeneratedResume}
+                        isFormCompleted={isFormCompleted}
+                        setIsFormCompleted={setIsFormCompleted}
+                        currentStep={currentStep}
+                        setCurrentStep={setCurrentStep}
+                        showPreview={showPreview}
+                        setShowPreview={setShowPreview}
+                        maxStepReached={maxStepReached}
+                        setMaxStepReached={setMaxStepReached}
+                        onSave={handleSave}
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
                 
                 {/* Preview Section - Right on desktop, bottom on mobile */}
                 {showPreview && (
-                  <div className="lg:order-2 lg:flex lg:flex-col lg:min-h-0 lg:overflow-hidden">
+                  <div className={`${showForm ? 'lg:order-2' : ''} lg:flex lg:flex-col lg:min-h-0 lg:overflow-hidden`}>
                     <div className="lg:flex-1 lg:overflow-y-auto lg:pr-2 lg:-mr-2 custom-scrollbar">
                       <Result 
                         formData={formData} 
                         generatedResume={generatedResume}
                         currentStep={currentStep}
                         showPreview={showPreview}
+                        showForm={showForm}
+                        setShowForm={setShowForm}
                       />
                     </div>
                   </div>

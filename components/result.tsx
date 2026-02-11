@@ -12,9 +12,11 @@ interface ResultProps {
     generatedResume: string
     currentStep?: number
     showPreview?: boolean
+    showForm?: boolean
+    setShowForm?: (show: boolean) => void
 }
 
-export default function Result({ formData, generatedResume, currentStep, showPreview = true }: ResultProps) {
+export default function Result({ formData, generatedResume, currentStep, showPreview = true, showForm, setShowForm }: ResultProps) {
     const [isDownloading, setIsDownloading] = useState(false)
     
     // Get the template from formData, default to 'professional-blue'
@@ -97,6 +99,25 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                             </svg>
                             Live Preview
                         </h2>
+                        {setShowForm && (
+                          <button
+                            onClick={() => setShowForm(!showForm)}
+                            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition duration-200 flex items-center space-x-2 ${
+                              showForm
+                                ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              {showForm ? (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                              ) : (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                              )}
+                            </svg>
+                            <span>{showForm ? 'Hide Form' : 'Show Form'}</span>
+                          </button>
+                        )}
                         {/* <span className="text-xs text-gray-500 bg-blue-50 px-3 py-1 rounded-full">
                             {isPreview ? (formData.template ? 'Template Preview' : 'Simple Format') : 'Final Resume'}
                         </span> */}
