@@ -41,18 +41,13 @@ export default function ResumeSwitcher({
   const currentResume = resumes?.find(r => r._id === currentResumeId)
   const hasResumes = resumes && resumes.length > 0
 
-  // Hide component if there's no current resume
-  if (!currentResume) {
-    return null
-  }
-
   return (
     <div className="relative">
       {/* Current Resume Display */}
       <div className="flex items-center gap-3">
         <div className="text-sm text-gray-600">
           <span className="font-medium">Editing:</span>{' '}
-          <span className="text-gray-800">{currentResume.jobTitle || 'Untitled Resume'}</span>
+          <span className="text-gray-800">{currentResume?.jobTitle || 'New Resume'}</span>
         </div>
         <div className="flex gap-2">
           <button

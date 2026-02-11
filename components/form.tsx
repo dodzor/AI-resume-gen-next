@@ -22,6 +22,7 @@ interface FormProps {
   maxStepReached?: number
   setMaxStepReached?: (step: number) => void
   onSave?: () => Promise<void>
+  currentResumeId?: string | null
 }
 
 const STEPS = [
@@ -49,7 +50,8 @@ export default function Form({
   setShowPreview: setExternalShowPreview,
   maxStepReached: externalMaxStepReached,
   setMaxStepReached: setExternalMaxStepReached,
-  onSave
+  onSave,
+  currentResumeId
 }: FormProps) {
     const [internalCurrentStep, setInternalCurrentStep] = useState(1)
     const [internalShowPreview, setInternalShowPreview] = useState(true)
@@ -2400,7 +2402,7 @@ export default function Form({
     }
 
     return (
-        <div className="bg-white rounded-xl shadow-lg p-8" style={{ overflow: 'visible' }}>
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-5xl mx-auto" style={{ overflow: 'visible' }}>
             <ProgressIndicator />
     
             <div className="space-y-6" style={{ overflow: 'visible' }}>
@@ -2428,7 +2430,7 @@ export default function Form({
                             <span>Previous</span>
                         </button>
 
-                        {!isFormCompleted && (
+                        {!isFormCompleted && currentStep !== 1 && currentResumeId !== null && (
                             <button
                                 type="button"
                                 onClick={() => setShowPreview(!showPreview)}

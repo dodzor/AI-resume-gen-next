@@ -112,6 +112,11 @@ export default function Content() {
         setLastSaved(new Date())
         setHasStartedEditing(true)
         
+        // Hide preview when creating a new resume
+        if (!currentResumeId && resumeId) {
+          setShowPreview(false)
+        }
+        
         // Update localStorage
         if (resumeId) {
           localStorage.setItem(LAST_EDITED_RESUME_KEY, resumeId)
@@ -284,6 +289,7 @@ export default function Content() {
       setLoadedResumeData(null)
       setCurrentStep(1)
       setMaxStepReached(1)
+      setShowPreview(false) // Hide preview when starting a new resume
       lastLoadedResumeId.current = null
       localStorage.removeItem(LAST_EDITED_RESUME_KEY)
       isLoadingFromConvex.current = false
@@ -379,6 +385,7 @@ export default function Content() {
                         showPreview={showPreview}
                         setShowPreview={setShowPreview}
                         onSave={handleSave}
+                        currentResumeId={currentResumeId}
                       />
                     )}
                 <Result 
@@ -412,6 +419,7 @@ export default function Content() {
                         maxStepReached={maxStepReached}
                         setMaxStepReached={setMaxStepReached}
                         onSave={handleSave}
+                        currentResumeId={currentResumeId}
                       />
                     </div>
                   </div>
