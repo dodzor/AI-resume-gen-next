@@ -26,13 +26,13 @@ interface FormProps {
 
 const STEPS = [
   { id: 1, title: 'Target Job', description: 'Analyze the job description to determine the CV tone and extract important keywords' },
-  { id: 2, title: 'Personal Info', description: 'Basic information about you' },
-  { id: 3, title: 'Experience', description: 'Your work history' },
-  { id: 4, title: 'Education', description: 'Your educational background' },
-  { id: 5, title: 'Skills', description: 'Your technical and soft skills' },
-  { id: 6, title: 'Portfolio', description: 'Your projects and work samples (optional)' },
-  { id: 7, title: 'Summary', description: 'A summary of your work experience, education, and skills tailored to the job you\'re applying for' },
-  { id: 8, title: 'Template', description: 'Choose your resume style' }
+  { id: 2, title: 'Template', description: 'Choose your resume style' },
+  { id: 3, title: 'Personal Info', description: 'Basic information about you' },
+  { id: 4, title: 'Experience', description: 'Your work history' },
+  { id: 5, title: 'Education', description: 'Your educational background' },
+  { id: 6, title: 'Skills', description: 'Your technical and soft skills' },
+  { id: 7, title: 'Portfolio', description: 'Your projects and work samples (optional)' },
+  { id: 8, title: 'Summary', description: 'A summary of your work experience, education, and skills tailored to the job you\'re applying for' }
 ]
 
 export default function Form({ 
@@ -379,25 +379,25 @@ export default function Form({
             case 1:
                 return formData.jobTitle?.trim() && formData.job?.trim() && formData.tone
             case 2:
-                return formData.name?.trim() && formData.email?.trim()
+                return !!formData.template
             case 3:
+                return formData.name?.trim() && formData.email?.trim()
+            case 4:
                 const experiences = formData.experiences || []
                 return experiences.length > 0 && experiences.some((exp: any) => 
                     (exp.role?.trim() || exp.company?.trim()) && exp.description?.trim()
                 )
-            case 4:
+            case 5:
                 const educationEntries = formData.educationEntries || []
                 return educationEntries.length > 0 && educationEntries.some((entry: any) => 
                     entry.degree?.trim() || entry.school?.trim()
                 )
-            case 5:
-                return formData.skills?.trim()
             case 6:
-                return true // Portfolio is optional
+                return formData.skills?.trim()
             case 7:
-                return formData.job?.trim()
+                return true // Portfolio is optional
             case 8:
-                return !!formData.template
+                return formData.job?.trim()
             default:
                 return false
         }
@@ -1302,6 +1302,59 @@ export default function Form({
                 )
             case 2:
                 return (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-4">Choose a Resume Template</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {TEMPLATES.map((template) => (
+                                <button
+                                    key={template.id}
+                                    type="button"
+                                    onClick={() => handleTemplateSelect(template.id)}
+                                    className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
+                                        formData.template === template.id
+                                            ? 'border-blue-500 bg-blue-50 shadow-md'
+                                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    {/* Template Preview */}
+                                    <div className={`template-preview mb-4 ${
+                                        formData.template === template.id ? 'selected' : ''
+                                    } template-preview-${template.id}`}>
+                                        <div className="preview-header">
+                                            <div className="preview-name">John Doe</div>
+                                            <div className="text-gray-400 text-[8px]">john@example.com</div>
+                                        </div>
+                                        <div className="preview-section-title">Summary</div>
+                                        <div className="text-gray-400 h-3 bg-gray-100 rounded mb-2"></div>
+                                        <div className="text-gray-400 h-3 bg-gray-100 rounded w-3/4 mb-3"></div>
+                                        <div className="preview-section-title">Experience</div>
+                                        <div className="text-gray-400 h-3 bg-gray-100 rounded mb-2"></div>
+                                        <div className="text-gray-400 h-3 bg-gray-100 rounded w-2/3"></div>
+                                    </div>
+                                    
+                                    {/* Template Info */}
+                                    <div className="flex items-start justify-between">
+                                        <div>
+                                            <h3 className="font-semibold text-gray-800">{template.name}</h3>
+                                            <p className="text-sm text-gray-500 mt-1">{template.description}</p>
+                                        </div>
+                                        {formData.template === template.id && (
+                                            <div className="flex-shrink-0 ml-3">
+                                                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )
+            case 3:
+                return (
                     <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
@@ -1362,7 +1415,7 @@ export default function Form({
                         </div>
                     </div>
                 )
-            case 3:
+            case 4:
                 return (
                     <div className="space-y-6">
                         <div className="flex items-center justify-between">
@@ -1725,7 +1778,7 @@ export default function Form({
                         )}
                     </div>
                 )
-            case 4:
+            case 5:
                 return (
                     <div className="space-y-6">
                         <div className="flex items-center justify-between">
@@ -1930,7 +1983,7 @@ export default function Form({
                         </div>
                     </div>
                 )
-            case 5:
+            case 6:
                 return (
                     <div className="space-y-4">
                         <div>
@@ -2051,7 +2104,7 @@ export default function Form({
                         })()}
                     </div>
                 )
-            case 6:
+            case 7:
                 return (
                     <div className="space-y-4">
                         <div>
@@ -2212,7 +2265,7 @@ export default function Form({
 
                     </div>
                 )
-            case 7:
+            case 8:
                 return (
                     <div className="space-y-4">
                         <div className="space-y-3">
@@ -2309,59 +2362,6 @@ export default function Form({
                                         </button>
                                     </div>
                             )}
-                        </div>
-                    </div>
-                )
-            case 8:
-                return (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-4">Choose a Resume Template</label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {TEMPLATES.map((template) => (
-                                <button
-                                    key={template.id}
-                                    type="button"
-                                    onClick={() => handleTemplateSelect(template.id)}
-                                    className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
-                                        formData.template === template.id
-                                            ? 'border-blue-500 bg-blue-50 shadow-md'
-                                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                    }`}
-                                >
-                                    {/* Template Preview */}
-                                    <div className={`template-preview mb-4 ${
-                                        formData.template === template.id ? 'selected' : ''
-                                    } template-preview-${template.id}`}>
-                                        <div className="preview-header">
-                                            <div className="preview-name">John Doe</div>
-                                            <div className="text-gray-400 text-[8px]">john@example.com</div>
-                                        </div>
-                                        <div className="preview-section-title">Summary</div>
-                                        <div className="text-gray-400 h-3 bg-gray-100 rounded mb-2"></div>
-                                        <div className="text-gray-400 h-3 bg-gray-100 rounded w-3/4 mb-3"></div>
-                                        <div className="preview-section-title">Experience</div>
-                                        <div className="text-gray-400 h-3 bg-gray-100 rounded mb-2"></div>
-                                        <div className="text-gray-400 h-3 bg-gray-100 rounded w-2/3"></div>
-                                    </div>
-                                    
-                                    {/* Template Info */}
-                                    <div className="flex items-start justify-between">
-                                        <div>
-                                            <h3 className="font-semibold text-gray-800">{template.name}</h3>
-                                            <p className="text-sm text-gray-500 mt-1">{template.description}</p>
-                                        </div>
-                                        {formData.template === template.id && (
-                                            <div className="flex-shrink-0 ml-3">
-                                                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                                                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                    </svg>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </button>
-                            ))}
                         </div>
                     </div>
                 )

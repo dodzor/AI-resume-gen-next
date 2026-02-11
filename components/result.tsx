@@ -23,6 +23,11 @@ export default function Result({ formData, generatedResume, currentStep, showPre
     const templateId: TemplateId = formData.template || 'professional-blue'
     const displayClassName = getDisplayClassName(templateId)
     
+    // Calculate A4 height based on 800px width
+    // A4 aspect ratio: 297mm / 210mm = 1.414
+    // Height = 800px * 1.414 = 1131px
+    const resumeA4Height = 1131
+    
     // Generate preview if no generated resume yet
     // const previewContent = generatedResume || generateSimplePreview(formData, currentStep)
     const previewContent = generateSimplePreview(formData, currentStep)
@@ -124,7 +129,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                     </div>
                 {/* )} */}
                 
-                <div className="flex-1 bg-gray-50 rounded-lg p-4 sm:p-6 border-2 border-dashed border-gray-300 overflow-y-auto min-h-[300px] lg:min-h-0 custom-scrollbar">
+                <div className={`flex-1 bg-gray-50 rounded-lg p-4 sm:p-6 border-2 border-dashed border-gray-300 overflow-y-auto min-h-[300px] lg:min-h-0 custom-scrollbar ${showForm === false ? 'lg:max-w-[800px] lg:mx-auto' : ''}`}>
                     {previewContent ? (
                         <div className={finalDisplayClassName} dangerouslySetInnerHTML={{ __html: previewContent }} />
                     ) : (

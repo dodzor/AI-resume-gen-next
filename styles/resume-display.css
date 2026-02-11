@@ -11,6 +11,7 @@
   max-width: 800px;
   margin: 0 auto;
   padding: 40px;
+  height: 100%;
 }
 
 .resume-display-professional-blue .resume-header {
@@ -606,7 +607,7 @@
 }
 
 .resume-display-developer .contact-info {
-  font-size: 13px;
+  font-size: 12px;
   color: #444444;
   font-family: "SF Mono", "Roboto Mono", Consolas, monospace;
 }
