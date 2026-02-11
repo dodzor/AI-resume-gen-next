@@ -89,7 +89,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
 
     return (
         <>
-            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 lg:p-8 h-full flex flex-col">
+            <div className={`bg-white rounded-xl shadow-lg p-4 sm:p-6 lg:p-8 h-full flex flex-col ${showForm === false ? 'lg:max-w-[800px] lg:mx-auto' : ''}`}>
                 {/* {isPreview && ( */}
                     <div className="mb-4 flex items-center justify-between flex-shrink-0">
                         <h2 className="text-lg sm:text-xl font-semibold text-gray-800 flex items-center">
