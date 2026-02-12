@@ -1964,10 +1964,6 @@ export default function Form({
                                     <ul className="space-y-2 text-sm text-amber-800">
                                         <li className="flex items-start space-x-2">
                                             <span className="text-amber-600 font-bold mt-0.5">❌</span>
-                                            <span>Putting education at the top of your resume when you have 5+ years experience</span>
-                                        </li>
-                                        <li className="flex items-start space-x-2">
-                                            <span className="text-amber-600 font-bold mt-0.5">❌</span>
                                             <span>Listing high school once you have a degree</span>
                                         </li>
                                         <li className="flex items-start space-x-2">
@@ -1977,6 +1973,10 @@ export default function Form({
                                         <li className="flex items-start space-x-2">
                                             <span className="text-amber-600 font-bold mt-0.5">❌</span>
                                             <span>Mixing certifications into education bullets</span>
+                                        </li>
+                                        <li className="flex items-start space-x-2">
+                                            <span className="text-amber-600 font-bold mt-0.5">❌</span>
+                                            <span>Putting education at the top of your resume when you have 5+ years experience</span>
                                         </li>
                                     </ul>
                                 </div>
@@ -2430,7 +2430,7 @@ export default function Form({
                             <span>Previous</span>
                         </button>
 
-                        {!isFormCompleted && currentStep !== 1 && currentResumeId !== null && (
+                        {!isFormCompleted && ((currentStep !== 1 && currentStep !== 2) || formData.name) && currentResumeId !== null && (
                             <button
                                 type="button"
                                 onClick={() => setShowPreview(!showPreview)}

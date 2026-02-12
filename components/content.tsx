@@ -280,6 +280,16 @@ export default function Content() {
       }
     }, [])
     
+    // Hide preview on step 1 and step 2 only when Full Name is not set
+    useEffect(() => {
+      if ((currentStep === 1 || currentStep === 2) && !formData.name) {
+        setShowPreview(false)
+      }
+      else if (currentStep >= 3) {
+        setShowPreview(true)
+      }
+    }, [currentStep, formData.name])
+    
     // Handler for creating new resume
     const handleCreateNew = useCallback(() => {
       console.log('Creating new resume')

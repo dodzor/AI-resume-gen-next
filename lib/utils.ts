@@ -273,8 +273,9 @@ function formatTextContent(text: string): string {
       }
       if (trimmed) {
         result += `<p>• ${line}</p>`;
-      } else if (index < lines.length - 1) {
-        result += '<br>';
+      } else {
+        // Empty lines should be formatted as <p> tags inside div.job-entry
+        result += '<p></p>';
       }
     }
   });
