@@ -353,11 +353,11 @@ export async function generatePDFWithPuppeteer(
       // Calculate scale factor with a small buffer (95% of available space)
       // scaleFactor = (A4_HEIGHT_PX * 0.95) / contentHeight;
       scaleFactor = A4_HEIGHT_PX / contentHeight;
-      console.log('scaleFactor', scaleFactor);
+      console.log('calculated scaleFactor', scaleFactor);
       
-      // Clamp scale factor between 0.7 and 0.95 to maintain readability
+      // Clamp scale factor between 0.85 and 0.95 to maintain readability
       scaleFactor = Math.max(0.85, Math.min(0.95, scaleFactor));
-      console.log('scaleFactor', scaleFactor);
+      console.log('clamped scaleFactor', scaleFactor);
       
       console.log(`${templateId} template: Content height ${contentHeight.toFixed(1)}px exceeds A4 (${A4_HEIGHT_PX.toFixed(1)}px). Applying scale factor: ${scaleFactor.toFixed(3)}`);
       

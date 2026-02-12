@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, experience, education, skills, job, existingSummary, modifyType } = body;
+    const { name, email, experience, education, skills, job, existingSummary, modifyType, tone } = body;
 
     // Validate required fields
     if (!job) {
@@ -41,6 +41,40 @@ export async function POST(request: NextRequest) {
     let prompt = '';
     let systemMessage = '';
 
+    // Build seniority adjustment instructions based on tone
+    let seniorityInstructions = '';
+    if (tone) {
+      if (tone === 'junior') {
+        seniorityInstructions = `SENIORITY ADJUSTMENT: Adjust the seniority level and language based on the tone "junior":
+- Use entry-level or junior positioning (e.g., "Junior developer", "Associate engineer", "Entry-level")
+- Focus on foundational skills, learning ability, and growth potential
+- Emphasize education, projects, and eagerness to contribute
+- Use language appropriate for someone early in their career`;
+      } else if (tone === 'senior') {
+        seniorityInstructions = `SENIORITY ADJUSTMENT: Adjust the seniority level and language based on the tone "senior":
+- Use senior-level positioning (e.g., "Senior engineer", "Lead developer", "Principal architect", "Staff engineer")
+- Emphasize leadership, strategic impact, architectural decisions, and mentoring
+- Highlight experience with complex systems, scale, and cross-functional influence
+- Use authoritative language that reflects deep expertise and decision-making authority`;
+      } else {
+        seniorityInstructions = `SENIORITY ADJUSTMENT: Adjust the seniority level and language based on the tone "mid":
+- Use mid-level positioning (e.g., "Engineer", "Developer", "Software engineer")
+- Balance technical depth with collaboration and impact
+- Emphasize hands-on experience and concrete achievements
+- Use confident but not overly authoritative language`;
+      }
+    }
+
+    // Build position level text based on tone
+    let positionLevelText = 'Position level (Senior / Lead / Backend Engineer)';
+    if (tone === 'junior') {
+      positionLevelText = 'Position level (Junior / Associate / Entry-level)';
+    } else if (tone === 'senior') {
+      positionLevelText = 'Position level (Senior / Lead / Principal / Staff)';
+    } else if (tone === 'mid') {
+      positionLevelText = 'Position level (Mid-level / Engineer)';
+    }
+
     if (modifyType && existingSummary) {
       // Modification mode
       const modificationInstructions = {
@@ -56,7 +90,6 @@ export async function POST(request: NextRequest) {
 Current Summary:
 ${existingSummary}
 
-${name ? `Candidate Name: ${name}` : ''}
 ${job ? `Target Job Description:\n${job}` : ''}
 ${experience ? `Work Experience:\n${experience}` : ''}
 ${education ? `Education:\n${education}` : ''}
@@ -68,6 +101,10 @@ Requirements:
 - Preserve key qualifications and achievements
 - Use professional language
 - Focus on concrete achievements and outcomes, not personality traits or vague abilities
+- Directly referencing the company or role in the summary
+- Use DIRECT POSITIONING: Write in a direct, confident style without first person ("I"), third person names ("John is..."), or alignment phrases ("Perfectly aligned with your role...")
+- Examples to avoid: "I am a highly motivated developer...", "${name ? name : 'Candidate'} is a results-driven engineer...", "Perfectly aligned with your role..."
+- Instead, use direct statements: "Full-stack developer with 5 years building scalable web applications..."
 
 CRITICAL: Avoid ALL buzzwords and clichés. Never use these terms:
 
@@ -100,7 +137,7 @@ Phrases Recruiters Ignore (use better verbs instead):
 
 Instead of buzzwords, use concrete language that shows what was accomplished, who was involved, what changed, and measurable outcomes.
 
-Return ONLY the modified summary text, without any markdown formatting, quotes, or additional explanations.`;
+${seniorityInstructions ? seniorityInstructions + '\n\n' : ''}Return ONLY the modified summary text, without any markdown formatting, quotes, or additional explanations.`;
     } else {
       // Generation mode
       systemMessage = 'You are a professional resume writer. Generate concise, compelling professional summaries tailored to specific job descriptions, avoiding buzzwords and clichés.';
@@ -120,6 +157,10 @@ Requirements:
 - Focus on relevant experience, skills, and achievements with concrete examples
 - Make it compelling and tailored to the target job description
 - Use professional language that is specific and concrete
+- Directly referencing the company or role in the summary
+- Use DIRECT POSITIONING: Write in a direct, confident style without first person ("I"), third person names ("John is..."), or alignment phrases ("Perfectly aligned with your role...")
+- Examples to avoid: "I am a highly motivated developer...", "${name ? name : 'Candidate'} is a results-driven engineer...", "Perfectly aligned with your role..."
+- Instead, use direct statements: "Full-stack developer with 5 years building scalable web applications..."
 
 CRITICAL: Avoid ALL buzzwords and clichés. Never use these terms:
 
@@ -152,7 +193,13 @@ Phrases Recruiters Ignore (use better verbs instead):
 
 Instead of buzzwords, use concrete language that shows what was accomplished, who was involved, what changed, and measurable outcomes.
 
-Return ONLY the summary text, without any markdown formatting, quotes, or additional explanations.`;
+The generated summary should:
+- ${positionLevelText}
+- Mention core stack
+- Mention architectural strength
+- Mention scale or impact
+
+${seniorityInstructions ? seniorityInstructions + '\n\n' : ''}Return ONLY the summary text, without any markdown formatting, quotes, or additional explanations.`;
     }
 
     const action = modifyType ? `Modifying summary (${modifyType})` : 'Generating summary';

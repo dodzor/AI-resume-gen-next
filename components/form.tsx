@@ -769,6 +769,7 @@ export default function Form({
                     education: formatEducationForAPI(formData.educationEntries || [], formData.certifications || []),
                     skills: formData.skills,
                     job: formData.job,
+                    tone: formData.tone,
                 }),
             })
     
@@ -819,6 +820,7 @@ export default function Form({
                     job: formData.job,
                     existingSummary: formData.summary,
                     modifyType: modifyType,
+                    tone: formData.tone,
                 }),
             })
     
