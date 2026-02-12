@@ -119,6 +119,9 @@
   body {
     @apply bg-background text-foreground;
   }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 /* Custom scrollbar styles */
