@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const systemMessage = 'You are a professional resume and job description analyst. Analyze job descriptions to determine the seniority level required and extract important keywords.';
+    const systemMessage = 'You are a professional resume and job description analyst. Analyze job descriptions to determine the seniority level required, extract important keywords, and identify key themes and values.';
 
     // First, determine the tone
     const tonePrompt = `Analyze the following job posting and determine the seniority level required. Consider factors such as:
@@ -86,10 +86,34 @@ Return the keywords in the following JSON format:
 
 Only include keywords that are relevant to a resume. Return ONLY valid JSON, no other text or explanations.`;
 
-    console.log('Analyzing job description for seniority level and keywords');
+    // Third, extract themes and recommendations
+    const themesPrompt = `Analyze the following job posting and identify:
+1. The core themes and values emphasized (e.g., ownership, system design, mentorship, scale, innovation, collaboration)
+2. What the resume should demonstrate (specific capabilities, experiences, or achievements)
+3. Why these matter for this role
 
-    // Make both API calls in parallel
-    const [toneCompletion, keywordsCompletion] = await Promise.all([
+Job Title: ${title}
+
+Job Description:
+${job}
+
+Return a JSON object with this structure:
+{
+  "themes": ["theme1", "theme2", "theme3"],
+  "recommendations": [
+    "What your resume should show 1",
+    "What your resume should show 2",
+    "What your resume should show 3"
+  ],
+  "summary": "One sentence explaining what this job emphasizes (e.g., 'This job emphasizes ownership and system design.')"
+}
+
+Focus on actionable insights that tell the candidate what to emphasize in their resume. Return ONLY valid JSON, no other text or explanations.`;
+
+    console.log('Analyzing job description for seniority level, keywords, and themes');
+
+    // Make all three API calls in parallel
+    const [toneCompletion, keywordsCompletion, themesCompletion] = await Promise.all([
       openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
@@ -120,6 +144,22 @@ Only include keywords that are relevant to a resume. Return ONLY valid JSON, no 
         temperature: 0.3,
         max_tokens: 500,
         response_format: { type: "json_object" }
+      }),
+      openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: systemMessage
+          },
+          {
+            role: "user",
+            content: themesPrompt
+          }
+        ],
+        temperature: 0.5,
+        max_tokens: 500,
+        response_format: { type: "json_object" }
       })
     ]);
 
@@ -140,6 +180,17 @@ Only include keywords that are relevant to a resume. Return ONLY valid JSON, no 
         { 
           error: 'Unexpected API Response',
           message: 'No content received from OpenAI API for keywords extraction' 
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!themesCompletion.choices[0]?.message?.content) {
+      console.error('Unexpected API response for themes:', themesCompletion);
+      return NextResponse.json(
+        { 
+          error: 'Unexpected API Response',
+          message: 'No content received from OpenAI API for themes analysis' 
         },
         { status: 500 }
       );
@@ -220,13 +271,57 @@ Only include keywords that are relevant to a resume. Return ONLY valid JSON, no 
       ...keywords.responsibilities
     ];
 
-    console.log('Job description analysis completed successfully. Tone:', tone, 'Total keywords:', allKeywords.length);
+    // Parse themes data
+    let themesText = themesCompletion.choices[0].message.content.trim();
+    console.log('Themes text:', themesText);
+    
+    // Remove markdown code blocks if present
+    themesText = themesText.replace(/^```json\s*|\s*```$/g, '');
+    themesText = themesText.replace(/^```\s*|\s*```$/g, '');
+    
+    let themesData;
+    try {
+      themesData = JSON.parse(themesText);
+      console.log('Themes data:', themesData);
+    } catch (error) {
+      console.error('Failed to parse themes JSON:', error);
+      // Fallback: try to extract JSON from the response
+      const jsonMatch = themesText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        themesData = JSON.parse(jsonMatch[0]);
+      } else {
+        // Ultimate fallback: return empty themes
+        themesData = {
+          themes: [],
+          recommendations: [],
+          summary: ""
+        };
+      }
+    }
+
+    // Ensure all theme fields exist
+    const themes = {
+      themes: Array.isArray(themesData.themes) 
+        ? themesData.themes.filter((t: string) => t && t.trim().length > 0)
+        : [],
+      recommendations: Array.isArray(themesData.recommendations)
+        ? themesData.recommendations.filter((r: string) => r && r.trim().length > 0)
+        : [],
+      summary: themesData.summary && typeof themesData.summary === 'string'
+        ? themesData.summary.trim()
+        : ""
+    };
+
+    console.log('Job description analysis completed successfully. Tone:', tone, 'Total keywords:', allKeywords.length, 'Themes:', themes.themes.length);
 
     return NextResponse.json({
       success: true,
       tone: tone,
       keywords: allKeywords, // Keep for backward compatibility
-      keywordsByCategory: keywords // New categorized structure
+      keywordsByCategory: keywords, // New categorized structure
+      themes: themes.themes,
+      recommendations: themes.recommendations,
+      summary: themes.summary
     });
 
   } catch (error: any) {

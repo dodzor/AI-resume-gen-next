@@ -65,6 +65,11 @@ export default defineSchema({
       responsibilities: v.array(v.string()),
     })),
     
+    // Themes and Recommendations
+    themes: v.optional(v.array(v.string())), // Core themes identified from job description
+    recommendations: v.optional(v.array(v.string())), // What the resume should show
+    thematicSummary: v.optional(v.string()), // One sentence explaining what the job emphasizes
+    
     // Generated Resume (HTML string)
     generatedResume: v.optional(v.string()),
     

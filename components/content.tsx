@@ -33,7 +33,10 @@ const getDefaultFormData = () => ({
     domainTerms: [] as string[],
     qualifications: [] as string[],
     responsibilities: [] as string[]
-  }
+  },
+  themes: [] as string[],
+  recommendations: [] as string[],
+  thematicSummary: ''
 })
 
 // localStorage keys
@@ -104,6 +107,9 @@ export default function Content() {
           summary: formData.summary || undefined,
           keywords: formData.keywords || undefined,
           keywordsByCategory: formData.keywordsByCategory || undefined,
+          themes: formData.themes || undefined,
+          recommendations: formData.recommendations || undefined,
+          thematicSummary: formData.thematicSummary || undefined,
           generatedResume: generatedResume || undefined,
           maxStepReached: maxStepReached || undefined,
         })
@@ -229,7 +235,10 @@ export default function Content() {
             domainTerms: [],
             qualifications: [],
             responsibilities: []
-          }
+          },
+          themes: getResume.themes || [],
+          recommendations: getResume.recommendations || [],
+          thematicSummary: getResume.thematicSummary || ''
         }
         
         setFormData(mappedFormData)

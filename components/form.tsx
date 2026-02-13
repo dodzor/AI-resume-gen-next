@@ -63,6 +63,11 @@ export default function Form({
     const [rewritingBullet, setRewritingBullet] = useState<{ experienceIndex: number; bulletIndex: number } | null>(null)
     const [isAnalyzingJobDescription, setIsAnalyzingJobDescription] = useState(false)
     const [analyzedTone, setAnalyzedTone] = useState<string | null>(null)
+    const [analyzedThemes, setAnalyzedThemes] = useState<{
+        themes: string[];
+        recommendations: string[];
+        summary: string;
+    } | null>(null)
     // Track selected keywords for each bullet: key = `${experienceIndex}-${bulletIndex}`
     const [selectedKeywords, setSelectedKeywords] = useState<Record<string, string[]>>({})
     // Track expanded state for showing all keywords: key = `${experienceIndex}-${bulletIndex}`
@@ -105,6 +110,20 @@ export default function Form({
             }
         }
     }, [currentStep, externalMaxStepReached, internalMaxStepReached, setExternalMaxStepReached])
+
+    // Restore analyzedThemes from formData when resume is loaded
+    useEffect(() => {
+        if (formData.thematicSummary && formData.recommendations && formData.themes) {
+            setAnalyzedThemes({
+                themes: formData.themes || [],
+                recommendations: formData.recommendations || [],
+                summary: formData.thematicSummary || ""
+            })
+        }
+        if (formData.tone) {
+            setAnalyzedTone(formData.tone)
+        }
+    }, [formData.thematicSummary, formData.recommendations, formData.themes, formData.tone])
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target
@@ -633,6 +652,7 @@ export default function Form({
 
         setIsAnalyzingJobDescription(true)
         setAnalyzedTone(null)
+        setAnalyzedThemes(null)
         
         try {
             const response = await fetch('/api/analyze-job-description', {
@@ -652,7 +672,7 @@ export default function Form({
                 throw new Error(data.message || 'Failed to analyze job description')
             }
         
-            // Update formData with the analyzed tone and keywords
+            // Update formData with the analyzed tone, keywords, and themes
             const tone = data.tone || 'mid'
             const keywords = data.keywords || []
             const keywordsByCategory = data.keywordsByCategory || {
@@ -663,12 +683,21 @@ export default function Form({
                 qualifications: [],
                 responsibilities: []
             }
+            const themes = {
+                themes: data.themes || [],
+                recommendations: data.recommendations || [],
+                summary: data.summary || ""
+            }
             setAnalyzedTone(tone)
+            setAnalyzedThemes(themes)
             setFormData((prev: any) => ({
                 ...prev,
                 tone: tone,
                 keywords: keywords, // Keep for backward compatibility
-                keywordsByCategory: keywordsByCategory
+                keywordsByCategory: keywordsByCategory,
+                themes: themes.themes,
+                recommendations: themes.recommendations,
+                thematicSummary: themes.summary
             }))
         } catch (error) {
             console.error('Error analyzing job description:', error)
@@ -1363,6 +1392,32 @@ export default function Form({
                                         </div>
                                     )}
                                 </div>
+
+                                {analyzedThemes && analyzedThemes.summary && (
+                                    <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+                                        <div className="flex items-start space-x-3">
+                                            <div className="flex-shrink-0 mt-0.5">
+                                                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                                </svg>
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-sm font-semibold text-gray-900 mb-2">
+                                                    {analyzedThemes.summary}
+                                                </p>
+                                                <p className="text-xs text-gray-700 mb-3">Your resume should show:</p>
+                                                <ul className="space-y-1.5">
+                                                    {analyzedThemes.recommendations.map((rec, index) => (
+                                                        <li key={index} className="flex items-start space-x-2 text-sm text-gray-700">
+                                                            <span className="text-purple-600 mt-0.5">•</span>
+                                                            <span>{rec}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {formData.keywords && formData.keywords.length > 0 && (
                                     <div className="mt-4 pt-4 border-t border-blue-200">

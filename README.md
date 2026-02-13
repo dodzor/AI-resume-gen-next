@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## About
+
+AI Resume Generator is a web application that helps users create professional, tailored resumes with the assistance of artificial intelligence. The app analyzes job descriptions to determine the appropriate tone and extract important keywords, then guides users through a step-by-step process to input their personal information, work experience, education, and skills. Using OpenAI's API, the application automatically generates professional summaries, improves experience descriptions, and rewrites bullet points to better match job requirements. Users can save multiple resume versions, switch between them seamlessly, and export their resumes as PDFs.
+
 ## Environment Setup
 
 Before running the application, you need to set up your environment variables. Create a `.env.local` file in the root directory with the following variables:
