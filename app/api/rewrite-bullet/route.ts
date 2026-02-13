@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { bullet, role, company, allBullets, keywords } = body;
+    const { bullet, role, company, allBullets, keywords, tone } = body;
 
     // Validate required fields
     if (!bullet || !bullet.trim()) {
@@ -31,6 +31,33 @@ export async function POST(request: NextRequest) {
     }
 
     const systemMessage = 'You are a professional resume writer specializing in transforming vague, task-based job descriptions into impactful, concrete bullet points that avoid buzzwords and clichés.';
+    
+    // Build seniority adjustment instructions based on tone
+    let seniorityInstructions = '';
+    if (tone) {
+      if (tone === 'junior') {
+        seniorityInstructions = `SENIORITY ADJUSTMENT: Adjust the seniority level and language based on the tone "junior":
+- Adapt verbs, scope, ownership language to the junior level
+- Use entry-level or junior positioning (e.g., "Junior developer", "Associate engineer", "Entry-level")
+- Focus on foundational skills, learning ability, and growth potential
+- Emphasize education, projects, and eagerness to contribute
+- Use language appropriate for someone early in their career`;
+      } else if (tone === 'senior') {
+        seniorityInstructions = `SENIORITY ADJUSTMENT: Adjust the seniority level and language based on the tone "senior":
+- Adapt verbs, scope, ownership language to the senior level
+- Use senior-level positioning (e.g., "Senior engineer", "Lead developer", "Principal architect", "Staff engineer")
+- Emphasize leadership, strategic impact, architectural decisions, and mentoring
+- Highlight experience with complex systems, scale, and cross-functional influence
+- Use authoritative language that reflects deep expertise and decision-making authority`;
+      } else {
+        seniorityInstructions = `SENIORITY ADJUSTMENT: Adjust the seniority level and language based on the tone "mid":
+- Adapt verbs, scope, ownership language to the mid level
+- Use mid-level positioning (e.g., "Engineer", "Developer", "Software engineer")
+- Balance technical depth with collaboration and impact
+- Emphasize hands-on experience and concrete achievements
+- Use confident but not overly authoritative language`;
+      }
+    }
     
     const contextInfo = allBullets && allBullets.length > 0 
       ? `\n\nOther bullet points in this role for context:\n${allBullets.map((b: string, i: number) => `${i + 1}. ${b}`).join('\n')}`
@@ -96,7 +123,7 @@ Phrases Recruiters Ignore (use better verbs instead):
 
 Instead of buzzwords, use concrete language that shows what was accomplished, who was involved, what changed, and measurable outcomes.
 
-Return ONLY the rewritten bullet point as a single line of text, without any prefixes, numbering, or formatting.`;
+${seniorityInstructions ? seniorityInstructions + '\n\n' : ''}Return ONLY the rewritten bullet point as a single line of text, without any prefixes, numbering, or formatting.`;
 
     console.log('Rewriting bullet point for:', role || 'Unknown role');
 

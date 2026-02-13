@@ -72,7 +72,19 @@ export default function Form({
     // Track info icon hover state: key = `${experienceIndex}-${bulletIndex}`
     const [showInfoTooltip, setShowInfoTooltip] = useState<Record<string, boolean>>({})
     // Track tooltip positions: key = `${experienceIndex}-${bulletIndex}`
-    const [tooltipPositions, setTooltipPositions] = useState<Record<string, { top: number; right: number }>>({})    
+    const [tooltipPositions, setTooltipPositions] = useState<Record<string, { top: number; right: number }>>({})
+    // Track tone info tooltip visibility
+    const [showToneInfoTooltip, setShowToneInfoTooltip] = useState(false)
+    // Track tone tooltip position
+    const [toneTooltipPosition, setToneTooltipPosition] = useState<{ top: number; left: number } | null>(null)
+    // Track keywords info tooltip visibility
+    const [showKeywordsInfoTooltip, setShowKeywordsInfoTooltip] = useState(false)
+    // Track keywords tooltip position
+    const [keywordsTooltipPosition, setKeywordsTooltipPosition] = useState<{ top: number; left: number } | null>(null)
+    // Track summary info tooltip visibility
+    const [showSummaryInfoTooltip, setShowSummaryInfoTooltip] = useState(false)
+    // Track summary tooltip position
+    const [summaryTooltipPosition, setSummaryTooltipPosition] = useState<{ top: number; left: number } | null>(null)    
 
     // Use external state if provided, otherwise use internal state
     const currentStep = externalCurrentStep ?? internalCurrentStep
@@ -1081,6 +1093,7 @@ export default function Form({
                     company: experience.company,
                     allBullets: bullets,
                     keywords: keywordsToUse,
+                    tone: formData.tone,
                 }),
             })
     
@@ -1275,12 +1288,110 @@ export default function Form({
                                                 {tone.charAt(0).toUpperCase() + tone.slice(1)}
                                             </button>
                                         ))}
+                                        {/* Info Icon */}
+                                        <button
+                                            type="button"
+                                            onMouseEnter={(e) => {
+                                                setShowToneInfoTooltip(true)
+                                                // Store button position for tooltip positioning
+                                                const rect = e.currentTarget.getBoundingClientRect()
+                                                setToneTooltipPosition({ 
+                                                    top: rect.top - 220, 
+                                                    left: rect.right + 8 
+                                                })
+                                            }}
+                                            onMouseLeave={() => {
+                                                setShowToneInfoTooltip(false)
+                                                setToneTooltipPosition(null)
+                                            }}
+                                            className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-700 flex items-center justify-center transition duration-200"
+                                            title=""
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </button>
                                     </div>
+                                    
+                                    {/* Tone Info Tooltip */}
+                                    {showToneInfoTooltip && (
+                                        <div 
+                                            className="fixed w-[520px] bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-[9999] pointer-events-auto"
+                                            style={{ 
+                                                maxWidth: 'min(520px, calc(100vw - 2rem))',
+                                                top: toneTooltipPosition ? `${toneTooltipPosition.top}px` : 'auto',
+                                                left: toneTooltipPosition ? `${toneTooltipPosition.left}px` : 'auto',
+                                                bottom: toneTooltipPosition ? 'auto' : '1rem'
+                                            }}
+                                        >
+                                            <h4 className="font-semibold text-sm text-gray-900 mb-3">Tone Adjustment</h4>
+                                            <p className="text-xs text-gray-700 mb-4">
+                                                The tone adjusts the language, verbs, scope, and ownership level in your resume summary and bullet points to match the seniority level of the role you're applying for.
+                                            </p>
+                                            
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <h5 className="font-semibold text-xs text-gray-900 mb-2">Junior Level</h5>
+                                                    <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                                                        <li>Uses entry-level or junior positioning (e.g., "Junior developer", "Associate engineer", "Entry-level")</li>
+                                                        <li>Focuses on foundational skills, learning ability, and growth potential</li>
+                                                        <li>Emphasizes education, projects, and eagerness to contribute</li>
+                                                        <li>Uses language appropriate for someone early in their career</li>
+                                                    </ul>
+                                                </div>
+                                                
+                                                <div>
+                                                    <h5 className="font-semibold text-xs text-gray-900 mb-2">Mid Level</h5>
+                                                    <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                                                        <li>Uses mid-level positioning (e.g., "Engineer", "Developer", "Software engineer")</li>
+                                                        <li>Balances technical depth with collaboration and impact</li>
+                                                        <li>Emphasizes hands-on experience and concrete achievements</li>
+                                                        <li>Uses confident but not overly authoritative language</li>
+                                                    </ul>
+                                                </div>
+                                                
+                                                <div>
+                                                    <h5 className="font-semibold text-xs text-gray-900 mb-2">Senior Level</h5>
+                                                    <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                                                        <li>Uses senior-level positioning (e.g., "Senior engineer", "Lead developer", "Principal architect", "Staff engineer")</li>
+                                                        <li>Emphasizes leadership, strategic impact, architectural decisions, and mentoring</li>
+                                                        <li>Highlights experience with complex systems, scale, and cross-functional influence</li>
+                                                        <li>Uses authoritative language that reflects deep expertise and decision-making authority</li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {formData.keywords && formData.keywords.length > 0 && (
                                     <div className="mt-4 pt-4 border-t border-blue-200">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Extracted Keywords:</label>
+                                        <div className="flex items-center space-x-2 mb-2">
+                                            <label className="block text-sm font-medium text-gray-700">Extracted Keywords:</label>
+                                            {/* Info Icon */}
+                                            <button
+                                                type="button"
+                                                onMouseEnter={(e) => {
+                                                    setShowKeywordsInfoTooltip(true)
+                                                    // Store button position for tooltip positioning
+                                                    const rect = e.currentTarget.getBoundingClientRect()
+                                                    setKeywordsTooltipPosition({ 
+                                                        top: rect.top - 220, 
+                                                        left: rect.right + 8 
+                                                    })
+                                                }}
+                                                onMouseLeave={() => {
+                                                    setShowKeywordsInfoTooltip(false)
+                                                    setKeywordsTooltipPosition(null)
+                                                }}
+                                                className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-700 flex items-center justify-center transition duration-200"
+                                                title=""
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
                                         <div className="flex flex-wrap gap-2">
                                             {formData.keywords
                                                 .map((keyword: string) => ({
@@ -1298,6 +1409,46 @@ export default function Form({
                                                     </span>
                                                 ))}
                                         </div>
+                                        
+                                        {/* Keywords Info Tooltip */}
+                                        {showKeywordsInfoTooltip && (
+                                            <div 
+                                                className="fixed w-[520px] bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-[9999] pointer-events-auto"
+                                                style={{ 
+                                                    maxWidth: 'min(520px, calc(100vw - 2rem))',
+                                                    top: keywordsTooltipPosition ? `${keywordsTooltipPosition.top}px` : 'auto',
+                                                    left: keywordsTooltipPosition ? `${keywordsTooltipPosition.left}px` : 'auto',
+                                                    bottom: keywordsTooltipPosition ? 'auto' : '1rem'
+                                                }}
+                                            >
+                                                <h4 className="font-semibold text-sm text-gray-900 mb-3">Extracted Keywords</h4>
+                                                <p className="text-xs text-gray-700 mb-4">
+                                                    Keywords are important terms and phrases extracted from the job description that help match your resume to the role.
+                                                </p>
+                                                
+                                                <div className="space-y-3">
+                                                    <div>
+                                                        <h5 className="font-semibold text-xs text-gray-900 mb-2">Purpose</h5>
+                                                        <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                                                            <li>Help your resume pass Applicant Tracking Systems (ATS)</li>
+                                                            <li>Increase keyword matching with the job description</li>
+                                                            <li>Improve your resume's relevance to recruiters</li>
+                                                            <li>Guide you to naturally incorporate important terms into your bullet points</li>
+                                                        </ul>
+                                                    </div>
+                                                    
+                                                    <div>
+                                                        <h5 className="font-semibold text-xs text-gray-900 mb-2">How to Use</h5>
+                                                        <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                                                            <li>When rewriting bullet points, select relevant keywords to incorporate</li>
+                                                            <li>Keywords are automatically suggested based on the bullet point content</li>
+                                                            <li>Only include keywords that naturally fit the context of your work</li>
+                                                            <li>The numbers show how many times each keyword appears in your resume</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1629,10 +1780,10 @@ export default function Form({
                                                                                         return updated
                                                                                     })
                                                                                 }}
-                                                                                className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-700 flex items-center justify-center transition duration-200"
+                                                                                className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-700 flex items-center justify-center transition duration-200"
                                                                                 title="Learn about the rewrite format"
                                                                             >
-                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                                                                 </svg>
                                                                             </button>
@@ -2276,7 +2427,32 @@ export default function Form({
                         {formData.summary && (
                             <>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Summary</label>
+                                        <div className="flex items-center space-x-2 mb-2">
+                                            <label className="block text-sm font-medium text-gray-700">Summary</label>
+                                            {/* Info Icon */}
+                                            <button
+                                                type="button"
+                                                onMouseEnter={(e) => {
+                                                    setShowSummaryInfoTooltip(true)
+                                                    // Store button position for tooltip positioning
+                                                    const rect = e.currentTarget.getBoundingClientRect()
+                                                    setSummaryTooltipPosition({ 
+                                                        top: rect.top - 220, 
+                                                        left: rect.right + 8 
+                                                    })
+                                                }}
+                                                onMouseLeave={() => {
+                                                    setShowSummaryInfoTooltip(false)
+                                                    setSummaryTooltipPosition(null)
+                                                }}
+                                                className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-700 flex items-center justify-center transition duration-200"
+                                                title=""
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
                                         <textarea 
                                             name="summary" 
                                             placeholder={formData.summary}
@@ -2285,6 +2461,56 @@ export default function Form({
                                             onChange={handleInputChange}
                                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
                                         />
+                                        
+                                        {/* Summary Info Tooltip */}
+                                        {showSummaryInfoTooltip && (
+                                            <div 
+                                                className="fixed w-[520px] bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-[9999] pointer-events-auto"
+                                                style={{ 
+                                                    maxWidth: 'min(520px, calc(100vw - 2rem))',
+                                                    top: summaryTooltipPosition ? `${summaryTooltipPosition.top}px` : 'auto',
+                                                    left: summaryTooltipPosition ? `${summaryTooltipPosition.left}px` : 'auto',
+                                                    bottom: summaryTooltipPosition ? 'auto' : '1rem'
+                                                }}
+                                            >
+                                                <h4 className="font-semibold text-sm text-gray-900 mb-3">How Summary is Generated</h4>
+                                                <p className="text-xs text-gray-700 mb-4">
+                                                    The summary is AI-generated based on your work experience, education, skills, and the target job description. It's tailored to match the seniority level and requirements of the role you're applying for.
+                                                </p>
+                                                
+                                                <div className="space-y-3">
+                                                    <div>
+                                                        <h5 className="font-semibold text-xs text-gray-900 mb-2">Generation Process</h5>
+                                                        <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                                                            <li>Analyzes your work experience, education, and skills</li>
+                                                            <li>Matches your qualifications to the target job description</li>
+                                                            <li>Adjusts language and seniority level based on the selected tone (junior/mid/senior)</li>
+                                                            <li>Uses direct positioning (no "I", no names, no third person)</li>
+                                                            <li>Avoids buzzwords and focuses on concrete achievements</li>
+                                                        </ul>
+                                                    </div>
+                                                    
+                                                    <div>
+                                                        <h5 className="font-semibold text-xs text-gray-900 mb-2">Modification Options</h5>
+                                                        <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                                                            <li><strong>More Concise:</strong> Reduces to 1-2 sentences (30-50 words) while keeping key information</li>
+                                                            <li><strong>More Verbose:</strong> Expands to 3-4 sentences (80-120 words) with more specific details</li>
+                                                            <li><strong>More Senior:</strong> Emphasizes senior-level experience, leadership, and strategic impact</li>
+                                                        </ul>
+                                                    </div>
+                                                    
+                                                    <div>
+                                                        <h5 className="font-semibold text-xs text-gray-900 mb-2">Best Practices</h5>
+                                                        <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                                                            <li>Review and edit the generated summary to ensure accuracy</li>
+                                                            <li>Make sure it reflects your actual experience and achievements</li>
+                                                            <li>Ensure it aligns with the tone you've selected for your resume</li>
+                                                            <li>Keep it concise and impactful - recruiters scan summaries quickly</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     </>
                             )}
