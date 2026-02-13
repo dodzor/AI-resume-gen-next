@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, experience, education, skills, job, existingSummary, modifyType, tone } = body;
+    const { name, email, experience, education, skills, job, existingSummary, modifyType, tone, themes, recommendations, thematicSummary } = body;
 
     // Validate required fields
     if (!job) {
@@ -40,6 +40,15 @@ export async function POST(request: NextRequest) {
 
     let prompt = '';
     let systemMessage = '';
+
+    /**Senior Software Developer with over 7 years of experience in PHP and Laravel, specializing in building scalable backend systems. Successfully reduced latency by 30% for global streaming platforms and increased auction participation by 40% through advanced multilingual database architectures and real-time interactions. Demonstrates expertise in implementing message queues and optimizing infrastructure, 
+     * enhancing system security and resilience for a 25% increase in user request handling capacity. Proficient in leveraging AWS services to drive feature adoption and informed product decisions. */
+
+    // Build themes instructions if available
+    let themesInstructions = '';
+    if (themes && Array.isArray(themes) && themes.length > 0 && recommendations && Array.isArray(recommendations) && recommendations.length > 0) {
+      themesInstructions = `\n\nIMPORTANT THEMES TO EMPHASIZE: The following themes and values are critical for this role:\n${themes.map((t: string) => `- ${t}`).join('\n')}\n\nThe summary should demonstrate these capabilities:\n${recommendations.map((r: string) => `- ${r}`).join('\n')}\n${thematicSummary ? `\nContext: ${thematicSummary}` : ''}\n\nWhen writing the summary, ensure it naturally incorporates and emphasizes these themes and recommendations. Show concrete examples of how the candidate's experience aligns with what this role values.`;
+    }
 
     // Build seniority adjustment instructions based on tone
     let seniorityInstructions = '';
@@ -140,7 +149,9 @@ Phrases Recruiters Ignore (use better verbs instead):
 
 Instead of buzzwords, use concrete language that shows what was accomplished, who was involved, what changed, and measurable outcomes.
 
-${seniorityInstructions ? seniorityInstructions + '\n\n' : ''}Return ONLY the modified summary text, without any markdown formatting, quotes, or additional explanations.`;
+${themesInstructions}${seniorityInstructions ? '\n\n' + seniorityInstructions : ''}
+
+Return ONLY the modified summary text, without any markdown formatting, quotes, or additional explanations.`;
     } else {
       // Generation mode
       systemMessage = 'You are a professional resume writer. Generate concise, compelling professional summaries tailored to specific job descriptions, avoiding buzzwords and clichés.';
@@ -202,7 +213,9 @@ The generated summary should:
 - Mention architectural strength
 - Mention scale or impact
 
-${seniorityInstructions ? seniorityInstructions + '\n\n' : ''}Return ONLY the summary text, without any markdown formatting, quotes, or additional explanations.`;
+${themesInstructions}${seniorityInstructions ? '\n\n' + seniorityInstructions : ''}
+
+Return ONLY the summary text, without any markdown formatting, quotes, or additional explanations.`;
     }
 
     const action = modifyType ? `Modifying summary (${modifyType})` : 'Generating summary';

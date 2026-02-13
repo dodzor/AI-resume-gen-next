@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { bullet, role, company, allBullets, keywords, tone } = body;
+    const { bullet, role, company, allBullets, keywords, tone, themes, recommendations, thematicSummary } = body;
 
     // Validate required fields
     if (!bullet || !bullet.trim()) {
@@ -31,6 +31,12 @@ export async function POST(request: NextRequest) {
     }
 
     const systemMessage = 'You are a professional resume writer specializing in transforming vague, task-based job descriptions into impactful, concrete bullet points that avoid buzzwords and clichés.';
+    
+    // Build themes instructions if available
+    let themesInstructions = '';
+    if (themes && Array.isArray(themes) && themes.length > 0 && recommendations && Array.isArray(recommendations) && recommendations.length > 0) {
+      themesInstructions = `\n\nIMPORTANT THEMES TO EMPHASIZE: The following themes and values are critical for this role:\n${themes.map((t: string) => `- ${t}`).join('\n')}\n\nThe bullet point should demonstrate these capabilities:\n${recommendations.map((r: string) => `- ${r}`).join('\n')}\n${thematicSummary ? `\nContext: ${thematicSummary}` : ''}\n\nWhen rewriting the bullet point, ensure it naturally incorporates and emphasizes these themes and recommendations. Show concrete examples of how the work described aligns with what this role values.`;
+    }
     
     // Build seniority adjustment instructions based on tone
     let seniorityInstructions = '';
@@ -123,7 +129,9 @@ Phrases Recruiters Ignore (use better verbs instead):
 
 Instead of buzzwords, use concrete language that shows what was accomplished, who was involved, what changed, and measurable outcomes.
 
-${seniorityInstructions ? seniorityInstructions + '\n\n' : ''}Return ONLY the rewritten bullet point as a single line of text, without any prefixes, numbering, or formatting.`;
+${themesInstructions}${seniorityInstructions ? '\n\n' + seniorityInstructions : ''}
+
+Return ONLY the rewritten bullet point as a single line of text, without any prefixes, numbering, or formatting.`;
 
     console.log('Rewriting bullet point for:', role || 'Unknown role');
 

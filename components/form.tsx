@@ -817,6 +817,9 @@ export default function Form({
                     skills: formData.skills,
                     job: formData.job,
                     tone: formData.tone,
+                    themes: formData.themes || [],
+                    recommendations: formData.recommendations || [],
+                    thematicSummary: formData.thematicSummary || '',
                 }),
             })
     
@@ -868,6 +871,9 @@ export default function Form({
                     existingSummary: formData.summary,
                     modifyType: modifyType,
                     tone: formData.tone,
+                    themes: formData.themes || [],
+                    recommendations: formData.recommendations || [],
+                    thematicSummary: formData.thematicSummary || '',
                 }),
             })
     
@@ -909,6 +915,9 @@ export default function Form({
                     description: experience.description,
                     role: experience.role,
                     company: experience.company,
+                    themes: formData.themes || [],
+                    recommendations: formData.recommendations || [],
+                    thematicSummary: formData.thematicSummary || '',
                 }),
             })
     
@@ -1129,6 +1138,9 @@ export default function Form({
                     allBullets: bullets,
                     keywords: keywordsToUse,
                     tone: formData.tone,
+                    themes: formData.themes || [],
+                    recommendations: formData.recommendations || [],
+                    thematicSummary: formData.thematicSummary || '',
                 }),
             })
     

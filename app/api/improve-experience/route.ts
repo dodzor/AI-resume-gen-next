@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { description, role, company } = body;
+    const { description, role, company, themes, recommendations, thematicSummary } = body;
 
     // Validate required fields
     if (!description || !description.trim()) {
@@ -31,6 +31,12 @@ export async function POST(request: NextRequest) {
     }
 
     const systemMessage = 'You are a professional resume writer specializing in transforming vague, task-based job descriptions into impactful, concrete bullet points that avoid buzzwords and clichés.';
+    
+    // Build themes instructions if available
+    let themesInstructions = '';
+    if (themes && Array.isArray(themes) && themes.length > 0 && recommendations && Array.isArray(recommendations) && recommendations.length > 0) {
+      themesInstructions = `\n\nIMPORTANT THEMES TO EMPHASIZE: The following themes and values are critical for this role:\n${themes.map((t: string) => `- ${t}`).join('\n')}\n\nThe bullet points should demonstrate these capabilities:\n${recommendations.map((r: string) => `- ${r}`).join('\n')}\n${thematicSummary ? `\nContext: ${thematicSummary}` : ''}\n\nWhen rewriting the bullet points, ensure they naturally incorporate and emphasize these themes and recommendations. Show concrete examples of how the work described aligns with what this role values. Prioritize bullet points that demonstrate these themes.`;
+    }
     
     const prompt = `Transform the following job description into impactful, concrete bullet points. Convert vague, task-based statements into bullets that show impact, results, or value, not just what the person was responsible for.
 
@@ -83,6 +89,8 @@ Phrases Recruiters Ignore (use better verbs instead):
 - Responsible for, In charge of, Tasked with, Assisted with (without outcome), Worked on
 
 Instead of buzzwords, use concrete language that shows what was accomplished, who was involved, what changed, and measurable outcomes.
+
+${themesInstructions}
 
 Return ONLY the improved bullet points, one per line, without any prefixes, numbering, or formatting.`;
 
