@@ -190,12 +190,36 @@ Return ONLY the rewritten bullet point as a single line of text, without any pre
       });
     }
 
-    console.log('Bullet point rewritten successfully. Incorporated keywords:', incorporatedKeywords.length);
+    // Detect which themes were relevant (if themes were provided)
+    const relevantThemes: string[] = [];
+    if (themes && Array.isArray(themes) && themes.length > 0) {
+      const rewrittenLower = rewrittenBullet.toLowerCase();
+      themes.forEach((theme: string) => {
+        const themeLower = theme.toLowerCase();
+        // Check if theme-related terms appear in the rewritten bullet
+        // This is a simple check - could be enhanced with semantic matching
+        if (rewrittenLower.includes(themeLower) || 
+            (themeLower.includes('ownership') && (rewrittenLower.includes('built') || rewrittenLower.includes('led') || rewrittenLower.includes('architected'))) ||
+            (themeLower.includes('system design') && (rewrittenLower.includes('architecture') || rewrittenLower.includes('system') || rewrittenLower.includes('design'))) ||
+            (themeLower.includes('mentorship') && (rewrittenLower.includes('mentor') || rewrittenLower.includes('team') || rewrittenLower.includes('lead')))) {
+          relevantThemes.push(theme);
+        }
+      });
+    }
+
+    console.log('Bullet point rewritten successfully. Incorporated keywords:', incorporatedKeywords.length, 'Relevant themes:', relevantThemes.length);
 
     return NextResponse.json({
       success: true,
       rewrittenBullet: rewrittenBullet,
-      incorporatedKeywords: incorporatedKeywords
+      incorporatedKeywords: incorporatedKeywords,
+      reasoning: {
+        themes: relevantThemes,
+        keywords: incorporatedKeywords,
+        tone: tone || null,
+        hasThemes: themes && themes.length > 0,
+        hasKeywords: keywords && keywords.length > 0
+      }
     });
 
   } catch (error: any) {

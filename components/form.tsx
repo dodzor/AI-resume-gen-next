@@ -74,6 +74,16 @@ export default function Form({
     const [expandedKeywords, setExpandedKeywords] = useState<Record<string, boolean>>({})
     // Track which bullet just got rewritten to show tooltip: key = `${experienceIndex}-${bulletIndex}`
     const [showRewriteTooltip, setShowRewriteTooltip] = useState<Record<string, boolean>>({})
+    // Track expanded state of rewrite tooltip: key = `${experienceIndex}-${bulletIndex}`
+    const [expandedRewriteTooltip, setExpandedRewriteTooltip] = useState<Record<string, boolean>>({})
+    // Track rewrite reasoning/details: key = `${experienceIndex}-${bulletIndex}`
+    const [rewriteReasoning, setRewriteReasoning] = useState<Record<string, {
+        themes: string[];
+        keywords: string[];
+        tone: string | null;
+        hasThemes: boolean;
+        hasKeywords: boolean;
+    }>>({})
     // Track info icon hover state: key = `${experienceIndex}-${bulletIndex}`
     const [showInfoTooltip, setShowInfoTooltip] = useState<Record<string, boolean>>({})
     // Track tooltip positions: key = `${experienceIndex}-${bulletIndex}`
@@ -1162,21 +1172,20 @@ export default function Form({
                 }))
             }
             
-            // Show tooltip after successful rewrite
+            // Store rewrite reasoning if available
             const key = `${experienceIndex}-${bulletIndex}`
+            if (data.reasoning) {
+                setRewriteReasoning((prev) => ({
+                    ...prev,
+                    [key]: data.reasoning
+                }))
+            }
+            
+            // Show tooltip after successful rewrite
             setShowRewriteTooltip((prev) => ({
                 ...prev,
                 [key]: true
             }))
-            
-            // Auto-hide tooltip after 5 seconds
-            setTimeout(() => {
-                setShowRewriteTooltip((prev) => {
-                    const updated = { ...prev }
-                    delete updated[key]
-                    return updated
-                })
-            }, 5000)
         } catch (error) {
             console.error('Error rewriting bullet:', error)
             alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
@@ -1865,6 +1874,9 @@ export default function Form({
                                                                             {showInfoTooltip[`${index}-${bulletIndex}`] && (() => {
                                                                                 const key = `${index}-${bulletIndex}`
                                                                                 const position = tooltipPositions[key]
+                                                                                const reasoning = rewriteReasoning[key]
+                                                                                const hasJobAnalysis = formData.themes && formData.themes.length > 0
+                                                                                
                                                                                 return (
                                                                                     <div 
                                                                                         className="fixed w-80 bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-[9999] pointer-events-auto"
@@ -1875,19 +1887,120 @@ export default function Form({
                                                                                             bottom: position ? 'auto' : '1rem'
                                                                                         }}
                                                                                     >
-                                                                                        <h4 className="font-semibold text-sm text-gray-900 mb-2">Why this format?</h4>
+                                                                                        <div className="flex items-start justify-between mb-2">
+                                                                                            <h4 className="font-semibold text-sm text-gray-900">Why this format?</h4>
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                onClick={() => {
+                                                                                                    setShowInfoTooltip((prev) => {
+                                                                                                        const updated = { ...prev }
+                                                                                                        delete updated[key]
+                                                                                                        return updated
+                                                                                                    })
+                                                                                                    setTooltipPositions((prev) => {
+                                                                                                        const updated = { ...prev }
+                                                                                                        delete updated[key]
+                                                                                                        return updated
+                                                                                                    })
+                                                                                                }}
+                                                                                                className="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-600"
+                                                                                            >
+                                                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                                                                </svg>
+                                                                                            </button>
+                                                                                        </div>
                                                                                         <p className="text-xs text-gray-700 mb-3">
                                                                                             We use the format: <strong>Action verb + what you did + how + result/impact</strong>
                                                                                         </p>
                                                                                         <p className="text-xs text-gray-600 mb-2">
                                                                                             Recruiters think in terms of:
                                                                                         </p>
-                                                                                        <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                                                                                        <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside mb-4">
                                                                                             <li><strong>Impact</strong> - What changed or improved?</li>
                                                                                             <li><strong>Results</strong> - What were the measurable outcomes?</li>
                                                                                             <li><strong>Scale</strong> - How many people/systems/projects?</li>
                                                                                             <li><strong>Improvement</strong> - What got better?</li>
                                                                                         </ul>
+                                                                                        
+                                                                                        {hasJobAnalysis && (
+                                                                                            <div className="pt-3 border-t border-gray-200 space-y-2">
+                                                                                                <p className="text-xs font-semibold text-gray-900 mb-2">Job-specific enhancements:</p>
+                                                                                                
+                                                                                                {formData.themes && formData.themes.length > 0 && (
+                                                                                                    <div>
+                                                                                                        <p className="text-xs font-medium text-gray-700 mb-1">Themes to emphasize:</p>
+                                                                                                        <div className="flex flex-wrap gap-1">
+                                                                                                            {formData.themes.slice(0, 3).map((theme: string, themeIndex: number) => (
+                                                                                                                <span key={themeIndex} className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs">
+                                                                                                                    {theme}
+                                                                                                                </span>
+                                                                                                            ))}
+                                                                                                            {formData.themes.length > 3 && (
+                                                                                                                <span className="px-2 py-0.5 text-gray-500 text-xs">+{formData.themes.length - 3} more</span>
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                )}
+                                                                                                
+                                                                                                {formData.keywords && formData.keywords.length > 0 && (
+                                                                                                    <div>
+                                                                                                        <p className="text-xs font-medium text-gray-700 mb-1">Keywords to incorporate:</p>
+                                                                                                        <div className="flex flex-wrap gap-1">
+                                                                                                            {formData.keywords.slice(0, 5).map((keyword: string, kwIndex: number) => (
+                                                                                                                <span key={kwIndex} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">
+                                                                                                                    {keyword}
+                                                                                                                </span>
+                                                                                                            ))}
+                                                                                                            {formData.keywords.length > 5 && (
+                                                                                                                <span className="px-2 py-0.5 text-gray-500 text-xs">+{formData.keywords.length - 5} more</span>
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                )}
+                                                                                                
+                                                                                                {formData.tone && (
+                                                                                                    <div>
+                                                                                                        <p className="text-xs font-medium text-gray-700 mb-1">Tone level:</p>
+                                                                                                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs font-medium capitalize">
+                                                                                                            {formData.tone}
+                                                                                                        </span>
+                                                                                                        <p className="text-xs text-gray-600 mt-1 italic">
+                                                                                                            {formData.tone === 'senior' && 'Emphasizes leadership and strategic impact'}
+                                                                                                            {formData.tone === 'mid' && 'Balances technical depth with collaboration'}
+                                                                                                            {formData.tone === 'junior' && 'Focuses on foundational skills and growth'}
+                                                                                                        </p>
+                                                                                                    </div>
+                                                                                                )}
+                                                                                                
+                                                                                                {reasoning && (reasoning.hasThemes || reasoning.hasKeywords || reasoning.tone) && (
+                                                                                                    <div className="pt-2 border-t border-gray-200">
+                                                                                                        <p className="text-xs font-medium text-gray-700 mb-1">This bullet incorporates:</p>
+                                                                                                        <ul className="text-xs text-gray-600 space-y-0.5">
+                                                                                                            {reasoning.hasThemes && reasoning.themes.length > 0 && (
+                                                                                                                <li className="flex items-center gap-1">
+                                                                                                                    <span className="text-purple-600">•</span>
+                                                                                                                    <span>{reasoning.themes.length} theme{reasoning.themes.length !== 1 ? 's' : ''}</span>
+                                                                                                                </li>
+                                                                                                            )}
+                                                                                                            {reasoning.hasKeywords && reasoning.keywords.length > 0 && (
+                                                                                                                <li className="flex items-center gap-1">
+                                                                                                                    <span className="text-blue-600">•</span>
+                                                                                                                    <span>{reasoning.keywords.length} keyword{reasoning.keywords.length !== 1 ? 's' : ''}</span>
+                                                                                                                </li>
+                                                                                                            )}
+                                                                                                            {reasoning.tone && (
+                                                                                                                <li className="flex items-center gap-1">
+                                                                                                                    <span className="text-indigo-600">•</span>
+                                                                                                                    <span>{reasoning.tone}-level tone</span>
+                                                                                                                </li>
+                                                                                                            )}
+                                                                                                        </ul>
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        )}
+                                                                                        
                                                                                         <p className="text-xs text-gray-600 mt-3">
                                                                                             This format helps your resume pass ATS systems and catch recruiters' attention.
                                                                                         </p>
@@ -1895,43 +2008,169 @@ export default function Form({
                                                                                 )
                                                                             })()}
                                                                             
-                                                                            {/* Post-rewrite Tooltip */}
-                                                                            {showRewriteTooltip[`${index}-${bulletIndex}`] && (
-                                                                                <div className="absolute right-0 top-full mt-1 w-80 bg-blue-50 border border-blue-200 rounded-lg shadow-lg p-4 z-50 transition-all duration-300 opacity-100">
-                                                                                    <div className="flex items-start justify-between">
-                                                                                        <div className="flex-1">
-                                                                                            <h4 className="font-semibold text-sm text-blue-900 mb-2 flex items-center gap-2">
-                                                                                                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                                                                                </svg>
-                                                                                                Rewritten with impact-focused format
-                                                                                            </h4>
-                                                                                            <p className="text-xs text-blue-800 mb-2">
-                                                                                                Format: <strong>Action verb + what you did + how + result/impact</strong>
-                                                                                            </p>
-                                                                                            <p className="text-xs text-blue-700">
-                                                                                                Recruiters focus on: Impact, Results, Scale, Improvement
-                                                                                            </p>
-                                                                                        </div>
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={() => {
-                                                                                                const key = `${index}-${bulletIndex}`
-                                                                                                setShowRewriteTooltip((prev) => {
-                                                                                                    const updated = { ...prev }
-                                                                                                    delete updated[key]
-                                                                                                    return updated
-                                                                                                })
-                                                                                            }}
-                                                                                            className="flex-shrink-0 ml-2 text-blue-600 hover:text-blue-800"
-                                                                                        >
-                                                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                                                                                            </svg>
-                                                                                        </button>
-                                                                                    </div>
-                                                                                </div>
+                                                                            {/* Post-rewrite Tooltip - Enhanced Expandable */}
+                                                                            {showRewriteTooltip[`${index}-${bulletIndex}`] && (() => {
+                                                                                const key = `${index}-${bulletIndex}`
+                                                                                const reasoning = rewriteReasoning[key]
+                                                                                const isExpanded = expandedRewriteTooltip[key] || false
+                                                                                const hasDetails = reasoning && (reasoning.hasThemes || reasoning.hasKeywords || reasoning.tone)
+                                                                                
+                                                                                return (
+                                                                                    <div className="absolute right-0 top-full mt-1 w-80 bg-blue-50 border border-blue-200 rounded-lg shadow-lg z-50 transition-all duration-300 opacity-100">
+                                                                                        <div className="p-4">
+                                                                                            <div className="flex items-start justify-between">
+                                                                                                <div className="flex-1">
+                                                                                                    <h4 className="font-semibold text-sm text-blue-900 mb-2 flex items-center gap-2">
+                                                                                                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                                                                        </svg>
+                                                                                                        Rewritten with impact-focused format
+                                                                                                    </h4>
+                                                                                                    <p className="text-xs text-blue-800 mb-2">
+                                                                                                        Format: <strong>Action verb + what you did + how + result/impact</strong>
+                                                                                                    </p>
+                                                                                                    <p className="text-xs text-blue-700 mb-3">
+                                                                                                        Recruiters focus on: Impact, Results, Scale, Improvement
+                                                                                                    </p>
+                                                                                                    
+                                                                                                    {hasDetails && (
+                                                                                                        <button
+                                                                                                            type="button"
+                                                                                                            onClick={() => {
+                                                                                                                setExpandedRewriteTooltip((prev) => ({
+                                                                                                                    ...prev,
+                                                                                                                    [key]: !isExpanded
+                                                                                                                }))
+                                                                                                            }}
+                                                                                                            className="text-xs text-blue-700 hover:text-blue-900 font-medium flex items-center gap-1 transition-colors"
+                                                                                                        >
+                                                                                                            {isExpanded ? (
+                                                                                                                <>
+                                                                                                                    <span>Hide details</span>
+                                                                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"></path>
+                                                                                                                    </svg>
+                                                                                                                </>
+                                                                            ) : (
+                                                                                                                <>
+                                                                                                                    <span>Show details</span>
+                                                                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                                                                                                                    </svg>
+                                                                                                                </>
                                                                             )}
+                                                                                                        </button>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    onClick={() => {
+                                                                                                        setShowRewriteTooltip((prev) => {
+                                                                                                            const updated = { ...prev }
+                                                                                                            delete updated[key]
+                                                                                                            return updated
+                                                                                                        })
+                                                                                                        setExpandedRewriteTooltip((prev) => {
+                                                                                                            const updated = { ...prev }
+                                                                                                            delete updated[key]
+                                                                                                            return updated
+                                                                                                        })
+                                                                                                    }}
+                                                                                                    className="flex-shrink-0 ml-2 text-blue-600 hover:text-blue-800"
+                                                                                                >
+                                                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                                                                    </svg>
+                                                                                                </button>
+                                                                                            </div>
+                                                                                            
+                                                                                            {/* Expanded Details Section */}
+                                                                                            {isExpanded && reasoning && (
+                                                                                                <div className="mt-4 pt-4 border-t border-blue-200 space-y-3">
+                                                                                                    <div className="text-xs font-semibold text-blue-900 mb-2">Why this rewrite?</div>
+                                                                                                    
+                                                                                                    {reasoning.hasThemes && reasoning.themes.length > 0 && (
+                                                                                                        <div>
+                                                                                                            <div className="text-xs font-medium text-blue-800 mb-1.5 flex items-center gap-1">
+                                                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                                                                                                </svg>
+                                                                                                                Themes emphasized:
+                                                                                                            </div>
+                                                                                                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                                                                                                {reasoning.themes.map((theme, themeIndex) => (
+                                                                                                                    <span key={themeIndex} className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                                                                                                                        {theme}
+                                                                                                                    </span>
+                                                                                                                ))}
+                                                                                                            </div>
+                                                                                                            {formData.recommendations && formData.recommendations.length > 0 && (
+                                                                                                                <p className="text-xs text-blue-700 italic">
+                                                                                                                    This bullet demonstrates: {formData.recommendations.slice(0, 2).join(', ')}
+                                                                                                                    {formData.recommendations.length > 2 && '...'}
+                                                                                                                </p>
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                    
+                                                                                                    {reasoning.hasKeywords && reasoning.keywords.length > 0 && (
+                                                                                                        <div>
+                                                                                                            <div className="text-xs font-medium text-blue-800 mb-1.5 flex items-center gap-1">
+                                                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                                                                                                                </svg>
+                                                                                                                Keywords incorporated:
+                                                                                                            </div>
+                                                                                                            <div className="flex flex-wrap gap-1.5">
+                                                                                                                {reasoning.keywords.map((keyword, kwIndex) => (
+                                                                                                                    <span key={kwIndex} className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                                                                                                                        {keyword}
+                                                                                                                    </span>
+                                                                                                                ))}
+                                                                                                            </div>
+                                                                                                            <p className="text-xs text-blue-700 italic mt-1">
+                                                                                                                Added to improve ATS matching and relevance
+                                                                                                            </p>
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                    
+                                                                                                    {reasoning.tone && (
+                                                                                                        <div>
+                                                                                                            <div className="text-xs font-medium text-blue-800 mb-1.5 flex items-center gap-1">
+                                                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+                                                                                                                </svg>
+                                                                                                                Tone adjustment:
+                                                                                                            </div>
+                                                                                                            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium capitalize">
+                                                                                                                {reasoning.tone}-level language used
+                                                                                                            </span>
+                                                                                                            <p className="text-xs text-blue-700 italic mt-1">
+                                                                                                                {reasoning.tone === 'senior' && 'Emphasizes leadership, strategic impact, and decision-making authority'}
+                                                                                                                {reasoning.tone === 'mid' && 'Balances technical depth with collaboration and impact'}
+                                                                                                                {reasoning.tone === 'junior' && 'Focuses on foundational skills, learning ability, and growth potential'}
+                                                                                                            </p>
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                    
+                                                                                                    {!reasoning.hasThemes && !reasoning.hasKeywords && !reasoning.tone && (
+                                                                                                        <div>
+                                                                                                            <p className="text-xs text-blue-700 mb-1">
+                                                                                                                Rewritten to follow impact-focused format:
+                                                                                                            </p>
+                                                                                                            <ul className="text-xs text-blue-600 space-y-0.5 list-disc list-inside ml-2">
+                                                                                                                <li>Stronger action verbs</li>
+                                                                                                                <li>Quantifiable results</li>
+                                                                                                                <li>Clear impact statements</li>
+                                                                                                            </ul>
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )
+                                                                            })()}
                                                                         </div>
                                                                         {displayBullets.length > 1 && (
                                                                             <button
