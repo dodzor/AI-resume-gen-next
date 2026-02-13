@@ -111,17 +111,23 @@ export default function Form({
         }
     }, [currentStep, externalMaxStepReached, internalMaxStepReached, setExternalMaxStepReached])
 
-    // Restore analyzedThemes from formData when resume is loaded
+    // Restore analyzedThemes from formData when resume is loaded, or clear when reset
     useEffect(() => {
-        if (formData.thematicSummary && formData.recommendations && formData.themes) {
+        if (formData.thematicSummary && formData.recommendations && formData.themes && formData.themes.length > 0) {
             setAnalyzedThemes({
                 themes: formData.themes || [],
                 recommendations: formData.recommendations || [],
                 summary: formData.thematicSummary || ""
             })
+        } else if (!formData.thematicSummary && (!formData.themes || formData.themes.length === 0)) {
+            // Clear themes when formData is reset (new resume)
+            setAnalyzedThemes(null)
         }
         if (formData.tone) {
             setAnalyzedTone(formData.tone)
+        } else {
+            // Clear tone when formData is reset (new resume)
+            setAnalyzedTone(null)
         }
     }, [formData.thematicSummary, formData.recommendations, formData.themes, formData.tone])
 
