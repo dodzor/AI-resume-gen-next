@@ -1480,16 +1480,31 @@ export default function Form({
                                                     keyword,
                                                     count: countKeywordOccurrences(keyword)
                                                 }))
-                                                .filter((item: { keyword: string; count: number }) => item.count > 0)
                                                 .sort((a: { keyword: string; count: number }, b: { keyword: string; count: number }) => b.count - a.count)
-                                                .map((item: { keyword: string; count: number }, index: number) => (
-                                                    <span
-                                                        key={index}
-                                                        className="px-3 py-1 bg-white border border-blue-300 text-blue-700 rounded-full text-xs font-medium"
-                                                    >
-                                                        {item.keyword} ({item.count})
-                                                    </span>
-                                                ))}
+                                                .map((item: { keyword: string; count: number }, index: number) => {
+                                                    // Visual weight based on occurrence count
+                                                    const isHighPriority = item.count >= 3
+                                                    const isMediumPriority = item.count >= 1 && item.count < 3
+                                                    const isLowPriority = item.count === 0
+                                                    
+                                                    const badgeClass = isHighPriority
+                                                        ? 'px-3 py-1 bg-white border-2 border-blue-600 text-blue-700 rounded-full text-xs font-bold'
+                                                        : isMediumPriority
+                                                        ? 'px-3 py-1 bg-white border border-blue-300 text-blue-700 rounded-full text-xs font-medium'
+                                                        : 'px-3 py-1 bg-white border border-gray-300 text-gray-600 rounded-full text-xs font-normal italic'
+                                                    
+                                                    return (
+                                                        <span
+                                                            key={index}
+                                                            className={badgeClass}
+                                                            title={item.count === 0 
+                                                                ? 'Extracted keyword (not explicitly mentioned in job description)' 
+                                                                : `Appears ${item.count} time${item.count !== 1 ? 's' : ''} in job description`}
+                                                        >
+                                                            {item.keyword} ({item.count})
+                                                        </span>
+                                                    )
+                                                })}
                                         </div>
                                         
                                         {/* Keywords Info Tooltip */}
@@ -1739,35 +1754,58 @@ export default function Form({
                                                         const showKeywordPreview = hasKeywords && relevantKeywords.length > 0
                                                         const selected = getSelectedKeywords(index, bulletIndex)
                                                         const isExpanded = expandedKeywords[`${index}-${bulletIndex}`] || false
-                                                        const displayKeywords = isExpanded ? relevantKeywords : relevantKeywords.slice(0, 6)
-                                                        const hasMore = relevantKeywords.length > 6
+                                                        
+                                                        // Process keywords: add counts, sort by priority, then slice for display
+                                                        const processedKeywords = relevantKeywords
+                                                            .map((keyword: string) => ({
+                                                                keyword,
+                                                                count: countKeywordOccurrences(keyword)
+                                                            }))
+                                                            .sort((a: { keyword: string; count: number }, b: { keyword: string; count: number }) => b.count - a.count)
+                                                        
+                                                        const displayKeywords = isExpanded ? processedKeywords : processedKeywords.slice(0, 6)
+                                                        const hasMore = processedKeywords.length > 6
                                                         
                                                         return (
                                                             <div key={bulletIndex} className="space-y-1">
                                                                 {showKeywordPreview && (
                                                                     <div className="flex items-center gap-1.5 flex-wrap text-xs">
                                                                         <span className="text-gray-500 font-medium">Keywords to incorporate:</span>
-                                                                        {displayKeywords.map((keyword: string, kwIndex: number) => {
-                                                                            const isSelected = selected.includes(keyword)
-                                                                            return (
-                                                                                <button
-                                                                                    key={kwIndex}
-                                                                                    type="button"
-                                                                                    onClick={() => toggleKeywordSelection(index, bulletIndex, keyword)}
-                                                                                    className={`px-2 py-0.5 rounded text-xs transition-all duration-200 cursor-pointer ${
-                                                                                        isSelected
-                                                                                            ? 'bg-blue-600 border border-blue-700 text-white font-medium'
-                                                                                            : 'bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100'
-                                                                                    }`}
-                                                                                    title={isSelected ? 'Click to deselect' : 'Click to select this keyword'}
-                                                                                >
-                                                                                    {keyword}
-                                                                                    {isSelected && (
-                                                                                        <span className="ml-1">✓</span>
-                                                                                    )}
-                                                                                </button>
-                                                                            )
-                                                                        })}
+                                                                        {displayKeywords.map((item: { keyword: string; count: number }, kwIndex: number) => {
+                                                                                const isSelected = selected.includes(item.keyword)
+                                                                                
+                                                                                // Visual weight based on occurrence count
+                                                                                const isHighPriority = item.count >= 3
+                                                                                const isMediumPriority = item.count >= 1 && item.count < 3
+                                                                                const isLowPriority = item.count === 0
+                                                                                
+                                                                                const buttonClass = isSelected
+                                                                                    ? 'px-2 py-0.5 rounded text-xs transition-all duration-200 cursor-pointer bg-blue-600 border-2 border-blue-700 text-white font-bold'
+                                                                                    : isHighPriority
+                                                                                    ? 'px-2 py-0.5 rounded text-xs transition-all duration-200 cursor-pointer bg-blue-50 border-2 border-blue-400 text-blue-700 hover:bg-blue-100 font-bold'
+                                                                                    : isMediumPriority
+                                                                                    ? 'px-2 py-0.5 rounded text-xs transition-all duration-200 cursor-pointer bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 font-medium'
+                                                                                    : 'px-2 py-0.5 rounded text-xs transition-all duration-200 cursor-pointer bg-gray-50 border border-gray-300 text-gray-600 hover:bg-gray-100 font-normal italic'
+                                                                                
+                                                                                return (
+                                                                                    <button
+                                                                                        key={kwIndex}
+                                                                                        type="button"
+                                                                                        onClick={() => toggleKeywordSelection(index, bulletIndex, item.keyword)}
+                                                                                        className={buttonClass}
+                                                                                        title={isSelected 
+                                                                                            ? 'Click to deselect' 
+                                                                                            : item.count === 0
+                                                                                            ? `Click to select "${item.keyword}" (extracted keyword, not explicitly mentioned)`
+                                                                                            : `Click to select "${item.keyword}" (appears ${item.count} time${item.count !== 1 ? 's' : ''} in job description)`}
+                                                                                    >
+                                                                                        {item.keyword}
+                                                                                        {isSelected && (
+                                                                                            <span className="ml-1">✓</span>
+                                                                                        )}
+                                                                                    </button>
+                                                                                )
+                                                                            })}
                                                                         {hasMore && !isExpanded && (
                                                                             <button
                                                                                 type="button"
@@ -1775,7 +1813,7 @@ export default function Form({
                                                                                 className="text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
                                                                                 title="Click to show all keywords"
                                                                             >
-                                                                                +{relevantKeywords.length - 6} more
+                                                                                +{processedKeywords.length - 6} more
                                                                             </button>
                                                                         )}
                                                                         {isExpanded && hasMore && (
