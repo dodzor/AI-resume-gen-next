@@ -690,7 +690,8 @@ export default function Form({
         
             // Update formData with the analyzed tone, keywords, and themes
             const tone = data.tone || 'mid'
-            const keywords = data.keywords || []
+            const keywords = data.keywords || [] // Already sorted by occurrence count
+            const keywordsWithCounts = data.keywordsWithCounts || [] // Keywords with occurrence counts
             const keywordsByCategory = data.keywordsByCategory || {
                 technicalSkills: [],
                 toolsFrameworks: [],
@@ -709,7 +710,8 @@ export default function Form({
             setFormData((prev: any) => ({
                 ...prev,
                 tone: tone,
-                keywords: keywords, // Keep for backward compatibility
+                keywords: keywords, // Already sorted by occurrence count from API
+                keywordsWithCounts: keywordsWithCounts, // Store counts for visual styling
                 keywordsByCategory: keywordsByCategory,
                 themes: themes.themes,
                 recommendations: themes.recommendations,
@@ -732,6 +734,17 @@ export default function Form({
     }
 
     const countKeywordOccurrences = (keyword: string): number => {
+        // First try to get count from pre-computed keywordsWithCounts (from API)
+        if (formData.keywordsWithCounts && Array.isArray(formData.keywordsWithCounts)) {
+            const found = formData.keywordsWithCounts.find((item: { keyword: string; count: number }) => 
+                item.keyword.toLowerCase() === keyword.toLowerCase()
+            )
+            if (found) {
+                return found.count
+            }
+        }
+        
+        // Fallback: count occurrences manually (for backward compatibility)
         const title = formData.jobTitle || ''
         const description = formData.job || ''
         const combinedText = `${title} ${description}`
@@ -1476,12 +1489,10 @@ export default function Form({
                                         </div>
                                         <div className="flex flex-wrap gap-2">
                                             {formData.keywords
-                                                .map((keyword: string) => ({
-                                                    keyword,
-                                                    count: countKeywordOccurrences(keyword)
-                                                }))
-                                                .sort((a: { keyword: string; count: number }, b: { keyword: string; count: number }) => b.count - a.count)
-                                                .map((item: { keyword: string; count: number }, index: number) => {
+                                                .map((keyword: string, index: number) => {
+                                                    // Keywords are already sorted by occurrence count from API
+                                                    const count = countKeywordOccurrences(keyword)
+                                                    const item = { keyword, count }
                                                     // Visual weight based on occurrence count
                                                     const isHighPriority = item.count >= 3
                                                     const isMediumPriority = item.count >= 1 && item.count < 3
@@ -1755,13 +1766,14 @@ export default function Form({
                                                         const selected = getSelectedKeywords(index, bulletIndex)
                                                         const isExpanded = expandedKeywords[`${index}-${bulletIndex}`] || false
                                                         
-                                                        // Process keywords: add counts, sort by priority, then slice for display
+                                                        // Process keywords: add counts (keywords are already sorted by API)
+                                                        // relevantKeywords maintains the order from formData.keywords (which is pre-sorted)
                                                         const processedKeywords = relevantKeywords
                                                             .map((keyword: string) => ({
                                                                 keyword,
                                                                 count: countKeywordOccurrences(keyword)
                                                             }))
-                                                            .sort((a: { keyword: string; count: number }, b: { keyword: string; count: number }) => b.count - a.count)
+                                                            // No need to sort - already sorted by API
                                                         
                                                         const displayKeywords = isExpanded ? processedKeywords : processedKeywords.slice(0, 6)
                                                         const hasMore = processedKeywords.length > 6

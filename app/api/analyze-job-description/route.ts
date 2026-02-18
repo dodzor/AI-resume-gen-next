@@ -74,17 +74,19 @@ Job Title: ${title}
 Job Description:
 ${job}
 
+IMPORTANT: For each keyword, count how many times it appears in the job description (case-insensitive). Then sort keywords within each category by occurrence count (highest first). If two keywords have the same count, maintain alphabetical order.
+
 Return the keywords in the following JSON format:
 {
-  "technicalSkills": ["keyword1", "keyword2", ...],
-  "toolsFrameworks": ["keyword1", "keyword2", ...],
-  "methodologies": ["keyword1", "keyword2", ...],
-  "domainTerms": ["keyword1", "keyword2", ...],
-  "qualifications": ["keyword1", "keyword2", ...],
-  "responsibilities": ["keyword1", "keyword2", ...]
+  "technicalSkills": [{"keyword": "keyword1", "count": 5}, {"keyword": "keyword2", "count": 3}, ...],
+  "toolsFrameworks": [{"keyword": "keyword1", "count": 4}, {"keyword": "keyword2", "count": 2}, ...],
+  "methodologies": [{"keyword": "keyword1", "count": 3}, {"keyword": "keyword2", "count": 1}, ...],
+  "domainTerms": [{"keyword": "keyword1", "count": 2}, {"keyword": "keyword2", "count": 0}, ...],
+  "qualifications": [{"keyword": "keyword1", "count": 3}, {"keyword": "keyword2", "count": 1}, ...],
+  "responsibilities": [{"keyword": "keyword1", "count": 4}, {"keyword": "keyword2", "count": 2}, ...]
 }
 
-Only include keywords that are relevant to a resume. Return ONLY valid JSON, no other text or explanations.`;
+Each keyword object must have both "keyword" (string) and "count" (number) fields. Keywords should be sorted by count (descending) within each category. Only include keywords that are relevant to a resume. Return ONLY valid JSON, no other text or explanations.`;
 
     // Third, extract themes and recommendations
     const themesPrompt = `Analyze the following job posting and identify:
@@ -239,27 +241,71 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
       }
     }
 
-    // Ensure all categories exist and are arrays
-    const keywords = {
-      technicalSkills: Array.isArray(categorizedKeywords.technicalSkills) 
-        ? categorizedKeywords.technicalSkills.filter((k: string) => k && k.trim().length > 0)
-        : [],
-      toolsFrameworks: Array.isArray(categorizedKeywords.toolsFrameworks)
-        ? categorizedKeywords.toolsFrameworks.filter((k: string) => k && k.trim().length > 0)
-        : [],
-      methodologies: Array.isArray(categorizedKeywords.methodologies)
-        ? categorizedKeywords.methodologies.filter((k: string) => k && k.trim().length > 0)
-        : [],
-      domainTerms: Array.isArray(categorizedKeywords.domainTerms)
-        ? categorizedKeywords.domainTerms.filter((k: string) => k && k.trim().length > 0)
-        : [],
-      qualifications: Array.isArray(categorizedKeywords.qualifications)
-        ? categorizedKeywords.qualifications.filter((k: string) => k && k.trim().length > 0)
-        : [],
-      responsibilities: Array.isArray(categorizedKeywords.responsibilities)
-        ? categorizedKeywords.responsibilities.filter((k: string) => k && k.trim().length > 0)
-        : []
+    // Helper function to extract keyword string from either format (string or {keyword, count} object)
+    const extractKeyword = (item: any): string => {
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item === 'object' && item.keyword) return item.keyword.trim();
+      return '';
     };
+
+    // Helper function to extract count from either format
+    const extractCount = (item: any, keyword: string): number => {
+      if (item && typeof item === 'object' && typeof item.count === 'number') {
+        return item.count;
+      }
+      return -1; // Indicate count not provided by AI
+    };
+
+    // Process each category - handle both old format (strings) and new format (objects with counts)
+    const processCategory = (categoryArray: any[]): { keywords: string[], keywordsWithCounts: Array<{keyword: string, count: number}> } => {
+      if (!Array.isArray(categoryArray)) {
+        return { keywords: [], keywordsWithCounts: [] };
+      }
+
+      const keywordsWithCounts = categoryArray
+        .map((item: any) => {
+          const keyword = extractKeyword(item);
+          if (!keyword) return null;
+          const aiCount = extractCount(item, keyword);
+          return { keyword, aiCount };
+        })
+        .filter((item): item is { keyword: string, aiCount: number } => item !== null);
+
+      return {
+        keywords: keywordsWithCounts.map(item => item.keyword),
+        keywordsWithCounts: keywordsWithCounts.map(item => ({ keyword: item.keyword, count: item.aiCount }))
+      };
+    };
+
+    // Process all categories
+    const processedCategories = {
+      technicalSkills: processCategory(categorizedKeywords.technicalSkills),
+      toolsFrameworks: processCategory(categorizedKeywords.toolsFrameworks),
+      methodologies: processCategory(categorizedKeywords.methodologies),
+      domainTerms: processCategory(categorizedKeywords.domainTerms),
+      qualifications: processCategory(categorizedKeywords.qualifications),
+      responsibilities: processCategory(categorizedKeywords.responsibilities)
+    };
+
+    // Create keywords structure for backward compatibility (just keyword strings)
+    const keywords = {
+      technicalSkills: processedCategories.technicalSkills.keywords,
+      toolsFrameworks: processedCategories.toolsFrameworks.keywords,
+      methodologies: processedCategories.methodologies.keywords,
+      domainTerms: processedCategories.domainTerms.keywords,
+      qualifications: processedCategories.qualifications.keywords,
+      responsibilities: processedCategories.responsibilities.keywords
+    };
+
+    // Collect all keywords with AI-provided counts
+    const allKeywordsWithAICounts = [
+      ...processedCategories.technicalSkills.keywordsWithCounts,
+      ...processedCategories.toolsFrameworks.keywordsWithCounts,
+      ...processedCategories.methodologies.keywordsWithCounts,
+      ...processedCategories.domainTerms.keywordsWithCounts,
+      ...processedCategories.qualifications.keywordsWithCounts,
+      ...processedCategories.responsibilities.keywordsWithCounts
+    ];
 
     // Create a flat list of all keywords for backward compatibility
     const allKeywords = [
@@ -270,6 +316,62 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
       ...keywords.qualifications,
       ...keywords.responsibilities
     ];
+
+    // Count occurrences of each keyword in the job description (backend fallback)
+    const countKeywordOccurrences = (keyword: string): number => {
+      const combinedText = `${title} ${job}`.toLowerCase();
+      const keywordLower = keyword.toLowerCase();
+      
+      // Escape special regex characters in the keyword
+      const escapedKeyword = keywordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
+      // Use word boundaries to match whole words only (case-insensitive)
+      const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'gi');
+      const matches = combinedText.match(regex);
+      return matches ? matches.length : 0;
+    };
+
+    // Use AI-provided counts if available, otherwise fall back to backend counting
+    // AI already sorted keywords within categories, but we need to sort across all categories
+    let keywordsWithCounts: Array<{ keyword: string, count: number }>;
+    
+    if (allKeywordsWithAICounts.length > 0) {
+      // Use AI-provided counts (or count manually if AI didn't provide count)
+      keywordsWithCounts = allKeywordsWithAICounts
+        .map((item: { keyword: string, count: number }) => {
+          // If AI provided a count (count >= 0), use it; otherwise count manually
+          const count = item.count >= 0 ? item.count : countKeywordOccurrences(item.keyword);
+          return {
+            keyword: item.keyword,
+            count: count
+          };
+        })
+        .sort((a, b) => {
+          // Sort by count (descending), then alphabetically if counts are equal
+          if (b.count !== a.count) {
+            return b.count - a.count;
+          }
+          return a.keyword.localeCompare(b.keyword);
+        });
+    } else {
+      // Fallback: if no AI counts available, use backend counting and sorting
+      console.log('No AI-provided counts found, using backend counting and sorting');
+      keywordsWithCounts = allKeywords
+        .map((keyword: string) => ({
+          keyword,
+          count: countKeywordOccurrences(keyword)
+        }))
+        .sort((a, b) => {
+          // Sort by count (descending), then alphabetically if counts are equal
+          if (b.count !== a.count) {
+            return b.count - a.count;
+          }
+          return a.keyword.localeCompare(b.keyword);
+        });
+    }
+
+    // Extract just the keywords in sorted order (for backward compatibility)
+    const sortedKeywords = keywordsWithCounts.map(item => item.keyword);
 
     // Parse themes data
     let themesText = themesCompletion.choices[0].message.content.trim();
@@ -317,8 +419,9 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
     return NextResponse.json({
       success: true,
       tone: tone,
-      keywords: allKeywords, // Keep for backward compatibility
-      keywordsByCategory: keywords, // New categorized structure
+      keywords: sortedKeywords, // Sorted by occurrence count (highest first)
+      keywordsWithCounts: keywordsWithCounts, // Keywords with occurrence counts for frontend use
+      keywordsByCategory: keywords, // New categorized structure (unsorted)
       themes: themes.themes,
       recommendations: themes.recommendations,
       summary: themes.summary
