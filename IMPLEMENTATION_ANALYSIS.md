@@ -7,7 +7,7 @@
 #### 1. **Job Description Analysis**
 - ✅ Users can paste a job description
 - ✅ "Analyze Job Description" button triggers analysis
-- ✅ Analysis extracts:
+- ✅ Analysis extracts three key components in parallel:
   - **Tone/Seniority Level**: Determines if role is junior/mid/senior based on:
     - Years of experience mentioned
     - Level of responsibility and autonomy
@@ -22,12 +22,26 @@
     - Domain-specific terms
     - Required qualifications
     - Key responsibilities
+    - **Keyword Occurrence Counting**: Each keyword includes occurrence count in job description
+    - **Smart Sorting**: Keywords sorted by occurrence count (descending), then alphabetically
+    - **Backend Fallback**: If AI doesn't provide counts, backend counts occurrences using regex
+  - **Themes & Recommendations**: ✅ **FULLY IMPLEMENTED**
+    - Core themes and values emphasized (e.g., ownership, system design, mentorship)
+    - Actionable recommendations about what the resume should demonstrate
+    - Summary sentence explaining what the job emphasizes
 
 #### 2. **Visual Feedback After Analysis**
 - ✅ Shows detected seniority level (junior/mid/senior)
 - ✅ Displays tone selector with ability to manually adjust
-- ✅ Shows extracted keywords with occurrence counts in resume
-- ✅ Keywords displayed as badges showing how many times they appear in the resume
+- ✅ Shows extracted keywords with occurrence counts
+- ✅ Keywords displayed as badges with visual weight based on occurrence count:
+  - High priority (3+ occurrences): Bold border, blue-600
+  - Medium priority (1-2 occurrences): Medium border, blue-300
+  - Low priority (0 occurrences): Light border, gray, italic
+- ✅ **Thematic Insights Display**: Shows prominent card with:
+  - Summary sentence (e.g., "This job emphasizes ownership and system design.")
+  - List of recommendations ("Your resume should show: ...")
+  - Visual styling with purple/blue gradient background
 
 #### 3. **Tone/Seniority Application**
 - ✅ Tone is applied to:
@@ -45,284 +59,253 @@
     - Shows relevant keywords for each bullet point
     - Users can select which keywords to incorporate
     - Keywords are naturally incorporated into rewritten bullets
+    - **Keyword Detection**: Automatically detects which keywords were incorporated
   - **Skills Section**: Shows keyword coverage percentage
     - Calculates how many extracted keywords match user's skills
     - Allows adding missing keywords to skills list
 - ✅ Keywords are auto-detected in bullet points as user types
 - ✅ Visual indicators show which keywords are selected for each bullet
+- ✅ Keywords pre-sorted by occurrence count (most important first)
 
-#### 5. **Contextual Guidance**
+#### 5. **Thematic Integration** ✅ **FULLY IMPLEMENTED**
+- ✅ Themes are extracted and displayed after job analysis
+- ✅ Themes are integrated into AI prompts:
+  - **Summary Generation**: Themes and recommendations are passed to ensure alignment
+  - **Bullet Point Rewriting**: Themes are incorporated to emphasize what the role values
+  - **Experience Improvement**: Themes guide the transformation of job descriptions
+- ✅ Theme detection in rewritten bullets: Shows which themes were emphasized
+- ✅ Visual display of themes in bullet point reasoning tooltips
+- ✅ Themes persist in form data and are saved with resume
+
+#### 6. **Contextual Guidance**
 - ✅ Keywords shown above each bullet point input field
 - ✅ Users can select/deselect keywords to customize rewriting
 - ✅ "Rewrite" button shows how many keywords will be incorporated
 - ✅ Info tooltips explain how keywords are used
+- ✅ Thematic insights displayed prominently after analysis
 
-#### 6. **AI-Powered Improvements**
-- ✅ "Improve Experience" button uses job description context
-- ✅ "Rewrite Bullet" incorporates selected keywords naturally
-- ✅ Summary generation uses tone and job description context
+#### 7. **AI-Powered Improvements**
+- ✅ "Improve Experience" button uses job description context and themes
+- ✅ "Rewrite Bullet" incorporates selected keywords and themes naturally
+- ✅ Summary generation uses tone, keywords, themes, and job description context
 - ✅ All AI prompts avoid buzzwords and clichés
+- ✅ Comprehensive buzzword filtering across all AI operations
+
+#### 8. **Resume Persistence & Management** ✅
+- ✅ Auto-save functionality (2-second debounce)
+- ✅ Resume data persisted in Convex database
+- ✅ Multiple resume support with resume switcher
+- ✅ Automatic resume loading on page refresh
+- ✅ Last edited resume remembered via localStorage
+- ✅ Real-time updates via Convex reactive queries
+- ✅ Resume deletion functionality
+
+#### 9. **Data Structure Enhancements**
+- ✅ `keywordsWithCounts`: Array of `{keyword, count}` objects for frontend use
+- ✅ `keywords`: Sorted array of keyword strings (backward compatibility)
+- ✅ `keywordsByCategory`: Categorized keywords by type
+- ✅ `themes`: Array of theme strings
+- ✅ `recommendations`: Array of actionable recommendations
+- ✅ `thematicSummary`: Summary sentence about job emphasis
+- ✅ All data persisted in Convex schema
 
 ---
 
 ## Gaps & Improvement Opportunities
 
-### 🔴 Critical Gaps (Missing "Why")
-
-#### 1. **No Explanation of What the Resume Needs to Emphasize**
-- **Current State**: Shows keywords and tone, but doesn't explain what themes/values the job emphasizes
-- **Missing**: Insights like "This job emphasizes ownership and system design. Your resume should show: End-to-end feature delivery, Architectural decisions, Mentorship examples"
-- **Impact**: Users don't understand WHY certain keywords matter or what themes to emphasize
-
-#### 2. **No Thematic Analysis**
-- **Current State**: Extracts keywords but doesn't identify underlying themes
-- **Missing**: Analysis of what the job values (e.g., ownership, collaboration, innovation, scale, mentorship)
-- **Impact**: Users may include keywords but miss the underlying message
-
-#### 3. **No Prioritization Guidance**
-- **Current State**: All keywords shown equally
-- **Missing**: Which keywords/themes are most important? What should be emphasized first?
-- **Impact**: Users don't know what to prioritize in their resume
-
 ### 🟡 Medium Priority Improvements
 
-#### 4. **Limited Visual Hierarchy**
-- Keywords are shown but not grouped by importance or theme
-- Could show: "Must-have keywords" vs "Nice-to-have keywords"
-- Could group keywords by theme (e.g., "Technical Skills", "Leadership", "Architecture")
+#### 1. **Keyword Importance Scoring Beyond Count**
+- **Current State**: Keywords sorted by occurrence count
+- **Enhancement**: Could add semantic importance scoring (e.g., "React" in a React job is more important than "communication")
+- **Impact**: Better prioritization of truly critical keywords
 
-#### 5. **No Gap Analysis**
-- Doesn't show what's missing from the user's resume compared to the job
-- Could highlight: "You're missing these important keywords: [list]"
-- Could suggest: "Add experience with [technology] to better match this role"
+#### 2. **Theme-Based Keyword Grouping**
+- **Current State**: Keywords shown in flat list, sorted by count
+- **Enhancement**: Group keywords by theme (e.g., "System Design Keywords", "Leadership Keywords")
+- **Impact**: Users can see which themes are well-covered vs missing
 
-#### 6. **No Progress Tracking**
-- Doesn't show how well the resume matches the job description
-- Could show: "Your resume matches 75% of required keywords"
-- Could track improvement as user adds more relevant content
+#### 3. **Resume Match Score**
+- **Current State**: Shows keyword coverage percentage in skills section
+- **Enhancement**: Overall match score with breakdown by category
+  - Technical skills match percentage
+  - Experience level alignment
+  - Theme coverage score
+- **Impact**: Users get clear feedback on how well their resume matches
 
-#### 7. **Limited Context in Experience Section**
-- Keywords shown per bullet, but no overall guidance
-- Could show: "This experience section should emphasize: [themes]"
-- Could suggest: "Add a bullet about [theme] to better match this role"
+#### 4. **Gap Analysis**
+- **Current State**: Shows missing keywords in skills section
+- **Enhancement**: Comprehensive gap analysis:
+  - "You're missing these important keywords: [list]"
+  - "Add experience with [technology] to better match this role"
+  - "Your resume doesn't emphasize [theme] - consider adding bullets about [specific examples]"
+- **Impact**: More actionable guidance on what to add
+
+#### 5. **Progress Tracking**
+- **Current State**: No visual progress indicator
+- **Enhancement**: 
+  - Progress bar showing how well resume matches job
+  - Updates in real-time as user edits
+  - Color-coded sections (green = well-matched, yellow = needs work, red = missing)
+- **Impact**: Users can see improvement as they make changes
+
+#### 6. **Contextual Suggestions Throughout**
+- **Current State**: Keywords and themes shown, but limited contextual guidance
+- **Enhancement**: 
+  - In Experience section: "This role values [theme]. Consider adding a bullet about [specific example]"
+  - In Summary: "Emphasize [theme] in your summary"
+  - In Skills: "Add [keyword] to better match this role"
+- **Impact**: More proactive guidance at each step
+
+#### 7. **Profession-Aware Bullet Point Pattern**
+- **Current State**: Uses rigid "Action verb + what you did + how + result/impact" pattern with emphasis on metrics
+- **Issue**: The pattern works across professions, but the definition of "impact" must adapt:
+  - **Software Engineers**: Metrics like "reduced latency by 28%" work well
+  - **Graphic Designers**: Impact = brand consistency, user clarity, engagement, visual cohesion (not always quantifiable)
+  - **Lawyers**: Impact = risk mitigation, case outcomes, regulatory compliance, deal speed (rarely revenue-based)
+  - **Teachers**: Impact = learning outcomes, pass rates, student engagement, curriculum effectiveness
+  - **Early Career/Internships**: Impact = specificity and scope, not always metrics
+- **Enhancement**: 
+  - **Detect profession** from job description or user input
+  - **Suggest relevant impact types** based on profession:
+    - Graphic Designer: Brand consistency, user engagement, visual clarity, conversion lift, campaign performance
+    - Lawyer: Risk mitigation, successful motions, case resolution, regulatory compliance, contract efficiency
+    - Developer: Performance, scalability, uptime, cost reduction, user growth
+    - Teacher: Learning outcomes, engagement, progression, curriculum effectiveness
+    - Marketing: Campaign performance, conversion rates, brand awareness, lead generation
+  - **Adapt the pattern** to be: **Action + Scope + Context + Outcome** (where outcome adapts to profession)
+  - **Avoid forcing metrics** where they don't apply naturally
+  - **Provide profession-specific examples** in the UI
+- **Impact**: 
+  - Makes the app feel intelligent and profession-aware
+  - Prevents forcing inappropriate metrics (e.g., "increased revenue by 20%" for a lawyer)
+  - Helps users understand that impact exists even without hard numbers
+  - Better guidance for non-technical roles
+  - More authentic bullet points that resonate with hiring managers in each field
+- **Implementation Notes**:
+  - The core pattern is universal: "What did you do? How well? What changed?"
+  - But impact definition changes by profession
+  - Even in roles without metrics, specificity and scope can demonstrate impact
+  - Seniority level also affects ownership language (junior: "Assisted in...", senior: "Led...")
 
 ### 🟢 Nice-to-Have Enhancements
 
 #### 8. **Comparison View**
 - Side-by-side comparison of job requirements vs. resume content
-- Visual matching score
+- Visual matching score with breakdown
+- Highlight matching and missing elements
 
 #### 9. **Smart Suggestions**
 - "Based on this job, you should add experience with [X]"
 - "Your resume is strong in [area], but could emphasize [other area] more"
+- Context-aware suggestions based on user's existing experience
 
-#### 10. **Resume Strength Score**
-- Overall match score with breakdown by category
-- Suggestions for improvement
+#### 10. **Enhanced Theme Detection**
+- More sophisticated theme detection in rewritten bullets (currently uses simple keyword matching)
+- Semantic analysis to detect theme alignment even without exact keyword matches
 
----
-
-## Implementation Plan: Adding Thematic Insights
-
-### Feature: "What Your Resume Needs to Emphasize"
-
-After analyzing the job description, show insights like:
-> "This job emphasizes ownership and system design. Your resume should show:
-> - End-to-end feature delivery
-> - Architectural decisions  
-> - Mentorship examples"
-
-### Implementation Steps
-
-#### Step 1: Update API Route (`app/api/analyze-job-description/route.ts`)
-
-Add a third API call to extract themes and recommendations:
-
-```typescript
-// Add new prompt for thematic analysis
-const themesPrompt = `Analyze the following job posting and identify:
-1. The core themes and values emphasized (e.g., ownership, system design, mentorship, scale, innovation, collaboration)
-2. What the resume should demonstrate (specific capabilities, experiences, or achievements)
-3. Why these matter for this role
-
-Job Title: ${title}
-
-Job Description:
-${job}
-
-Return a JSON object with this structure:
-{
-  "themes": ["theme1", "theme2", "theme3"],
-  "recommendations": [
-    "What your resume should show 1",
-    "What your resume should show 2",
-    "What your resume should show 3"
-  ],
-  "summary": "One sentence explaining what this job emphasizes (e.g., 'This job emphasizes ownership and system design.')"
-}
-
-Focus on actionable insights that tell the candidate what to emphasize in their resume. Return ONLY valid JSON.`;
-
-// Add to Promise.all array
-const [toneCompletion, keywordsCompletion, themesCompletion] = await Promise.all([
-  // ... existing calls
-  openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: systemMessage
-      },
-      {
-        role: "user",
-        content: themesPrompt
-      }
-    ],
-    temperature: 0.5,
-    max_tokens: 500,
-    response_format: { type: "json_object" }
-  })
-]);
-
-// Parse and return themes
-const themesData = JSON.parse(themesCompletion.choices[0].message.content);
-
-return NextResponse.json({
-  success: true,
-  tone: tone,
-  keywords: allKeywords,
-  keywordsByCategory: keywords,
-  themes: themesData.themes || [],
-  recommendations: themesData.recommendations || [],
-  summary: themesData.summary || ""
-});
-```
-
-#### Step 2: Update Form Component (`components/form.tsx`)
-
-**2a. Add state for themes:**
-```typescript
-const [analyzedThemes, setAnalyzedThemes] = useState<{
-  themes: string[];
-  recommendations: string[];
-  summary: string;
-} | null>(null);
-```
-
-**2b. Update `handleAnalyzeJobDescription` to store themes:**
-```typescript
-const data = await response.json();
-
-// ... existing code ...
-
-setAnalyzedThemes({
-  themes: data.themes || [],
-  recommendations: data.recommendations || [],
-  summary: data.summary || ""
-});
-```
-
-**2c. Add UI component to display insights (after the tone selector):**
-```typescript
-{analyzedThemes && analyzedThemes.summary && (
-  <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-    <div className="flex items-start space-x-3">
-      <div className="flex-shrink-0 mt-0.5">
-        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-        </svg>
-      </div>
-      <div className="flex-1">
-        <p className="text-sm font-semibold text-gray-900 mb-2">
-          {analyzedThemes.summary}
-        </p>
-        <p className="text-xs text-gray-700 mb-3">Your resume should show:</p>
-        <ul className="space-y-1.5">
-          {analyzedThemes.recommendations.map((rec, index) => (
-            <li key={index} className="flex items-start space-x-2 text-sm text-gray-700">
-              <span className="text-purple-600 mt-0.5">•</span>
-              <span>{rec}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  </div>
-)}
-```
-
-#### Step 3: Store Themes in Form Data (Optional)
-
-If you want themes to persist:
-```typescript
-setFormData((prev: any) => ({
-  ...prev,
-  tone: tone,
-  keywords: keywords,
-  keywordsByCategory: keywordsByCategory,
-  themes: analyzedThemes.themes,
-  recommendations: analyzedThemes.recommendations,
-  summary: analyzedThemes.summary
-}))
-```
-
-#### Step 4: Use Themes in AI Prompts (Optional Enhancement)
-
-You could also pass themes to summary generation and bullet rewriting to ensure they're emphasized:
-
-```typescript
-// In generate-summary route
-${themes ? `\n\nIMPORTANT THEMES TO EMPHASIZE: ${themes.join(', ')}\nThe summary should demonstrate: ${recommendations.join(', ')}` : ''}
-```
+#### 11. **Export & Sharing**
+- Export analysis results (keywords, themes, recommendations) as PDF or text
+- Share analysis with others
+- Save multiple job analyses for comparison
 
 ---
 
-## Additional Value-Add Suggestions
+## Technical Implementation Details
 
-### 1. **Keyword Importance Scoring**
-- Rate keywords by importance (must-have vs nice-to-have)
-- Show visual indicators (e.g., ⭐ for critical keywords)
+### API Routes
 
-### 2. **Theme-Based Keyword Grouping**
-- Group keywords by theme (e.g., "System Design Keywords", "Leadership Keywords")
-- Show which themes are well-covered vs missing
+#### `/api/analyze-job-description`
+- **Purpose**: Analyzes job description and extracts tone, keywords, and themes
+- **Returns**:
+  - `tone`: "junior" | "mid" | "senior"
+  - `keywords`: Sorted array of keyword strings (by occurrence count)
+  - `keywordsWithCounts`: Array of `{keyword, count}` objects
+  - `keywordsByCategory`: Categorized keywords (unsorted)
+  - `themes`: Array of theme strings
+  - `recommendations`: Array of actionable recommendations
+  - `summary`: Summary sentence about job emphasis
+- **Implementation**: Three parallel OpenAI API calls for tone, keywords, and themes
 
-### 3. **Resume Match Score**
-- Calculate overall match percentage
-- Show breakdown by category (technical skills, experience level, etc.)
-- Update in real-time as user edits
+#### `/api/generate-summary`
+- **Purpose**: Generates or modifies professional summary
+- **Uses**: Tone, themes, recommendations, keywords, job description
+- **Features**: Buzzword filtering, direct positioning style
 
-### 4. **Smart Suggestions Throughout**
-- In Experience section: "This role values [theme]. Consider adding a bullet about [specific example]"
-- In Skills section: "Add [keyword] to better match this role"
-- In Summary: "Emphasize [theme] in your summary"
+#### `/api/rewrite-bullet`
+- **Purpose**: Rewrites individual bullet points
+- **Uses**: Selected keywords, themes, recommendations, tone
+- **Returns**: Rewritten bullet + reasoning (incorporated keywords, relevant themes)
+- **Features**: Keyword detection, theme detection, buzzword filtering
 
-### 5. **Visual Progress Indicators**
-- Progress bar showing how well resume matches job
-- Color-coded sections (green = well-matched, yellow = needs work, red = missing)
+#### `/api/improve-experience`
+- **Purpose**: Transforms entire experience description
+- **Uses**: Themes, recommendations, job description context
+- **Features**: Buzzword filtering, theme emphasis
 
-### 6. **Contextual Help**
-- Tooltips explaining why certain keywords/themes matter
-- Links to examples of how to demonstrate each theme
+### Data Flow
+
+1. **Job Analysis**:
+   - User pastes job description → API analyzes → Returns tone, keywords (with counts), themes
+   - Data stored in `formData` and `analyzedThemes` state
+   - UI displays insights immediately
+
+2. **Resume Building**:
+   - Keywords and themes available throughout form
+   - AI operations (summary, rewrite, improve) receive context
+   - User selections (keyword selection, tone adjustment) influence AI output
+
+3. **Persistence**:
+   - All analysis data saved with resume in Convex
+   - Auto-save on changes (2-second debounce)
+   - Resume loads with all analysis data intact
+
+### Key Features
+
+#### Keyword Counting & Sorting
+- **AI-Provided Counts**: AI counts occurrences and returns `{keyword, count}` format
+- **Backend Fallback**: If AI doesn't provide counts, backend uses regex with word boundaries
+- **Sorting Logic**: Sort by count (descending), then alphabetically if counts equal
+- **Visual Weight**: Badge styling based on occurrence count
+
+#### Theme Integration
+- **Extraction**: Third API call extracts themes, recommendations, and summary
+- **Storage**: Stored in `formData.themes`, `formData.recommendations`, `formData.thematicSummary`
+- **Display**: Prominent card after analysis showing summary and recommendations
+- **Usage**: Passed to all AI prompts (summary, rewrite, improve) to ensure alignment
+- **Detection**: Simple keyword-based theme detection in rewritten bullets
+
+#### Backward Compatibility
+- **Keyword Format**: Handles both old format (string arrays) and new format (objects with counts)
+- **API Response**: Provides both `keywords` (strings) and `keywordsWithCounts` (objects)
+- **Frontend**: Uses pre-computed counts when available, falls back to manual counting
 
 ---
 
 ## Summary
 
 **Current Strengths:**
-- ✅ Extracts keywords and tone
-- ✅ Applies tone throughout resume generation
-- ✅ Integrates keywords into bullet points
-- ✅ Provides visual feedback
+- ✅ Comprehensive job analysis (tone, keywords with counts, themes)
+- ✅ Themes fully implemented and integrated throughout
+- ✅ Smart keyword sorting by occurrence count
+- ✅ Tone applied throughout resume generation
+- ✅ Keywords integrated into bullet points with selection UI
+- ✅ Thematic insights displayed prominently
+- ✅ Resume persistence with auto-save
+- ✅ Multiple resume management
+- ✅ Comprehensive buzzword filtering
 
-**Critical Missing Piece:**
-- ❌ **No explanation of WHAT themes to emphasize and WHY**
-- ❌ **No actionable insights about what the resume needs to demonstrate**
+**Areas for Enhancement:**
+- 🟡 Resume match score and progress tracking
+- 🟡 Theme-based keyword grouping
+- 🟡 Enhanced gap analysis
+- 🟡 Contextual suggestions throughout the form
+- 🟢 Comparison view and advanced analytics
 
-**Recommended Next Steps:**
-1. Implement thematic analysis (as outlined above)
-2. Display insights prominently after analysis
-3. Optionally use themes in AI prompts for better alignment
-4. Consider adding match scoring and progress tracking
+**Status**: The core value proposition is **fully implemented**. The app successfully shows users "exactly what your resume needs to say — and why" through:
+1. Keyword extraction with prioritization (occurrence counts)
+2. Thematic analysis explaining what the job values
+3. Actionable recommendations about what to demonstrate
+4. Integration of these insights throughout the resume building process
 
-This will transform the app from "showing keywords" to "showing exactly what your resume needs to say — and why."
+The app has moved beyond just showing keywords to providing meaningful, actionable guidance on resume alignment.

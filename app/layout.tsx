@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'AI Resume Generator',
-  description: 'Create a professional resume in seconds with AI assistance',
+  description: 'Paste a job description. We show you exactly what your resume needs to say — and why.”',
 }
 
 export default function RootLayout({

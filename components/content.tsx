@@ -348,7 +348,7 @@ export default function Content() {
           {/* Header */}
           <div className="text-center py-6 px-4 sm:px-6">
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-2">🤖 AI Resume Generator</h1>
-            <p className="text-gray-600 text-base sm:text-lg">Create a professional resume in seconds with AI assistance</p>
+            <p className="text-gray-600 text-base sm:text-lg">Paste a job description. We show you exactly what your resume needs to say — and why.</p>
             
             {/* Resume Switcher */}
             {showResumeSwitcher && (
