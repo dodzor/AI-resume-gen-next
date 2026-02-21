@@ -109,9 +109,261 @@
 - ✅ `thematicSummary`: Summary sentence about job emphasis
 - ✅ All data persisted in Convex schema
 
+#### 10. **Authentication & User Management (Clerk)** ✅
+- ✅ **Clerk Package**: `@clerk/nextjs` v6.32.2 installed
+- ✅ **Clerk Middleware** (`middleware.ts`):
+  - Uses `clerkMiddleware()` from `@clerk/nextjs/server`
+  - Configured to run on all routes except static files
+  - Runs on all API routes (`/(api|trpc)(.*)`)
+- ✅ **ClerkProvider** (`app/layout.tsx`):
+  - Wraps entire application in root layout
+  - Properly nested with `ConvexClientProvider`
+- ✅ **Convex + Clerk Integration** (`components/ConvexClientProvider.tsx`):
+  - Uses `ConvexProviderWithClerk` from `convex/react-clerk`
+  - Passes `useAuth` hook from `@clerk/nextjs` for authentication state
+  - Connects Clerk authentication tokens to Convex
+- ✅ **Convex Auth Configuration** (`convex/auth.config.ts`):
+  - Configured with Clerk as identity provider
+  - Uses `CLERK_FRONTEND_API_URL` environment variable
+  - Application ID: 'convex'
+- ✅ **Authentication-Protected UI** (`app/page.tsx`):
+  - Uses `<Authenticated>` component to protect content
+  - Uses `<Unauthenticated>` component for sign-in flow
+  - `<SignInButton>` displayed for unauthenticated users
+  - `<UserButton>` displayed in header for authenticated users (profile/sign-out)
+- ✅ **User-Scoped Data** (`convex/resumes.ts` + `convex/schema.ts`):
+  - All Convex operations verify authentication via `ctx.auth.getUserIdentity()`
+  - User ID extracted via `identity.subject` (Clerk user ID string)
+  - Database schema includes `userId` field on resumes table
+  - Database indexed by `userId` (`by_user` index) for fast user-scoped queries
+  - Ownership verification on all mutations (`saveResume`, `deleteResume`)
+  - Ownership verification on all queries (`getResume`, `getUserResumes`)
+  - Throws "Not authenticated" error if no identity
+  - Throws "Resume not found or unauthorized" if user doesn't own the resource
+- ✅ **Clerk Pricing/Billing** (`app/pricing/page.tsx`):
+  - Uses `<PricingTable />` from `@clerk/nextjs`
+  - Clerk-managed pricing table for subscription plans
+
+#### 11. **Clerk Implementation Gaps** 🟡
+- ❌ **Custom Sign-In/Sign-Up Pages**: Using Clerk's hosted pages (no `/sign-in` or `/sign-up` routes)
+- ❌ **User Profile Page**: No dedicated profile page (only UserButton dropdown)
+- ❌ **Subscription/Plan Checking**: No logic to check user's subscription tier
+- ❌ **Usage Limits**: No enforcement of usage limits based on plan
+- ❌ **Protected API Routes**: API routes not explicitly checking Clerk auth (relies on frontend protection)
+- ❌ **Environment Variables Documentation**: No `.env.example` file documenting required Clerk variables
+
 ---
 
 ## Gaps & Improvement Opportunities
+
+### 🔴 High Priority Improvements
+
+#### 1. **Subscription Tier Checking & Usage Limits**
+- **Current State**: 
+  - `<PricingTable />` component exists but no plan checking logic
+  - No usage tracking or limits enforcement
+  - All users have unlimited access regardless of subscription status
+  - No way to differentiate free vs. paid users
+- **Enhancement**: Implement comprehensive subscription management with usage tracking and enforcement
+- **Architecture Overview**:
+  ```
+  Frontend (Check Limits) → Convex Backend (Track Usage) → Clerk Webhook (Sync Plan)
+  ```
+  
+  **A. Plan Limits Configuration**:
+  ```typescript
+  PLAN_LIMITS = {
+    free: { maxResumes: 1, maxAIRewrites: 5/month, maxJobAnalyses: 3/month },
+    pro: { maxResumes: 10, maxAIRewrites: 100/month, maxJobAnalyses: 50/month },
+    enterprise: { maxResumes: unlimited, maxAIRewrites: unlimited }
+  }
+  ```
+  
+  **B. Convex Schema for Usage Tracking**:
+  - New `userUsage` table with fields:
+    - `userId`: Clerk user ID
+    - `aiRewritesUsed`, `jobAnalysesUsed`, `exportsUsed`: Monthly counters
+    - `periodStart`, `periodEnd`: Billing period tracking
+    - `plan`: Current plan tier ("free" | "pro" | "enterprise")
+    - Indexed by `userId` for fast queries
+  
+  **C. Usage Checking Functions** (`convex/usage.ts`):
+  - `getUserUsage`: Query to get current usage and limits
+  - `canPerformAction`: Check if user can perform action (ai_rewrite, job_analysis, create_resume, export)
+  - `incrementUsage`: Mutation to increment counters after successful operations
+  - Returns `{ allowed: boolean, reason?: string, remaining?: number, upgradeRequired?: boolean }`
+  
+  **D. Clerk Webhook Integration** (`app/api/webhooks/clerk/route.ts`):
+  - Listen for `subscription.created`, `subscription.updated`, `subscription.deleted` events
+  - Sync plan tier from Clerk's public metadata to Convex `userUsage` table
+  - Map Stripe price IDs to plan names (free/pro/enterprise)
+  - Update `plan` and `planUpdatedAt` fields when subscription changes
+  
+  **E. Frontend Implementation**:
+  - **Custom Hook** (`hooks/useUsageLimits.ts`):
+    - Uses `useQuery` to fetch usage data reactively
+    - Provides `canRewrite`, `canAnalyze`, `canCreateResume` checks
+    - Returns `isPro`, `isLoading` flags
+  - **Usage-Gated Button Component** (`components/UsageGatedButton.tsx`):
+    - Wraps action buttons (Rewrite, Analyze, etc.)
+    - Checks limits before allowing action
+    - Shows remaining quota: "({remaining} left)"
+    - Displays upgrade modal when limit reached
+  - **Usage Display Component** (`components/UsageDisplay.tsx`):
+    - Shows current plan tier
+    - Progress bars for each quota (AI Rewrites, Job Analyses, Resumes)
+    - Color-coded (green/yellow/red) based on usage percentage
+    - "Upgrade to Pro" CTA for free users
+  
+  **F. API Route Protection**:
+  - All API routes check usage before processing:
+    ```typescript
+    const canPerform = await convex.query(api.usage.canPerformAction, { action: 'ai_rewrite' })
+    if (!canPerform.allowed) {
+      return Response.json({ error: canPerform.reason, upgradeRequired: true }, { status: 403 })
+    }
+    // ... perform action ...
+    await convex.mutation(api.usage.incrementUsage, { action: 'ai_rewrite' })
+    ```
+  
+  **G. Monthly Counter Reset**:
+  - Convex cron job (`convex/crons.ts`) resets usage counters at start of billing period
+  - Scheduled monthly: `crons.monthly("reset monthly usage", { day: 1, hourUTC: 0 })`
+  
+  **H. Subscription Data Location**:
+  - Clerk stores subscription info in user metadata:
+    - `user.publicMetadata.plan`: Plan tier (accessible client-side)
+    - `user.privateMetadata.stripeCustomerId`: Stripe customer ID (server-side only)
+    - `user.privateMetadata.stripeSubscriptionId`: Subscription ID (server-side only)
+  
+- **Implementation Checklist**:
+  | Component | Priority | Effort |
+  |-----------|----------|--------|
+  | Plan limits config | High | 30 min |
+  | `userUsage` table schema | High | 1 hour |
+  | Usage checking queries | High | 2-3 hours |
+  | Webhook handler | High | 2-3 hours |
+  | Frontend hooks | Medium | 1-2 hours |
+  | Usage display UI | Medium | 2-3 hours |
+  | Upgrade modal | Medium | 1-2 hours |
+  | API route protection | Medium | 2-3 hours |
+  | Cron job for reset | Low | 1 hour |
+  
+- **Benefits**:
+  - Enables freemium business model (free tier with limits, paid tiers with more)
+  - Prevents abuse and controls costs (AI API calls are expensive)
+  - Clear upgrade path for users hitting limits
+  - Transparent usage tracking builds trust
+  - Revenue generation through subscription tiers
+  
+- **Impact**: 
+  - **Critical for monetization**: Without usage limits, free users can consume unlimited AI resources
+  - **Cost control**: Prevents runaway costs from unlimited AI API calls
+  - **User experience**: Clear feedback on remaining quota encourages upgrades
+  - **Business viability**: Enables sustainable pricing model
+
+#### 2. **Protected API Routes (Server-Side Authentication)**
+- **Current State**: 
+  - No `auth()` checks in API route handlers
+  - Routes rely solely on frontend protection (can be bypassed)
+  - No user identification in API operations
+  - No rate limiting per user
+  - No audit trail of who called what
+  - All 7 API routes unprotected: `/api/analyze-job-description`, `/api/rewrite-bullet`, `/api/improve-experience`, `/api/generate-summary`, `/api/generate-resume`, `/api/generate-pdf`, `/api/search`
+- **Security Risk**: 
+  - Anyone with API endpoint URL can call it directly (bypassing frontend)
+  - No way to track usage per user
+  - Can't enforce subscription limits server-side
+  - Potential for abuse and cost overruns
+- **Enhancement**: Implement server-side authentication checks in all API routes
+- **Architecture Overview**:
+  ```
+  Client Request → Clerk Middleware → API Route Handler → auth() Check → Usage Check → Operation
+  ```
+  
+  **A. Reusable Auth Helper** (`lib/api-auth.ts`):
+  ```typescript
+  export async function requireAuth(): Promise<AuthResult | AuthError> {
+    const { userId } = await auth()
+    if (!userId) {
+      return { isAuthenticated: false, error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+    }
+    return { isAuthenticated: true, userId }
+  }
+  ```
+  
+  **B. Protected Route Pattern**:
+  ```typescript
+  // app/api/rewrite-bullet/route.ts
+  import { requireAuth } from '@/lib/api-auth'
+  
+  export async function POST(request: NextRequest) {
+    const authResult = await requireAuth()
+    if (!authResult.isAuthenticated) return authResult.error
+    
+    const { userId } = authResult
+    // Now userId available for logging, usage tracking, etc.
+    // ... rest of handler
+  }
+  ```
+  
+  **C. Integration with Usage Limits**:
+  - Check usage limits before processing (if subscription system implemented)
+  - Increment usage counters after successful operations
+  - Return 403 with upgrade prompt when limits exceeded
+  
+  **D. Error Handling** (`lib/api-errors.ts`):
+  - Custom error classes: `UnauthorizedError`, `ForbiddenError`, `UsageLimitError`
+  - Consistent error response format: `{ error, code, message, details }`
+  - Proper HTTP status codes (401, 403, 429, 500)
+  
+  **E. Request Logging & Audit Trail**:
+  - Log all API requests with userId, endpoint, timestamp
+  - Track authentication failures for security monitoring
+  - Store logs in Convex for analytics and debugging
+  
+  **F. Rate Limiting (Optional Enhancement)**:
+  - Use Upstash Redis for rate limiting
+  - Per-user limits (e.g., 10 requests/minute)
+  - Return 429 with retry-after header when exceeded
+  
+  **G. Route-Specific Patterns**:
+  - **Public Routes**: No auth required (e.g., `/api/public/health`)
+  - **Authenticated Routes**: Auth required (most routes)
+  - **Optional Auth**: Works with or without auth (e.g., analytics)
+  - **Role-Based**: Check user roles/metadata for admin routes
+  
+- **Implementation Checklist**:
+  | Component | Priority | Files to Update | Effort |
+  |-----------|----------|-----------------|--------|
+  | Auth helper utility | High | `lib/api-auth.ts` | 30 min |
+  | Error handling utilities | High | `lib/api-errors.ts` | 1 hour |
+  | Update all 7 API routes | High | All `/app/api/**/route.ts` | 2-3 hours |
+  | Request logging | Medium | `lib/api-logger.ts` + Convex schema | 2 hours |
+  | Rate limiting | Low | `lib/rate-limit.ts` | 1-2 hours |
+  | Middleware enhancement | Low | `middleware.ts` | 30 min |
+  
+- **Migration Strategy**:
+  1. **Step 1**: Create auth utilities (non-breaking, no route changes)
+  2. **Step 2**: Update high-value routes first (`/api/rewrite-bullet`, `/api/analyze-job-description`)
+  3. **Step 3**: Update remaining routes incrementally
+  4. **Step 4**: Add usage limits integration (after subscription system)
+  5. **Step 5**: Add monitoring and logging
+  
+- **Benefits**:
+  - **Security**: Prevents unauthorized API access (anyone can't just call endpoints directly)
+  - **Cost control**: Can enforce limits per user server-side
+  - **Audit trail**: Track who uses what features for analytics
+  - **Better UX**: Clear error messages for auth failures
+  - **Scalability**: Foundation for rate limiting and usage tracking
+  - **Compliance**: Required for production applications handling user data
+  
+- **Impact**: 
+  - **Critical for production**: Without this, anyone can call your API directly, bypassing frontend
+  - **Required for subscription system**: Can't enforce limits without server-side auth
+  - **Prevents abuse**: Stops malicious users from spamming endpoints
+  - **Enables analytics**: Track feature usage per user
+  - **Security vulnerability**: Currently a major security gap that must be fixed before production
 
 ### 🟡 Medium Priority Improvements
 
@@ -188,23 +440,160 @@
   - Even in roles without metrics, specificity and scope can demonstrate impact
   - Seniority level also affects ownership language (junior: "Assisted in...", senior: "Led...")
 
+#### 8. **Custom Sign-In/Sign-Up Pages**
+- **Current State**: Using Clerk's hosted pages (redirects to `accounts.xxx.clerk.dev`)
+- **Enhancement**: Implement custom, embedded sign-in/sign-up pages for brand consistency
+- **Implementation Approach**:
+  
+  **A. Route Structure Required**:
+  ```
+  app/
+  ├── sign-in/
+  │   └── [[...sign-in]]/
+  │       └── page.tsx       # Custom sign-in page
+  ├── sign-up/
+  │   └── [[...sign-up]]/
+  │       └── page.tsx       # Custom sign-up page
+  ```
+  
+  **B. Environment Variables**:
+  ```bash
+  NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+  NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+  NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
+  NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
+  ```
+  
+  **C. Middleware Update**: Use `createRouteMatcher` to make auth routes public:
+  ```typescript
+  const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/pricing(.*)'])
+  ```
+  
+  **D. Customization Levels**:
+  | Approach | Effort | Customization |
+  |----------|--------|---------------|
+  | Hosted Pages (current) | None | Limited to Clerk dashboard |
+  | `<SignIn>` with Appearance API | ~1-2 hours | Colors, fonts, spacing |
+  | `<SignIn>` in custom layout | ~2-4 hours | Layout, branding, marketing |
+  | Fully custom with `useSignIn` hook | ~1-2 days | Complete control |
+  
+  **E. Key Components**:
+  - `<SignIn />` / `<SignUp />`: Pre-built Clerk components with theming
+  - `appearance` prop: Customize colors, fonts, border-radius via CSS variables
+  - `useSignIn()` / `useSignUp()` hooks: Build fully custom UI from scratch
+  - `<AuthenticateWithRedirectCallback />`: Handle OAuth callbacks
+  
+- **Benefits**:
+  - Brand consistency with app design
+  - Custom layout (add marketing content, testimonials, features list)
+  - SEO control (custom meta tags, page titles)
+  - Analytics integration (track sign-in funnel)
+  - A/B testing capability
+  - Full localization control
+
+- **Impact**: Professional, branded authentication experience that matches the app's design system
+
+#### 9. **Environment Variables Documentation**
+- **Current State**: 
+  - No `.env.example` file exists
+  - Documentation scattered across README.md and CONVEX_QUICKSTART.md
+  - Missing variables documented (e.g., `CLERK_FRONTEND_API_URL`, optional Clerk URLs)
+  - No validation or startup checks for required variables
+  - No clear categorization (required vs optional, public vs secret)
+  - No production vs development guidance
+- **Enhancement**: Create comprehensive environment variables documentation and validation
+- **Implementation Approach**:
+  
+  **A. Create `.env.example` File**:
+  - Template file with all variables (no real values)
+  - Categorized by: Required vs Optional, Public vs Secret
+  - Includes comments explaining each variable
+  - Where to obtain each value
+  - Example format:
+    ```bash
+    # Required Variables
+    OPENAI_API_KEY=sk-your_key_here
+    NEXT_PUBLIC_CONVEX_URL=https://xxx.convex.cloud
+    # ... etc
+    ```
+  
+  **B. Enhanced README Documentation**:
+  - Comprehensive environment variables section
+  - Quick reference table (variable, required, public, description)
+  - Detailed setup instructions for each variable
+  - Security guidelines (what to keep secret)
+  - Environment-specific configuration (dev vs production)
+  
+  **C. Environment Variable Validation** (`lib/env-validation.ts`):
+  - Startup validation script
+  - Checks all required variables are set
+  - Throws descriptive errors if missing
+  - Prevents runtime errors from missing config
+  
+  **D. Type-Safe Environment Access** (`lib/env.ts`):
+  - TypeScript interface for all environment variables
+  - Type-safe access with autocomplete
+  - Centralized environment variable management
+  - Prevents typos and missing variables
+  
+  **E. Complete Variable Inventory**:
+  - **Required**: `OPENAI_API_KEY`, `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_FRONTEND_API_URL`
+  - **Optional**: `NEXT_PUBLIC_CLERK_SIGN_IN_URL`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL`, `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL`, `NEXT_PUBLIC_APP_URL`, `CLERK_WEBHOOK_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+  - **Public vs Secret**: Document which variables are safe to expose (`NEXT_PUBLIC_*`) vs must be kept secret
+  
+  **F. Security Documentation**:
+  - Never commit `.env.local` to git
+  - Always add `.env.local` to `.gitignore`
+  - Use `.env.example` as template (no real values)
+  - Different keys for development and production
+  - Key rotation guidelines
+  
+  **G. Optional: Dedicated Guide** (`ENV_SETUP.md`):
+  - Comprehensive setup guide
+  - Troubleshooting section
+  - Common issues and solutions
+  - Platform-specific instructions (Vercel, etc.)
+  
+- **Implementation Checklist**:
+  | Component | Priority | Files to Create/Update | Effort |
+  |-----------|----------|------------------------|--------|
+  | `.env.example` file | High | `.env.example` | 30 min |
+  | Update README.md | High | `README.md` | 1 hour |
+  | Environment validation | Medium | `lib/env-validation.ts` | 1 hour |
+  | Type-safe env access | Medium | `lib/env.ts` | 1 hour |
+  | `ENV_SETUP.md` guide | Low | `ENV_SETUP.md` | 1-2 hours |
+  | Update `.gitignore` | High | `.gitignore` | 5 min |
+  
+- **Benefits**:
+  - **Faster onboarding**: New developers know exactly what to configure
+  - **Fewer errors**: Clear documentation prevents misconfiguration
+  - **Security**: Clear guidance on what to keep secret
+  - **Maintenance**: Easier to track which variables are used where
+  - **Debugging**: Validation catches missing variables early
+  
+- **Impact**: 
+  - **Developer experience**: Reduces setup time and confusion significantly
+  - **Security**: Prevents accidental exposure of secrets
+  - **Reliability**: Validation prevents runtime errors from missing variables
+  - **Maintainability**: Centralized documentation easier to keep updated
+
 ### 🟢 Nice-to-Have Enhancements
 
-#### 8. **Comparison View**
+#### 9. **Comparison View**
 - Side-by-side comparison of job requirements vs. resume content
 - Visual matching score with breakdown
 - Highlight matching and missing elements
 
-#### 9. **Smart Suggestions**
+#### 10. **Smart Suggestions**
 - "Based on this job, you should add experience with [X]"
 - "Your resume is strong in [area], but could emphasize [other area] more"
 - Context-aware suggestions based on user's existing experience
 
-#### 10. **Enhanced Theme Detection**
+#### 11. **Enhanced Theme Detection**
 - More sophisticated theme detection in rewritten bullets (currently uses simple keyword matching)
 - Semantic analysis to detect theme alignment even without exact keyword matches
 
-#### 11. **Export & Sharing**
+#### 12. **Export & Sharing**
 - Export analysis results (keywords, themes, recommendations) as PDF or text
 - Share analysis with others
 - Save multiple job analyses for comparison
@@ -245,20 +634,28 @@
 
 ### Data Flow
 
-1. **Job Analysis**:
+1. **Authentication**:
+   - User visits app → Clerk middleware runs → Checks session
+   - `<ClerkProvider>` provides auth context to entire app
+   - `<ConvexProviderWithClerk>` bridges Clerk tokens to Convex
+   - Unauthenticated users see `<SignInButton>` → Redirects to Clerk hosted sign-in
+   - Authenticated users get access token passed to Convex automatically
+
+2. **Job Analysis**:
    - User pastes job description → API analyzes → Returns tone, keywords (with counts), themes
    - Data stored in `formData` and `analyzedThemes` state
    - UI displays insights immediately
 
-2. **Resume Building**:
+3. **Resume Building**:
    - Keywords and themes available throughout form
    - AI operations (summary, rewrite, improve) receive context
    - User selections (keyword selection, tone adjustment) influence AI output
 
-3. **Persistence**:
+4. **Persistence**:
    - All analysis data saved with resume in Convex
    - Auto-save on changes (2-second debounce)
    - Resume loads with all analysis data intact
+   - All operations scoped to `userId` from Clerk identity
 
 ### Key Features
 
@@ -280,6 +677,38 @@
 - **API Response**: Provides both `keywords` (strings) and `keywordsWithCounts` (objects)
 - **Frontend**: Uses pre-computed counts when available, falls back to manual counting
 
+### Authentication Architecture (Clerk + Convex)
+
+#### Environment Variables Required
+```
+# Clerk (Frontend)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
+CLERK_SECRET_KEY=sk_...
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in     # (optional, defaults to Clerk hosted)
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up     # (optional, defaults to Clerk hosted)
+
+# Clerk (Convex)
+CLERK_FRONTEND_API_URL=https://xxx.clerk.accounts.dev
+
+# Convex
+NEXT_PUBLIC_CONVEX_URL=https://xxx.convex.cloud
+```
+
+#### Authentication Flow
+1. **Middleware** (`middleware.ts`): Runs on every request, attaches Clerk session
+2. **ClerkProvider** (`app/layout.tsx`): Provides auth context to React tree
+3. **ConvexProviderWithClerk** (`components/ConvexClientProvider.tsx`): Bridges Clerk auth to Convex
+4. **Convex Auth Config** (`convex/auth.config.ts`): Tells Convex to trust Clerk tokens
+5. **Server Queries/Mutations** (`convex/resumes.ts`): Use `ctx.auth.getUserIdentity()` to get user
+
+#### User Identity in Convex
+```typescript
+const identity = await ctx.auth.getUserIdentity();
+// identity.subject = Clerk user ID (e.g., "user_2abc...")
+// identity.tokenIdentifier = Full identifier
+// identity.email, identity.name, etc. also available
+```
+
 ---
 
 ## Summary
@@ -294,13 +723,26 @@
 - ✅ Resume persistence with auto-save
 - ✅ Multiple resume management
 - ✅ Comprehensive buzzword filtering
+- ✅ **Clerk authentication fully integrated**:
+  - Clerk + Convex integration working
+  - User-scoped data with ownership verification
+  - Protected routes and components
+  - Clerk PricingTable for billing
 
 **Areas for Enhancement:**
-- 🟡 Resume match score and progress tracking
-- 🟡 Theme-based keyword grouping
-- 🟡 Enhanced gap analysis
-- 🟡 Contextual suggestions throughout the form
-- 🟢 Comparison view and advanced analytics
+- 🔴 **High Priority**:
+  - Subscription tier checking and usage limits (critical for monetization)
+  - Protected API routes with server-side authentication (security vulnerability)
+- 🟡 **Medium Priority**:
+  - Resume match score and progress tracking
+  - Theme-based keyword grouping
+  - Enhanced gap analysis
+  - Contextual suggestions throughout the form
+  - Custom sign-in/sign-up pages
+  - Protected API routes (server-side auth)
+  - Environment variables documentation
+- 🟢 **Nice-to-Have**:
+  - Comparison view and advanced analytics
 
 **Status**: The core value proposition is **fully implemented**. The app successfully shows users "exactly what your resume needs to say — and why" through:
 1. Keyword extraction with prioritization (occurrence counts)
