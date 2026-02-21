@@ -80,4 +80,31 @@ export default defineSchema({
   })
     .index("by_user", ["userId"]) // Index for fast queries by user
     .index("by_created", ["createdAt"]), // Index for sorting by date
+
+  // User usage tracking for subscription limits
+  userUsage: defineTable({
+    // User identification (from Clerk)
+    userId: v.string(),
+    
+    // Plan information
+    plan: v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise")), // Current plan tier
+    planUpdatedAt: v.number(), // Timestamp when plan was last updated
+    
+    // Billing period tracking (for monthly limits)
+    periodStart: v.number(), // Timestamp of current billing period start
+    periodEnd: v.number(), // Timestamp of current billing period end
+    
+    // Monthly usage counters (reset at billing period start)
+    jobAnalysesUsed: v.number(), // Count of job analyses this period
+    aiRewritesUsed: v.number(), // Count of AI rewrites (bullet + experience + summary combined)
+    exportsUsed: v.number(), // Count of PDF exports this period
+    
+    // Lifetime usage counters (never reset)
+    resumesCreated: v.number(), // Count of resumes created (lifetime, not monthly)
+    
+    // Metadata
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]), // Fast lookup by user ID
 });

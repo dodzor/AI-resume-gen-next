@@ -245,14 +245,3 @@ Not:
 
 Avoid becoming a design tool.
 
----
-
-# If you want, I can also help with
-
-• Pricing psychology that increases conversion
-• Landing page structure for this product
-• The exact moment to show the paywall
-• Features competitors have that users actually hate
-• What makes resume tools fail
-
-Those insights can save months of development.
