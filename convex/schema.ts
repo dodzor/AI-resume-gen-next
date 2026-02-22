@@ -90,6 +90,9 @@ export default defineSchema({
     plan: v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise")), // Current plan tier
     planUpdatedAt: v.number(), // Timestamp when plan was last updated
     
+    // Subscription tracking (for per-user billing periods)
+    subscriptionStartDate: v.number(), // Date when user first subscribed (used to calculate billing periods)
+    
     // Billing period tracking (for monthly limits)
     periodStart: v.number(), // Timestamp of current billing period start
     periodEnd: v.number(), // Timestamp of current billing period end
