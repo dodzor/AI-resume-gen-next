@@ -688,3 +688,232 @@ export const initializeUserUsage = mutation({
     return { success: true, alreadyExists: false };
   },
 });
+
+/**
+ * Query: Check if user can perform a specific action (SERVER-SIDE VERSION)
+ * This version accepts userId directly for use in API routes
+ * Returns allowed status with reason, remaining quota, and upgrade requirement
+ */
+export const canPerformActionServer = query({
+  args: {
+    userId: v.string(),
+    action: v.union(
+      v.literal("job_analysis"),
+      v.literal("ai_rewrite"),
+      v.literal("create_resume"),
+      v.literal("export")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId;
+    const action = args.action as ActionType;
+
+    // Get usage record (read-only, queries can't mutate)
+    const usage = await getUserUsageRecord(ctx, userId);
+    
+    // If no record exists, assume free plan with default limits
+    // Record will be created automatically by first mutation
+    if (!usage) {
+      const defaultPlan: PlanTier = "free";
+      const limit = getActionLimit(defaultPlan, action);
+      
+      // For export, check feature availability
+      if (action === "export") {
+        if (!hasFeature(defaultPlan, "pdfExport")) {
+          return {
+            allowed: false,
+            reason: "PDF export is not available in your plan. Upgrade to Pro for PDF export.",
+            remaining: 0,
+            upgradeRequired: true,
+          };
+        }
+      }
+      
+      // Check if unlimited
+      if (isUnlimited(limit)) {
+        return {
+          allowed: true,
+          remaining: -1,
+          upgradeRequired: false,
+        };
+      }
+      
+      // For new users, they haven't used anything yet
+      return {
+        allowed: true,
+        remaining: limit,
+        upgradeRequired: false,
+      };
+    }
+
+    const plan = usage.plan;
+    const limit = getActionLimit(plan, action);
+
+    // Check feature availability for export
+    if (action === "export") {
+      if (!hasFeature(plan, "pdfExport")) {
+        return {
+          allowed: false,
+          reason: "PDF export is not available in your plan. Upgrade to Pro for PDF export.",
+          remaining: 0,
+          upgradeRequired: true,
+        };
+      }
+    }
+
+    // Get current usage for this action
+    let currentUsage: number;
+    switch (action) {
+      case "job_analysis":
+        currentUsage = usage.jobAnalysesUsed;
+        break;
+      case "ai_rewrite":
+        currentUsage = usage.aiRewritesUsed;
+        break;
+      case "create_resume":
+        currentUsage = usage.resumesCreated;
+        break;
+      case "export":
+        currentUsage = usage.exportsUsed;
+        break;
+      default:
+        return {
+          allowed: false,
+          reason: "Unknown action",
+          remaining: 0,
+          upgradeRequired: false,
+        };
+    }
+
+    // Check if unlimited
+    if (isUnlimited(limit)) {
+      return {
+        allowed: true,
+        remaining: -1, // -1 means unlimited
+        upgradeRequired: false,
+      };
+    }
+
+    // Check if limit reached
+    if (currentUsage >= limit) {
+      const actionNames: Record<ActionType, string> = {
+        job_analysis: "job analyses",
+        ai_rewrite: "AI rewrites",
+        create_resume: "resumes",
+        export: "PDF exports",
+      };
+
+      return {
+        allowed: false,
+        reason: `You've used all your free ${actionNames[action]} (${limit}/${limit}). Upgrade to Pro for unlimited access.`,
+        remaining: 0,
+        upgradeRequired: true,
+      };
+    }
+
+    // Calculate remaining
+    const remaining = limit - currentUsage;
+
+    return {
+      allowed: true,
+      remaining,
+      upgradeRequired: false,
+    };
+  },
+});
+
+/**
+ * Mutation: Increment usage counter after successful operation (SERVER-SIDE VERSION)
+ * This version accepts userId directly for use in API routes
+ * Handles billing period reset if needed
+ * Idempotent - can be called multiple times safely
+ */
+export const incrementUsageServer = mutation({
+  args: {
+    userId: v.string(),
+    action: v.union(
+      v.literal("job_analysis"),
+      v.literal("ai_rewrite"),
+      v.literal("create_resume"),
+      v.literal("export")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId;
+    const action = args.action as ActionType;
+    const now = Date.now();
+
+    // Get or create usage record
+    const usageId = await getOrCreateUserUsage(ctx, userId);
+    const usage = await ctx.db.get(usageId);
+    
+    if (!usage) {
+      throw new Error("Failed to get usage record");
+    }
+
+    // Check if billing period expired and reset if needed
+    if (now >= usage.periodEnd) {
+      const newPeriod = calculateBillingPeriod(now, usage.subscriptionStartDate);
+      await ctx.db.patch(usageId, {
+        periodStart: newPeriod.start,
+        periodEnd: newPeriod.end,
+        jobAnalysesUsed: 0,
+        aiRewritesUsed: 0,
+        exportsUsed: 0,
+        updatedAt: now,
+      });
+      
+      // Reload usage after reset
+      const updatedUsage = await ctx.db.get(usageId);
+      if (!updatedUsage) {
+        throw new Error("Failed to get updated usage record");
+      }
+      
+      // Increment the appropriate counter
+      const update: Partial<typeof updatedUsage> = {
+        updatedAt: now,
+      };
+      
+      switch (action) {
+        case "job_analysis":
+          update.jobAnalysesUsed = updatedUsage.jobAnalysesUsed + 1;
+          break;
+        case "ai_rewrite":
+          update.aiRewritesUsed = updatedUsage.aiRewritesUsed + 1;
+          break;
+        case "create_resume":
+          update.resumesCreated = updatedUsage.resumesCreated + 1;
+          break;
+        case "export":
+          update.exportsUsed = updatedUsage.exportsUsed + 1;
+          break;
+      }
+      
+      await ctx.db.patch(usageId, update);
+      return { success: true };
+    }
+
+    // Increment the appropriate counter
+    const update: Partial<typeof usage> = {
+      updatedAt: now,
+    };
+    
+    switch (action) {
+      case "job_analysis":
+        update.jobAnalysesUsed = usage.jobAnalysesUsed + 1;
+        break;
+      case "ai_rewrite":
+        update.aiRewritesUsed = usage.aiRewritesUsed + 1;
+        break;
+      case "create_resume":
+        update.resumesCreated = usage.resumesCreated + 1;
+        break;
+      case "export":
+        update.exportsUsed = usage.exportsUsed + 1;
+        break;
+    }
+    
+    await ctx.db.patch(usageId, update);
+    return { success: true };
+  },
+});
