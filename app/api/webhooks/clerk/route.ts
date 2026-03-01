@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebhookEvent, webhook } from '@clerk/nextjs/server';
-import { ConvexHttpClient } from 'convex/http';
+import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
 import type { PlanTier } from '@/lib/plan-limits';
 

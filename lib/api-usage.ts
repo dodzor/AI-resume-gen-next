@@ -8,7 +8,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { ConvexHttpClient } from 'convex/http';
+import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
 import type { ActionType } from '@/lib/plan-limits';
 
