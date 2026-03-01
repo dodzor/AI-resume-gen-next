@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generatePDFWithPuppeteer } from '../../../lib/pdfServerUtils';
 import { TemplateId } from '../../../lib/templates';
+import { requireAuth } from '@/lib/api-auth';
+import { checkUsageLimit, incrementUsageAfterAction } from '@/lib/api-usage';
 
 export async function POST(request: NextRequest) {
   try {
+    // 1. Authenticate user
+    const authResult = await requireAuth();
+    if ('error' in authResult) {
+      return authResult.error;
+    }
+    const { userId } = authResult;
+
+    // 2. Check usage limit BEFORE processing (export is Pro-only feature)
+    const usageCheck = await checkUsageLimit(userId, 'export');
+    if (!usageCheck.allowed) {
+      return usageCheck.error;
+    }
+
     const body = await request.json();
     const { content, templateId, fileName } = body;
 
@@ -32,6 +47,9 @@ export async function POST(request: NextRequest) {
       templateId: selectedTemplate,
       fileName: fileName || 'Resume.pdf',
     });
+
+    // 4. Increment usage AFTER successful operation
+    await incrementUsageAfterAction(userId, 'export');
 
     // Return PDF as response
     return new NextResponse(pdfBuffer, {

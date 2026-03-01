@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createResumePrompt } from '../../../lib/resumeTemplate';
+import { requireAuth } from '@/lib/api-auth';
+import { checkUsageLimit, incrementUsageAfterAction } from '@/lib/api-usage';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -9,6 +11,19 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
+    // 1. Authenticate user
+    const authResult = await requireAuth();
+    if ('error' in authResult) {
+      return authResult.error;
+    }
+    const { userId } = authResult;
+
+    // 2. Check usage limit BEFORE processing (lifetime limit for resume creation)
+    const usageCheck = await checkUsageLimit(userId, 'create_resume');
+    if (!usageCheck.allowed) {
+      return usageCheck.error;
+    }
+
     // Check if API key is available
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
@@ -94,6 +109,9 @@ export async function POST(request: NextRequest) {
     content = content.trim();
 
     console.log('Resume generated successfully for:', name);
+
+    // 4. Increment usage AFTER successful operation
+    await incrementUsageAfterAction(userId, 'create_resume');
 
     return NextResponse.json({
       success: true,

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>API Routes Test</title>
+  <style>
+    body { font-family: monospace; padding: 20px; max-width: 1200px; margin: 0 auto; }
+    .test { margin: 10px 0; padding: 15px; border: 1px solid #ccc; border-radius: 4px; }
+    .success { background: #d4edda; border-color: #c3e6cb; }
+    .error { background: #f8d7da; border-color: #f5c6cb; }
+    .warning { background: #fff3cd; border-color: #ffeaa7; }
+    button { margin: 5px; padding: 10px 20px; cursor: pointer; font-size: 14px; }
+    h1 { color: #333; }
+    h2 { color: #666; margin-top: 30px; }
+    pre { background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    .status { font-weight: bold; }
+    .status-200 { color: #28a745; }
+    .status-401 { color: #dc3545; }
+    .status-403 { color: #ffc107; }
+  </style>
+</head>
+<body>
+  <h1>🔍 API Routes Test Suite</h1>
+  <p>Test all API routes with authentication and usage checks.</p>
+  
+  <div>
+    <button onclick="testAllAuthenticated()">✅ Test All Routes (Authenticated)</button>
+    <button onclick="testAllUnauthenticated()">❌ Test All Routes (Unauthenticated)</button>
+    <button onclick="testUsageLimits()">📊 Test Usage Limits</button>
+    <button onclick="clearResults()">🗑️ Clear Results</button>
+  </div>
+  
+  <div id="results"></div>
+
+  <script>
+    const baseUrl = window.location.origin;
+    
+    async function testRoute(name, url, method, body, authenticated = true) {
+      const options = {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+      };
+      
+      if (authenticated) {
+        options.credentials = 'include';
+      }
+      
+      try {
+        const res = await fetch(url, options);
+        let data;
+        const contentType = res.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+          data = await res.json();
+        } else if (contentType && contentType.includes('application/pdf')) {
+          data = { type: 'PDF', size: 'N/A' };
+        } else {
+          data = { raw: 'Non-JSON response', contentType };
+        }
+        
+        return {
+          name,
+          status: res.status,
+          success: res.ok,
+          authenticated,
+          data,
+          contentType
+        };
+      } catch (e) {
+        return {
+          name,
+          error: e.message,
+          authenticated,
+          success: false
+        };
+      }
+    }
+    
+    async function testAllAuthenticated() {
+      addResult('Starting authenticated tests...', 'info');
+      
+      const routes = [
+        ['analyze-job-description', '/api/analyze-job-description', 'POST', { 
+          title: 'Senior Software Engineer', 
+          job: 'We are looking for a senior software engineer with 5+ years of experience in JavaScript and React.' 
+        }],
+        ['rewrite-bullet', '/api/rewrite-bullet', 'POST', { 
+          bullet: 'Responsible for developing web applications using React and Node.js' 
+        }],
+        ['improve-experience', '/api/improve-experience', 'POST', { 
+          description: 'Worked on various web development projects using React and Node.js' 
+        }],
+        ['generate-summary', '/api/generate-summary', 'POST', { 
+          job: 'Senior Software Engineer position requiring 5+ years experience',
+          name: 'John Doe',
+          email: 'john@example.com',
+          experience: '5 years software development',
+          education: 'BS Computer Science',
+          skills: 'JavaScript, React, Node.js'
+        }],
+        ['generate-resume', '/api/generate-resume', 'POST', { 
+          name: 'John Doe',
+          email: 'john@example.com',
+          experience: '5 years software development',
+          education: 'BS Computer Science',
+          skills: 'JavaScript, React, Node.js',
+          job: 'Senior Software Engineer position...'
+        }],
+        ['generate-pdf', '/api/generate-pdf', 'POST', { 
+          content: '<html><body><h1>Resume</h1><p>Test content</p></body></html>' 
+        }]
+      ];
+      
+      for (const [name, url, method, body] of routes) {
+        addResult(`Testing ${name}...`, 'info');
+        const result = await testRoute(name, baseUrl + url, method, body, true);
+        displayResult(result);
+        await new Promise(resolve => setTimeout(resolve, 500)); // Small delay between requests
+      }
+      
+      addResult('✅ Authenticated tests completed!', 'success');
+    }
+    
+    async function testAllUnauthenticated() {
+      addResult('Starting unauthenticated tests...', 'info');
+      
+      const routes = [
+        ['analyze-job-description', '/api/analyze-job-description', 'POST', { 
+          title: 'Test', 
+          job: 'Test description' 
+        }],
+        ['rewrite-bullet', '/api/rewrite-bullet', 'POST', { 
+          bullet: 'Test bullet' 
+        }],
+        ['improve-experience', '/api/improve-experience', 'POST', { 
+          description: 'Test description' 
+        }],
+        ['generate-summary', '/api/generate-summary', 'POST', { 
+          job: 'Test', 
+          name: 'Test', 
+          email: 'test@test.com', 
+          experience: 'Test', 
+          education: 'Test', 
+          skills: 'Test' 
+        }],
+        ['generate-resume', '/api/generate-resume', 'POST', { 
+          name: 'Test', 
+          email: 'test@test.com', 
+          experience: 'Test', 
+          education: 'Test', 
+          skills: 'Test', 
+          job: 'Test' 
+        }],
+        ['generate-pdf', '/api/generate-pdf', 'POST', { 
+          content: '<html><body>Test</body></html>' 
+        }]
+      ];
+      
+      for (const [name, url, method, body] of routes) {
+        addResult(`Testing ${name} (unauthenticated)...`, 'info');
+        const result = await testRoute(name, baseUrl + url, method, body, false);
+        displayResult(result);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      addResult('✅ Unauthenticated tests completed!', 'success');
+    }
+    
+    async function testUsageLimits() {
+      addResult('Testing usage limits...', 'info');
+      addResult('Note: This will use up your free tier quota!', 'warning');
+      
+      // Test job analysis limit (3 for free tier)
+      for (let i = 0; i < 4; i++) {
+        addResult(`Testing job analysis ${i + 1}/4...`, 'info');
+        const result = await testRoute(
+          `job-analysis-${i + 1}`,
+          baseUrl + '/api/analyze-job-description',
+          'POST',
+          { title: `Test Job ${i}`, job: 'Test description' },
+          true
+        );
+        displayResult(result);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      addResult('✅ Usage limit tests completed!', 'success');
+    }
+    
+    function displayResult(result) {
+      const div = document.createElement('div');
+      div.className = `test ${result.success ? 'success' : 'error'}`;
+      
+      const statusClass = `status status-${result.status || 'unknown'}`;
+      const statusText = result.status ? `HTTP ${result.status}` : 'No Status';
+      
+      let dataPreview = '';
+      if (result.data) {
+        if (result.data.type === 'PDF') {
+          dataPreview = 'PDF file';
+        } else {
+          const dataStr = JSON.stringify(result.data);
+          dataPreview = dataStr.length > 200 ? dataStr.substring(0, 200) + '...' : dataStr;
+        }
+      }
+      
+      div.innerHTML = `
+        <strong>${result.name}</strong> 
+        <span class="${statusClass}">${statusText}</span>
+        <br>
+        <small>${result.authenticated ? '✅ Authenticated' : '❌ Unauthenticated'}</small>
+        ${result.error ? `<br><strong>Error:</strong> ${result.error}` : ''}
+        ${result.data ? `<br><strong>Response:</strong> <pre>${dataPreview}</pre>` : ''}
+        ${result.contentType ? `<br><small>Content-Type: ${result.contentType}</small>` : ''}
+      `;
+      
+      document.getElementById('results').appendChild(div);
+    }
+    
+    function addResult(message, type = 'info') {
+      const div = document.createElement('div');
+      div.className = `test ${type === 'success' ? 'success' : type === 'warning' ? 'warning' : ''}`;
+      div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+      document.getElementById('results').appendChild(div);
+    }
+    
+    function clearResults() {
+      document.getElementById('results').innerHTML = '';
+    }
+  </script>
+</body>
+</html>

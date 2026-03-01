@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { requireAuth } from '@/lib/api-auth';
+import { checkUsageLimit, incrementUsageAfterAction } from '@/lib/api-usage';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -8,6 +10,19 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
+    // 1. Authenticate user
+    const authResult = await requireAuth();
+    if ('error' in authResult) {
+      return authResult.error;
+    }
+    const { userId } = authResult;
+
+    // 2. Check usage limit BEFORE processing
+    const usageCheck = await checkUsageLimit(userId, 'ai_rewrite');
+    if (!usageCheck.allowed) {
+      return usageCheck.error;
+    }
+
     // Check if API key is available
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
@@ -137,6 +152,9 @@ Return ONLY the improved bullet points, one per line, without any prefixes, numb
     improvedDescription = improvedDescription.trim();
 
     console.log('Experience description improved successfully');
+
+    // 4. Increment usage AFTER successful operation
+    await incrementUsageAfterAction(userId, 'ai_rewrite');
 
     return NextResponse.json({
       success: true,
