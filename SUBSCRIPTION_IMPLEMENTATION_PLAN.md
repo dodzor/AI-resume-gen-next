@@ -317,7 +317,13 @@ export async function POST(request: NextRequest) {
 ## Phase 4: Frontend Hooks & State Management
 
 ### Step 4.1: Create Usage Limits Hook
-**File**: `hooks/useUsageLimits.ts` (new file)
+**File**: `hooks/useUsageLimits.ts` (new file) — Main hook that provides:
+* Plan information (plan, isPro, isFree, isEnterprise)
+* Usage data (jobAnalyses, aiRewrites, exports, resumes)
+* Limits for each action type
+* Permission checks (canRewrite, canAnalyze, canCreateResume, canExport)
+* Remaining quotas for each action
+* Loading states
 **Effort**: 1-2 hours
 **Priority**: High
 
@@ -351,6 +357,8 @@ export async function POST(request: NextRequest) {
 - Handle loading and error states
 - Provide helper functions for checking specific actions
 - Calculate remaining quota for each action type
+
+useCanPerformAction(action) — Hook for real-time action checks with upgrade requirements
 
 **Dependencies**: Step 1.3 (usage functions)
 **Testing**: Test hook with different plan tiers, test reactive updates
