@@ -35,6 +35,7 @@ export default function UsageGatedButton({
 }: UsageGatedButtonProps) {
   const { plan, isLoading: usageLoading } = useUsageLimits()
   const { allowed, remaining, upgradeRequired, isLoading: actionLoading } = useCanPerformAction(action)
+  console.log('allowed', allowed)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   const isLoading = usageLoading || actionLoading
@@ -147,7 +148,7 @@ export default function UsageGatedButton({
       <button
         type="button"
         onClick={handleClick}
-        disabled={isDisabled}
+        // disabled={isDisabled}
         className={cn(
           'rounded-lg font-medium transition-colors flex items-center justify-center',
           getVariantClasses(),
@@ -156,7 +157,7 @@ export default function UsageGatedButton({
         )}
         title={tooltipText || undefined}
       >
-        {getButtonText()}
+        {showRemaining ? getButtonText() : children}
       </button>
 
       {showUpgradeModal && (

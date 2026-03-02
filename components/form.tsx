@@ -6,6 +6,11 @@ import { TEMPLATES, TemplateId } from '../lib/templates'
 import { generateFileName } from '../lib/pdfUtils'
 import { validatePDFContent } from '../lib/pdfErrorHandler'
 import { generateSimplePreview } from '../lib/utils'
+import { useUsageLimits } from '@/hooks/useUsageLimits'
+import UsageGatedButton from './UsageGatedButton'
+import UsageDisplay from './UsageDisplay'
+import UpgradeModal from './UpgradeModal'
+import type { ActionType } from '@/lib/plan-limits'
 
 interface FormProps {
   formData: any
@@ -62,6 +67,11 @@ export default function Form({
     const [improvingExperienceIndex, setImprovingExperienceIndex] = useState<number | null>(null)    
     const [rewritingBullet, setRewritingBullet] = useState<{ experienceIndex: number; bulletIndex: number } | null>(null)
     const [isAnalyzingJobDescription, setIsAnalyzingJobDescription] = useState(false)
+    
+    // Usage limits and upgrade modal state
+    const { plan } = useUsageLimits()
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+    const [upgradeModalAction, setUpgradeModalAction] = useState<ActionType | undefined>(undefined)
     const [analyzedTone, setAnalyzedTone] = useState<string | null>(null)
     const [analyzedThemes, setAnalyzedThemes] = useState<{
         themes: string[];
@@ -685,6 +695,11 @@ export default function Form({
             const data = await response.json()
         
             if (!response.ok) {
+                // Check for upgrade requirement
+                if (data.upgradeRequired) {
+                    handleAPIError(data, 'job_analysis')
+                    return
+                }
                 throw new Error(data.message || 'Failed to analyze job description')
             }
         
@@ -717,9 +732,11 @@ export default function Form({
                 recommendations: themes.recommendations,
                 thematicSummary: themes.summary
             }))
-        } catch (error) {
-            console.error('Error analyzing job description:', error)
-            alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+        } catch (error: any) {
+            if (!handleAPIError(error, 'job_analysis')) {
+                // Only show alert if upgrade modal wasn't shown
+                alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+            }
         } finally {
             setIsAnalyzingJobDescription(false)
         }
@@ -818,6 +835,22 @@ export default function Form({
         return { matched, total, percentage }
     }
 
+    // Helper function to handle API errors and check for upgrade requirements
+    const handleAPIError = (error: any, action: ActionType) => {
+        console.error(`Error in ${action}:`, error)
+        
+        // Check if error response contains upgrade requirement
+        if (error && typeof error === 'object' && 'upgradeRequired' in error && error.upgradeRequired) {
+            setUpgradeModalAction(action)
+            setShowUpgradeModal(true)
+            return true // Indicates upgrade modal was shown
+        }
+        
+        // Fallback to alert for other errors
+        alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+        return false
+    }
+
     const handleGenerateSummary = async () => {
         if (!formData.job?.trim()) {
             alert('Please enter a target job description first.')
@@ -849,6 +882,11 @@ export default function Form({
             const data = await response.json()
         
             if (!response.ok) {
+                // Check for upgrade requirement
+                if (data.upgradeRequired) {
+                    handleAPIError(data, 'ai_rewrite')
+                    return
+                }
                 throw new Error(data.message || 'Failed to generate summary')
             }
         
@@ -857,9 +895,11 @@ export default function Form({
                 ...prev,
                 summary: data.summary
             }))
-        } catch (error) {
-            console.error('Error generating summary:', error)
-            alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+        } catch (error: any) {
+            if (!handleAPIError(error, 'ai_rewrite')) {
+                // Only show alert if upgrade modal wasn't shown
+                alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+            }
         } finally {
             setIsGeneratingSummary(false)
         }
@@ -947,14 +987,21 @@ export default function Form({
             const data = await response.json()
         
             if (!response.ok) {
+                // Check for upgrade requirement
+                if (data.upgradeRequired) {
+                    handleAPIError(data, 'ai_rewrite')
+                    return
+                }
                 throw new Error(data.message || 'Failed to improve description')
             }
         
             // Update the experience description with the improved version
             handleExperienceChange(index, 'description', data.improvedDescription)
-        } catch (error) {
-            console.error('Error improving experience:', error)
-            alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+        } catch (error: any) {
+            if (!handleAPIError(error, 'ai_rewrite')) {
+                // Only show alert if upgrade modal wasn't shown
+                alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+            }
         } finally {
             setImprovingExperienceIndex(null)
         }
@@ -1170,6 +1217,11 @@ export default function Form({
             const data = await response.json()
         
             if (!response.ok) {
+                // Check for upgrade requirement
+                if (data.upgradeRequired) {
+                    handleAPIError(data, 'ai_rewrite')
+                    return
+                }
                 throw new Error(data.message || 'Failed to rewrite bullet')
             }
         
@@ -1199,9 +1251,11 @@ export default function Form({
                 ...prev,
                 [key]: true
             }))
-        } catch (error) {
-            console.error('Error rewriting bullet:', error)
-            alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+        } catch (error: any) {
+            if (!handleAPIError(error, 'ai_rewrite')) {
+                // Only show alert if upgrade modal wasn't shown
+                alert(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.')
+            }
         } finally {
             setRewritingBullet(null)
         }
@@ -1306,15 +1360,12 @@ export default function Form({
                             />
                         </div>
                         
-                        <button
-                            type="button"
+                        <UsageGatedButton
+                            action="job_analysis"
                             onClick={handleAnalyzeJobDescription}
                             disabled={isAnalyzingJobDescription || !formData.jobTitle?.trim() || !formData.job?.trim()}
-                            className={`w-full px-4 py-3 rounded-lg font-medium transition duration-200 flex items-center justify-center space-x-2 ${
-                                isAnalyzingJobDescription || !formData.jobTitle?.trim() || !formData.job?.trim()
-                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                    : 'bg-purple-600 text-white hover:bg-purple-700'
-                            }`}
+                            variant="primary"
+                            className="w-full"
                         >
                             {isAnalyzingJobDescription ? (
                                 <>
@@ -1332,7 +1383,7 @@ export default function Form({
                                     <span>Analyze Job Description</span>
                                 </>
                             )}
-                        </button>
+                        </UsageGatedButton>
 
                         {(analyzedTone || formData.tone) && (
                             <div className="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -1850,20 +1901,14 @@ export default function Form({
                                                                     />
                                                                     <div className="flex flex-col gap-1">
                                                                         <div className="flex items-center gap-1 relative" style={{ overflow: 'visible' }}>
-                                                                            <button
-                                                                                type="button"
+                                                                            <UsageGatedButton
+                                                                                action="ai_rewrite"
                                                                                 onClick={() => handleRewriteBullet(index, bulletIndex)}
                                                                                 disabled={rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex || !bullet.trim()}
-                                                                                className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded transition duration-200 flex items-center space-x-1 ${
-                                                                                    rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex || !bullet.trim()
-                                                                                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                                                                        : 'bg-purple-600 text-white hover:bg-purple-700'
-                                                                                }`}
-                                                                                title={hasKeywords && selected.length > 0
-                                                                                    ? `Rewrite with ${selected.length} selected keyword${selected.length !== 1 ? 's' : ''}`
-                                                                                    : hasKeywords && relevantKeywords.length > 0
-                                                                                    ? `Rewrite with ${relevantKeywords.length} relevant keyword${relevantKeywords.length !== 1 ? 's' : ''} (select keywords above to customize)`
-                                                                                    : 'Rewrite this bullet point'}
+                                                                                variant="primary"
+                                                                                size="sm"
+                                                                                showRemaining={false}
+                                                                                className="flex-shrink-0"
                                                                             >
                                                                                 {rewritingBullet?.experienceIndex === index && rewritingBullet?.bulletIndex === bulletIndex ? (
                                                                                     <>
@@ -1881,7 +1926,7 @@ export default function Form({
                                                                                         <span>Rewrite</span>
                                                                                     </>
                                                                                 )}
-                                                                            </button>
+                                                                            </UsageGatedButton>
                                                                             
                                                                             {/* Info Icon */}
                                                                             <button
@@ -2877,15 +2922,12 @@ export default function Form({
                                     </>
                             )}
 
-                            <button
-                                type="button"
+                            <UsageGatedButton
+                                action="ai_rewrite"
                                 onClick={handleGenerateSummary}
                                 disabled={isGeneratingSummary || !formData.job?.trim()}
-                                className={`w-full px-4 py-3 rounded-lg font-medium transition duration-200 flex items-center justify-center space-x-2 ${
-                                    isGeneratingSummary || !formData.job?.trim()
-                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                        : 'bg-purple-600 text-white hover:bg-purple-700'
-                                }`}
+                                variant="primary"
+                                className="w-full"
                             >
                                 {isGeneratingSummary ? (
                                     <>
@@ -2903,7 +2945,7 @@ export default function Form({
                                         <span>{formData.summary ? 'Regenerate Summary' : 'Generate Summary'}</span>
                                     </>
                                 )}
-                            </button>
+                            </UsageGatedButton>
                             
                             {formData.summary && (
                                     <div className="grid grid-cols-3 gap-2">
@@ -2992,14 +3034,20 @@ export default function Form({
     }
 
     return (
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-5xl mx-auto" style={{ overflow: 'visible' }}>
-            <ProgressIndicator />
-    
-            <div className="space-y-6" style={{ overflow: 'visible' }}>
-                {/* Step Content */}
-                <div className="min-h-[300px]" style={{ overflow: 'visible' }}>
-                    {renderStepContent()}
+        <>
+            <div className="bg-white rounded-xl shadow-lg p-8 max-w-5xl mx-auto" style={{ overflow: 'visible' }}>
+                {/* Usage Display - Compact version in header */}
+                <div className="mb-6">
+                    <UsageDisplay compact={true} showUpgradeButton={true} />
                 </div>
+                
+                <ProgressIndicator />
+        
+                <div className="space-y-6" style={{ overflow: 'visible' }}>
+                    {/* Step Content */}
+                    <div className="min-h-[300px]" style={{ overflow: 'visible' }}>
+                        {renderStepContent()}
+                    </div>
 
                 {/* Navigation Buttons */}
                 <div className="flex justify-between items-center pt-6 border-t border-gray-200">
@@ -3088,5 +3136,14 @@ export default function Form({
                 </div>
             </div>
         </div>
+        
+        {/* Upgrade Modal */}
+        <UpgradeModal
+            isOpen={showUpgradeModal}
+            onClose={() => setShowUpgradeModal(false)}
+            action={upgradeModalAction}
+            plan={plan}
+        />
+        </>
     )
 }
