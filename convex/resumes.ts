@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { api } from "./_generated/api";
 
 // Save or update a resume
 export const saveResume = mutation({
@@ -74,13 +75,37 @@ export const saveResume = mutation({
       return args.resumeId;
     }
 
-    // Otherwise, create new resume
+    // Otherwise, create new resume - check usage limit first
+    // Check if user can create a new resume
+    const canCreate = await ctx.runQuery(api.usage.canPerformAction, {
+      action: "create_resume",
+    });
+
+    if (!canCreate.allowed) {
+      // Throw error with upgrade requirement information
+      const error: any = new Error(canCreate.reason || "Resume limit reached");
+      error.upgradeRequired = canCreate.upgradeRequired || false;
+      error.code = "USAGE_LIMIT_EXCEEDED";
+      throw error;
+    }
+
+    // Create new resume
     const resumeId = await ctx.db.insert("resumes", {
       ...args,
       userId,
       createdAt: now,
       updatedAt: now,
     });
+
+    // Increment usage counter after successful creation
+    try {
+      await ctx.runMutation(api.usage.incrementUsage, {
+        action: "create_resume",
+      });
+    } catch (error) {
+      // Log error but don't fail the resume creation
+      console.error("Failed to increment usage counter:", error);
+    }
 
     return resumeId;
   },

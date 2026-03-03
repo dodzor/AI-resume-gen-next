@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { Id } from '@/convex/_generated/dataModel'
+import { useUsageLimits } from '@/hooks/useUsageLimits'
+import { isUnlimited } from '@/lib/plan-limits'
+import UpgradeModal from './UpgradeModal'
 
 interface Resume {
   _id: Id<'resumes'>
@@ -28,6 +31,12 @@ export default function ResumeSwitcher({
   isLoading
 }: ResumeSwitcherProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const { canCreateResume, remaining, limits, usage, plan } = useUsageLimits()
+  
+  const resumeCount = resumes?.length || 0
+  const limit = limits.resumes
+  const isLimitReached = !isUnlimited(limit) && resumeCount >= limit
 
   if (isLoading) {
     return (
@@ -41,6 +50,21 @@ export default function ResumeSwitcher({
   const currentResume = resumes?.find(r => r._id === currentResumeId)
   const hasResumes = resumes && resumes.length > 0
 
+  const handleCreateNew = () => {
+    if (!canCreateResume || isLimitReached) {
+      setShowUpgradeModal(true)
+      return
+    }
+    onCreateNew()
+  }
+
+  const formatLimitText = () => {
+    if (isUnlimited(limit)) {
+      return `${resumeCount} resumes (Unlimited)`
+    }
+    return `${resumeCount} / ${limit} resumes`
+  }
+
   return (
     <div className="relative">
       {/* Current Resume Display */}
@@ -48,17 +72,27 @@ export default function ResumeSwitcher({
         <div className="text-sm text-gray-600">
           <span className="font-medium">Editing:</span>{' '}
           <span className="text-gray-800">{currentResume?.jobTitle || 'New Resume'}</span>
+          {' '}
+          <span className="text-gray-500">({formatLimitText()})</span>
         </div>
         <div className="flex gap-2">
+          {hasResumes && (
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700 transition-colors"
+            >
+              Switch
+            </button>
+          )}
           <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700 transition-colors"
-          >
-            Switch
-          </button>
-          <button
-            onClick={onCreateNew}
-            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            onClick={handleCreateNew}
+            // disabled={isLimitReached}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+              isLimitReached
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+            title={isLimitReached ? "Resume limit reached. Upgrade to Pro to create more resumes." : undefined}
           >
             New Resume
           </button>
@@ -106,6 +140,14 @@ export default function ResumeSwitcher({
           </div>
         </>
       )}
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        action="create_resume"
+        plan={plan}
+      />
     </div>
   )
 }

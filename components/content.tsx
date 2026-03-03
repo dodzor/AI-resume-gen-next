@@ -7,6 +7,8 @@ import { Id } from '@/convex/_generated/dataModel'
 import Result from './result'
 import Form from './form'
 import ResumeSwitcher from './ResumeSwitcher'
+import { useUsageLimits } from '@/hooks/useUsageLimits'
+import UpgradeModal from './UpgradeModal'
 
 // Default empty form data
 const getDefaultFormData = () => ({
@@ -56,6 +58,10 @@ export default function Content() {
     
     // Resume management state
     const [currentResumeId, setCurrentResumeId] = useState<Id<'resumes'> | null>(null)
+    
+    // Usage limits and upgrade modal state
+    const { canCreateResume, plan } = useUsageLimits()
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false)
     
     // Convex queries and mutations
     const resumes = useQuery(api.resumes.getUserResumes) // Get all user resumes
@@ -133,9 +139,16 @@ export default function Content() {
             _id: resumeId
           })
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to save resume:', error)
-        alert('Failed to save resume. Please try again.')
+        
+        // Check if error is due to usage limit
+        if (error?.upgradeRequired || error?.code === 'USAGE_LIMIT_EXCEEDED') {
+          setShowUpgradeModal(true)
+          return
+        }
+        
+        alert(error?.message || 'Failed to save resume. Please try again.')
       } finally {
         setIsSaving(false)
       }
@@ -343,6 +356,7 @@ export default function Content() {
     const showResumeSwitcher = (resumes && resumes.length > 0) || (!isLoadingResume && resumes !== undefined)
     
     return (
+      <>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="max-w-[1920px] mx-auto">
           {/* Header */}
@@ -469,5 +483,14 @@ export default function Content() {
           </div>
         </div>
       </div>
+      
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        action="create_resume"
+        plan={plan}
+      />
+      </>
     )
 }
