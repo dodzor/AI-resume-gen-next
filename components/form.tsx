@@ -69,7 +69,7 @@ export default function Form({
     const [isAnalyzingJobDescription, setIsAnalyzingJobDescription] = useState(false)
     
     // Usage limits and upgrade modal state
-    const { plan } = useUsageLimits()
+    const { plan, canExport, isPro, isFree } = useUsageLimits()
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
     const [upgradeModalAction, setUpgradeModalAction] = useState<ActionType | undefined>(undefined)
     const [analyzedTone, setAnalyzedTone] = useState<string | null>(null)
@@ -609,7 +609,37 @@ export default function Form({
         }
     }
 
+    // Copy resume content to clipboard (for free users)
+    const handleCopyToClipboard = async () => {
+        const previewContent = generateSimplePreview(formData, currentStep)
+        
+        try {
+            // Create a temporary div to extract text content
+            const tempDiv = document.createElement('div')
+            tempDiv.innerHTML = previewContent
+            
+            // Get plain text content
+            const textContent = tempDiv.textContent || tempDiv.innerText || ''
+            
+            // Copy to clipboard
+            await navigator.clipboard.writeText(textContent)
+            
+            // Show success feedback
+            alert('Resume content copied to clipboard!')
+        } catch (error: any) {
+            console.error('Failed to copy to clipboard:', error)
+            alert('Failed to copy to clipboard. Please try again.')
+        }
+    }
+
     const handleDownloadPDF = async () => {
+        // Check if user can export PDF (Pro feature)
+        if (!canExport || isFree) {
+            setUpgradeModalAction('export')
+            setShowUpgradeModal(true)
+            return
+        }
+
         const previewContent = generateSimplePreview(formData, currentStep)
         
         // Validate content before proceeding
@@ -643,6 +673,13 @@ export default function Form({
 
             if (!response.ok) {
                 const errorData = await response.json()
+                
+                // Check for upgrade requirement in error response
+                if (errorData.upgradeRequired) {
+                    handleAPIError(errorData, 'export')
+                    return
+                }
+                
                 throw new Error(errorData.message || 'Failed to generate PDF')
             }
 
@@ -658,8 +695,11 @@ export default function Form({
             document.body.removeChild(a)
             
         } catch (error: any) {
-            console.error('PDF generation error:', error)
-            alert(error.message || 'An error occurred while generating the PDF. Please try again.')
+            if (!handleAPIError(error, 'export')) {
+                // Only show alert if upgrade modal wasn't shown
+                console.error('PDF generation error:', error)
+                alert(error.message || 'An error occurred while generating the PDF. Please try again.')
+            }
         } finally {
             setIsDownloading(false)
         }
@@ -2949,51 +2989,48 @@ export default function Form({
                             
                             {formData.summary && (
                                     <div className="grid grid-cols-3 gap-2">
-                                        <button
-                                            type="button"
+                                        <UsageGatedButton
+                                            action="ai_rewrite"
                                             onClick={() => handleModifySummary('concise')}
                                             disabled={isGeneratingSummary}
-                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center space-x-1 ${
-                                                isGeneratingSummary
-                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                            }`}
+                                            variant="secondary"
+                                            size="sm"
+                                            showRemaining={false}
+                                            className="px-3 py-2"
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                             </svg>
                                             <span>More Concise</span>
-                                        </button>
-                                        <button
-                                            type="button"
+                                        </UsageGatedButton>
+                                        <UsageGatedButton
+                                            action="ai_rewrite"
                                             onClick={() => handleModifySummary('verbose')}
                                             disabled={isGeneratingSummary}
-                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center space-x-1 ${
-                                                isGeneratingSummary
-                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                            }`}
+                                            variant="secondary"
+                                            size="sm"
+                                            showRemaining={false}
+                                            className="px-3 py-2"
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
                                             </svg>
                                             <span>More Verbose</span>
-                                        </button>
-                                        <button
-                                            type="button"
+                                        </UsageGatedButton>
+                                        <UsageGatedButton
+                                            action="ai_rewrite"
                                             onClick={() => handleModifySummary('senior')}
                                             disabled={isGeneratingSummary}
-                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center space-x-1 ${
-                                                isGeneratingSummary
-                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                            }`}
+                                            variant="secondary"
+                                            size="sm"
+                                            showRemaining={false}
+                                            className="px-3 py-2"
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
                                             </svg>
                                             <span>More Senior</span>
-                                        </button>
+                                        </UsageGatedButton>
                                     </div>
                             )}
                         </div>
@@ -3056,7 +3093,7 @@ export default function Form({
                             type="button"
                             onClick={prevStep}
                             disabled={currentStep === 1}
-                            className={`px-6 py-3 rounded-lg font-medium transition duration-200 flex items-center space-x-2 ${
+                            className={`px-2 py-3 rounded-lg font-medium transition duration-200 flex items-center space-x-2 ${
                                 currentStep === 1
                                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -3072,7 +3109,7 @@ export default function Form({
                             <button
                                 type="button"
                                 onClick={() => setShowPreview(!showPreview)}
-                                className={`px-4 py-3 rounded-lg font-medium transition duration-200 flex items-center space-x-2 ${
+                                className={`px-2 py-3 rounded-lg font-medium transition duration-200 flex items-center space-x-2 ${
                                     showPreview
                                         ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -3108,30 +3145,65 @@ export default function Form({
                             </svg>
                         </button>
                     ) : (
-                        <button 
-                            type="submit" 
-                            // onClick={handleSubmit}
-                            onClick={handleDownloadPDF}
-                            disabled={isGenerating || !validateStep(currentStep)}
-                            className="bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold py-3 px-8 rounded-lg hover:from-green-700 hover:to-emerald-700 transform hover:scale-105 transition duration-200 shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                        >
-                            {isGenerating ? (
+                        <div className="flex gap-2">
+                            {isFree ? (
                                 <>
-                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    <span>Generating PDF...</span>
+                                    <button 
+                                        type="button"
+                                        onClick={handleCopyToClipboard}
+                                        disabled={isGenerating || !validateStep(currentStep)}
+                                        className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3 px-2 rounded-lg hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition duration-200 shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                        </svg>
+                                        <span>Copy to Clipboard</span>
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            setUpgradeModalAction('export')
+                                            setShowUpgradeModal(true)
+                                        }}
+                                        disabled={isGenerating || !validateStep(currentStep)}
+                                        className="bg-gray-200 text-gray-500 font-semibold py-3 px-2 rounded-lg cursor-pointer transition duration-200 shadow-md flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed relative group hover:bg-gray-300"
+                                        title="Upgrade to Pro to export your resume as a polished PDF"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                        <span>Download PDF (Pro)</span>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                        </svg>
+                                    </button>
                                 </>
                             ) : (
-                                <>
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                    </svg>
-                                    <span>Download to PDF</span>
-                                </>
+                                <button 
+                                    type="button"
+                                    onClick={handleDownloadPDF}
+                                    disabled={isDownloading || isGenerating || !validateStep(currentStep)}
+                                    className="bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold py-3 px-8 rounded-lg hover:from-green-700 hover:to-emerald-700 transform hover:scale-105 transition duration-200 shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                                >
+                                    {isDownloading ? (
+                                        <>
+                                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span>Generating PDF...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                            <span>Download PDF</span>
+                                        </>
+                                    )}
+                                </button>
                             )}
-                        </button>
+                        </div>
                     )}
                 </div>
             </div>

@@ -5,6 +5,9 @@ import { generateFileName } from '../lib/pdfUtils'
 import { validatePDFContent } from '../lib/pdfErrorHandler'
 import { getDisplayClassName, TemplateId } from '../lib/templates'
 import { generateSimplePreview } from '../lib/utils'
+import { useUsageLimits } from '@/hooks/useUsageLimits'
+import UpgradeModal from './UpgradeModal'
+import type { ActionType } from '@/lib/plan-limits'
 import '../styles/resume-display.css'
 
 interface ResultProps {
@@ -18,6 +21,8 @@ interface ResultProps {
 
 export default function Result({ formData, generatedResume, currentStep, showPreview = true, showForm, setShowForm }: ResultProps) {
     const [isDownloading, setIsDownloading] = useState(false)
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+    const { canExport, isFree, plan } = useUsageLimits()
     
     // Get the template from formData, default to 'professional-blue'
     const templateId: TemplateId = formData.template || 'professional-blue'
@@ -37,7 +42,34 @@ export default function Result({ formData, generatedResume, currentStep, showPre
     const shouldUseTemplateClass = !isPreview || (isPreview && formData.template)
     const finalDisplayClassName = shouldUseTemplateClass ? displayClassName : ''
 
+    // Copy resume content to clipboard (for free users)
+    const handleCopyToClipboard = async () => {
+        try {
+            // Create a temporary div to extract text content
+            const tempDiv = document.createElement('div')
+            tempDiv.innerHTML = generatedResume || previewContent
+            
+            // Get plain text content
+            const textContent = tempDiv.textContent || tempDiv.innerText || ''
+            
+            // Copy to clipboard
+            await navigator.clipboard.writeText(textContent)
+            
+            // Show success feedback
+            alert('Resume content copied to clipboard!')
+        } catch (error: any) {
+            console.error('Failed to copy to clipboard:', error)
+            alert('Failed to copy to clipboard. Please try again.')
+        }
+    }
+
     const handleDownloadPDF = async () => {
+        // Check if user can export PDF (Pro feature)
+        if (!canExport || isFree) {
+            setShowUpgradeModal(true)
+            return
+        }
+
         // Validate content before proceeding
         const validation = validatePDFContent(generatedResume)
         if (!validation.isValid) {
@@ -66,6 +98,13 @@ export default function Result({ formData, generatedResume, currentStep, showPre
 
             if (!response.ok) {
                 const errorData = await response.json()
+                
+                // Check for upgrade requirement in error response
+                if (errorData.upgradeRequired) {
+                    setShowUpgradeModal(true)
+                    return
+                }
+                
                 throw new Error(errorData.message || 'Failed to generate PDF')
             }
 
@@ -82,6 +121,11 @@ export default function Result({ formData, generatedResume, currentStep, showPre
             
         } catch (error: any) {
             console.error('PDF generation error:', error)
+            // Check if error is due to usage limit
+            if (error?.upgradeRequired || error?.code === 'USAGE_LIMIT_EXCEEDED') {
+                setShowUpgradeModal(true)
+                return
+            }
             alert(error.message || 'An error occurred while generating the PDF. Please try again.')
         } finally {
             setIsDownloading(false)
@@ -148,31 +192,51 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                 {/* Download Button */}
                 {/* {generatedResume && (
                     <div className="mt-6 text-center">
-                        <button 
-                            onClick={handleDownloadPDF}
-                            disabled={isDownloading}
-                            className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition duration-200 flex items-center justify-center space-x-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                        >
-                            {isDownloading ? (
-                                <>
-                                    <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    <span>Generating PDF...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                    </svg>
-                                    <span>Download as PDF</span>
-                                </>
-                            )}
-                        </button>
+                        {isFree ? (
+                            <button 
+                                onClick={handleCopyToClipboard}
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition duration-200 flex items-center justify-center space-x-2 mx-auto"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                                <span>Copy to Clipboard</span>
+                            </button>
+                        ) : (
+                            <button 
+                                onClick={handleDownloadPDF}
+                                disabled={isDownloading}
+                                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition duration-200 flex items-center justify-center space-x-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                            >
+                                {isDownloading ? (
+                                    <>
+                                        <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Generating PDF...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                        <span>Download PDF</span>
+                                    </>
+                                )}
+                            </button>
+                        )}
                     </div>
                 )} */}
             </div>
+            
+            {/* Upgrade Modal */}
+            <UpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                action="export"
+                plan={plan}
+            />
         </>
     )
 }

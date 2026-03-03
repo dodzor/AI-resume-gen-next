@@ -40,8 +40,10 @@ export default function UsageGatedButton({
 
   const isLoading = usageLoading || actionLoading
 
-  // Determine if button should be disabled
-  const isDisabled = externalDisabled || isLoading || !allowed
+  // Determine if button should be disabled (only for external disabled state or loading)
+  // Don't disable for usage limits - show locked style instead
+  const isDisabled = externalDisabled || isLoading
+  const isLocked = !allowed && upgradeRequired && !isLoading
 
   // Get button text with remaining count
   const getButtonText = (): ReactNode => {
@@ -63,14 +65,9 @@ export default function UsageGatedButton({
       )
     }
 
-    // If limit reached, show children with upgrade hint
-    if (!allowed && upgradeRequired) {
-      return (
-        <>
-          {children}
-          <span className="ml-1 text-xs opacity-75">(Upgrade required)</span>
-        </>
-      )
+    // If limit reached, show children with lock icon (no text hint needed since button looks locked)
+    if (isLocked) {
+      return children
     }
 
     // Show remaining count
@@ -86,11 +83,14 @@ export default function UsageGatedButton({
 
   // Handle button click
   const handleClick = async () => {
+    // If limit reached, show upgrade modal
+    if (isLocked) {
+      setShowUpgradeModal(true)
+      return
+    }
+
+    // If disabled (external or loading), don't execute
     if (isDisabled) {
-      // If limit reached, show upgrade modal
-      if (!allowed && upgradeRequired) {
-        setShowUpgradeModal(true)
-      }
       return
     }
 
@@ -100,6 +100,12 @@ export default function UsageGatedButton({
 
   // Get variant classes
   const getVariantClasses = (): string => {
+    // If locked (limit reached), use locked style
+    if (isLocked) {
+      return 'bg-gray-200 text-gray-500 cursor-pointer hover:bg-gray-300'
+    }
+
+    // If disabled (external or loading), use disabled style
     if (isDisabled) {
       return 'bg-gray-200 text-gray-400 cursor-not-allowed'
     }
@@ -129,7 +135,7 @@ export default function UsageGatedButton({
   // Get tooltip text
   const getTooltipText = (): string | null => {
     if (isLoading) return null
-    if (!allowed && upgradeRequired) {
+    if (isLocked) {
       const actionNames: Record<ActionType, string> = {
         job_analysis: 'job analyses',
         ai_rewrite: 'AI rewrites',
@@ -148,9 +154,9 @@ export default function UsageGatedButton({
       <button
         type="button"
         onClick={handleClick}
-        // disabled={isDisabled}
+        disabled={isDisabled && !isLocked}
         className={cn(
-          'rounded-lg font-medium transition-colors flex items-center justify-center',
+          'rounded-lg font-medium transition-colors flex items-center justify-center space-x-2',
           getVariantClasses(),
           getSizeClasses(),
           className
@@ -158,6 +164,11 @@ export default function UsageGatedButton({
         title={tooltipText || undefined}
       >
         {showRemaining ? getButtonText() : children}
+        {isLocked && (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+          </svg>
+        )}
       </button>
 
       {showUpgradeModal && (
