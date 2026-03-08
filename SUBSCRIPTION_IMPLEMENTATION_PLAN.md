@@ -501,8 +501,8 @@ useCanPerformAction(action) — Hook for real-time action checks with upgrade re
 
 ---
 
-### Step 5.3: Integrate Export Limit
-**File**: `components/form.tsx` (modify existing)
+**File**: `components/form.tsx` (mod### Step 5.3: Integrate Export Limit
+ify existing)
 **Effort**: 30 minutes
 **Priority**: Medium
 
