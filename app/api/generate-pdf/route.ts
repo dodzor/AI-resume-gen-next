@@ -52,7 +52,9 @@ export async function POST(request: NextRequest) {
     await incrementUsageAfterAction(userId, 'export');
 
     // Return PDF as response
-    return new NextResponse(pdfBuffer, {
+    // Convert Buffer to Uint8Array for NextResponse compatibility
+    const uint8Array = new Uint8Array(pdfBuffer);
+    return new NextResponse(uint8Array, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',

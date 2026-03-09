@@ -17,6 +17,8 @@ function Comments() {
     )
 }
 
+export default Comments;
+
 // This is a regular comment
 // Regular comments work outside of jsx
 

@@ -16,7 +16,7 @@ function TodoList() {
     )
 }
 
-export default TodoList()
+export default TodoList;
 
 /*
 * 🟢 Essential - always include key prop in lists

@@ -31,7 +31,7 @@ function Preferences() {
                     <input
                         type="radio"
                         value="weekly"
-                        checked={frequency == 'weekly'}
+                        checked={frequency === 'weekly'}
                         onChange={e => setFrequency(e.target.value)}
                     />
                     Weekly

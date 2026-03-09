@@ -3,10 +3,12 @@ import OpenAI from 'openai';
 import { requireAuth } from '@/lib/api-auth';
 import { checkUsageLimit, incrementUsageAfterAction } from '@/lib/api-usage';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-initialize OpenAI client to avoid build-time errors
+function getOpenAIClient() {
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -130,6 +132,7 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
     console.log('Analyzing job description for seniority level, keywords, and themes');
 
     // Make all three API calls in parallel
+    const openai = getOpenAIClient();
     const [toneCompletion, keywordsCompletion, themesCompletion] = await Promise.all([
       openai.chat.completions.create({
         model: "gpt-4o",

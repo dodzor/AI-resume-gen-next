@@ -3,10 +3,12 @@ import OpenAI from 'openai';
 import { requireAuth } from '@/lib/api-auth';
 import { checkUsageLimit, incrementUsageAfterAction } from '@/lib/api-usage';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-initialize OpenAI client to avoid build-time errors
+function getOpenAIClient() {
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -236,6 +238,7 @@ Return ONLY the summary text, without any markdown formatting, quotes, or additi
     const action = modifyType ? `Modifying summary (${modifyType})` : 'Generating summary';
     console.log(`${action} for:`, name || 'Unknown');
 
+    const openai = getOpenAIClient();
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [

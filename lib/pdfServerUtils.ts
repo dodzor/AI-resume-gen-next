@@ -1,4 +1,6 @@
+import puppeteerCore from 'puppeteer-core';
 import puppeteer from 'puppeteer';
+import chromium from '@sparticuz/chromium';
 import { createPDFStylesheet, TemplateId } from './templates';
 
 export interface PDFGenerationOptions {
@@ -281,17 +283,32 @@ export async function generatePDFWithPuppeteer(
     throw new Error('No content provided for PDF generation');
   }
 
+  // Configure Chromium for Vercel (serverless) or local development
+  const isVercel = process.env.VERCEL === '1';
+  
   // Launch Puppeteer browser
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--disable-gpu',
-    ],
-  });
+  // On Vercel: use puppeteer-core with @sparticuz/chromium
+  // Locally: use full puppeteer package (includes bundled Chromium)
+  const browser = isVercel
+    ? await puppeteerCore.launch({
+        headless: true,
+        args: [
+          ...chromium.args,
+          '--hide-scrollbars',
+          '--disable-web-security',
+        ],
+        executablePath: await chromium.executablePath(),
+      })
+    : await puppeteer.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--disable-gpu',
+        ],
+      });
 
   try {
     const page = await browser.newPage();

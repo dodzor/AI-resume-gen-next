@@ -39,3 +39,18 @@ function Child2() {
  * 💡 No need to manually pass message at every level
  * 📌 Easier to manage shared data 
  */
+
+export default function Page() {
+    return (
+        <div style={{ display: 'grid', gap: '2rem' }}>
+            <section>
+                <h1>Props Drilling</h1>
+                <Grandparent />
+            </section>
+            <section>
+                <h1>Context API</h1>
+                <Grandparent2 />
+            </section>
+        </div>
+    )
+}
