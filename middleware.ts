@@ -1,6 +1,21 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-export default clerkMiddleware();
+// Get Clerk publishable key from environment
+const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+// Create middleware - use Clerk if key is available, otherwise passthrough
+const middleware = publishableKey
+  ? clerkMiddleware({
+      publishableKey,
+    })
+  : function(request: NextRequest) {
+      console.warn('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is not set. Middleware running in passthrough mode.');
+      return NextResponse.next();
+    };
+
+export default middleware;
 
 export const config = {
   matcher: [

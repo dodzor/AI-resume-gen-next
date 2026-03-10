@@ -3,6 +3,12 @@ import puppeteer from 'puppeteer';
 import chromium from '@sparticuz/chromium';
 import { createPDFStylesheet, TemplateId } from './templates';
 
+// Ensure Chromium detects serverless environment on Vercel
+// This helps @sparticuz/chromium use the correct build for serverless environments
+if (process.env.VERCEL && !process.env.AWS_LAMBDA_JS_RUNTIME) {
+  process.env.AWS_LAMBDA_JS_RUNTIME = 'nodejs20.x';
+}
+
 export interface PDFGenerationOptions {
   content: string;
   templateId?: TemplateId;
@@ -284,31 +290,52 @@ export async function generatePDFWithPuppeteer(
   }
 
   // Configure Chromium for Vercel (serverless) or local development
-  const isVercel = process.env.VERCEL === '1';
-  
+  const isVercel = !!process.env.VERCEL;
+
   // Launch Puppeteer browser
   // On Vercel: use puppeteer-core with @sparticuz/chromium
+  // This uses a Chromium build that is compatible with AWS Lambda / Vercel
+  // and avoids pulling in Puppeteer's default Chromium (which can require
+  // unavailable shared libraries like libnss3.so).
   // Locally: use full puppeteer package (includes bundled Chromium)
-  const browser = isVercel
-    ? await puppeteerCore.launch({
-        headless: true,
+  let browser;
+  
+  if (isVercel) {
+    try {
+      // Get the executable path - this ensures Chromium is properly extracted
+      const executablePath = await chromium.executablePath();
+      
+      if (!executablePath) {
+        throw new Error('Failed to get Chromium executable path on Vercel');
+      }
+
+      browser = await puppeteerCore.launch({
         args: [
           ...chromium.args,
           '--hide-scrollbars',
           '--disable-web-security',
+          '--single-process', // Important for serverless environments
         ],
-        executablePath: await chromium.executablePath(),
-      })
-    : await puppeteer.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--disable-gpu',
-        ],
+        defaultViewport: chromium.defaultViewport,
+        executablePath,
+        headless: chromium.headless,
       });
+    } catch (error: any) {
+      console.error('Failed to launch Chromium on Vercel:', error);
+      throw new Error(`PDF generation failed on Vercel: ${error.message || 'Unknown error'}`);
+    }
+  } else {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+      ],
+    });
+  }
 
   try {
     const page = await browser.newPage();

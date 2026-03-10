@@ -12,6 +12,8 @@ if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
 const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL)
 
 export default function ConvexClientProvider({ children }: { children: ReactNode }) {
+  // This component MUST be inside ClerkProvider
+  // The useAuth hook requires ClerkProvider to be an ancestor
   return (
     <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
       {children}

@@ -35,6 +35,12 @@ export default function RootLayout({
 }>) {
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   
+  // ConvexProviderWithClerk requires ClerkProvider to be an ancestor
+  // Always wrap with ClerkProvider when publishableKey is available
+  if (!publishableKey) {
+    console.error('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing. Clerk and Convex authentication will not work.');
+  }
+  
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} ${dmSans.variable} antialiased`}>
@@ -43,9 +49,13 @@ export default function RootLayout({
             <ConvexClientProvider>{children}</ConvexClientProvider>
           </ClerkProvider>
         ) : (
-          // Fallback for build-time when env vars might not be available
-          // This should not happen in production runtime
-          <>{children}</>
+          // Without Clerk, we can't use ConvexProviderWithClerk
+          // Show an error message instead of crashing
+          <div style={{ padding: '2rem', textAlign: 'center' }}>
+            <h1>Configuration Error</h1>
+            <p>NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is not configured.</p>
+            <p>Please set this environment variable in your Vercel project settings.</p>
+          </div>
         )}
       </body>
     </html>
