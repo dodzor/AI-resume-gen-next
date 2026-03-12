@@ -197,10 +197,9 @@
 #### 13. **Clerk Implementation Gaps** 🟡
 - ❌ **Custom Sign-In/Sign-Up Pages**: Using Clerk's hosted pages (no `/sign-in` or `/sign-up` routes)
 - ❌ **User Profile Page**: No dedicated profile page (only UserButton dropdown)
-- ✅ **Protected API Routes**: All API routes now use server-side auth checks and usage limits (see "Protected API Routes (Server-Side Authentication)" below)
 - ❌ **Environment Variables Documentation**: No `.env.example` file documenting required Clerk variables
 
-#### 14. **Deployment to Vercel** ✅
+#### 14. **Deployment to Vercel & Analytics** ✅
 - ✅ **Production Deployment**: App deployed to Vercel with `vercel --prod` and project linked to Git repo
 - ✅ **Next.js Security Patching**: Upgraded to Next.js `15.5.7` per the React2Shell security bulletin
 - ✅ **Serverless PDF Generation**: `puppeteer-core` + `@sparticuz/chromium` configured for Vercel, with `vercel.json` function timeout and `AWS_LAMBDA_JS_RUNTIME` support for Chromium
@@ -208,6 +207,7 @@
 - ✅ **Custom Domain Ready**: Deployment and DNS steps documented in `VERCEL_DEPLOYMENT_CHANGES.md` for Namecheap → Vercel setup
 - ✅ **Production Clerk Environment**: Production Clerk keys (`pk_live_...`, `sk_live_...`) configured separately from dev keys
 - ✅ **Production Convex Configuration**: Convex deployment configured with production Clerk Frontend API URL
+ - ✅ **Vercel Analytics**: `@vercel/analytics` installed and `<Analytics />` component added to `app/layout.tsx` to automatically track page views across all routes
 
 ---
 
@@ -826,6 +826,9 @@ const identity = await ctx.auth.getUserIdentity();
   - Frontend hooks and UI components for usage display
   - Usage-gated buttons with upgrade prompts
   - API usage utilities for server-side checks
+ - ✅ **Vercel Analytics**:
+   - Analytics package installed and wired into the root layout
+   - Automatic page view tracking for all Next.js routes, aligned with Vercel’s Analytics setup flow
 
 **Areas for Enhancement:**
 - 🔴 **High Priority**:

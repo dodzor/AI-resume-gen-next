@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, DM_Sans } from 'next/font/google'
 import './globals.css'
 import { ClerkProvider } from '@clerk/nextjs'
 import ConvexClientProvider from '@/components/ConvexClientProvider'
+import { Analytics } from '@vercel/analytics/react'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -46,7 +47,10 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} ${dmSans.variable} antialiased`}>
         {publishableKey ? (
           <ClerkProvider publishableKey={publishableKey}>
-            <ConvexClientProvider>{children}</ConvexClientProvider>
+            <ConvexClientProvider>
+              {children}
+              <Analytics />
+            </ConvexClientProvider>
           </ClerkProvider>
         ) : (
           // Without Clerk, we can't use ConvexProviderWithClerk
