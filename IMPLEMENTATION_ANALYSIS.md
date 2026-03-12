@@ -143,6 +143,9 @@
 - ✅ **Clerk Pricing/Billing** (`app/pricing/page.tsx`):
   - Uses `<PricingTable />` from `@clerk/nextjs`
   - Clerk-managed pricing table for subscription plans
+  - ✅ **Production Payments Enabled**: Stripe account connected to Clerk production instance
+  - ✅ **Credit Card Processing**: Real payment methods (credit cards) working in production
+  - ✅ **Billing Configuration**: Clerk Billing enabled with subscription plans configured
 
 #### 11. **Subscription Tier Checking & Usage Limits** ✅ **FULLY IMPLEMENTED**
 - ✅ **Plan Limits Configuration** (`lib/plan-limits.ts`):
@@ -181,11 +184,30 @@
   - `incrementUsageAfterAction`: Increment counters after successful operations
   - Error handling with upgrade prompts
 
-#### 12. **Clerk Implementation Gaps** 🟡
+#### 12. **Clerk Production Setup & Billing** ✅ **PRODUCTION READY**
+- ✅ **Production Clerk Instance**: Created and configured with production API keys
+- ✅ **Custom Domain Configuration**: `clerk.rolemirror.com` and `accounts.rolemirror.com` DNS verified
+- ✅ **Google OAuth**: Configured for production with OAuth credentials
+- ✅ **Stripe Integration**: Stripe account connected to Clerk production instance
+- ✅ **Payment Processing**: Credit card payments working in production
+- ✅ **Billing Enabled**: Clerk Billing configured with subscription plans
+- ✅ **Pricing Page**: Functional with live payment processing
+- ✅ **Environment Variables**: Production keys configured in Vercel (separate from dev)
+
+#### 13. **Clerk Implementation Gaps** 🟡
 - ❌ **Custom Sign-In/Sign-Up Pages**: Using Clerk's hosted pages (no `/sign-in` or `/sign-up` routes)
 - ❌ **User Profile Page**: No dedicated profile page (only UserButton dropdown)
-- 🟡 **Protected API Routes**: Auth utilities created, but API routes not yet updated with auth checks
+- ✅ **Protected API Routes**: All API routes now use server-side auth checks and usage limits (see "Protected API Routes (Server-Side Authentication)" below)
 - ❌ **Environment Variables Documentation**: No `.env.example` file documenting required Clerk variables
+
+#### 14. **Deployment to Vercel** ✅
+- ✅ **Production Deployment**: App deployed to Vercel with `vercel --prod` and project linked to Git repo
+- ✅ **Next.js Security Patching**: Upgraded to Next.js `15.5.7` per the React2Shell security bulletin
+- ✅ **Serverless PDF Generation**: `puppeteer-core` + `@sparticuz/chromium` configured for Vercel, with `vercel.json` function timeout and `AWS_LAMBDA_JS_RUNTIME` support for Chromium
+- ✅ **Environment Variables on Vercel**: OpenAI, Clerk, Convex, webhook secrets, and PDF-related env vars configured for Production/Preview/Development
+- ✅ **Custom Domain Ready**: Deployment and DNS steps documented in `VERCEL_DEPLOYMENT_CHANGES.md` for Namecheap → Vercel setup
+- ✅ **Production Clerk Environment**: Production Clerk keys (`pk_live_...`, `sk_live_...`) configured separately from dev keys
+- ✅ **Production Convex Configuration**: Convex deployment configured with production Clerk Frontend API URL
 
 ---
 
@@ -807,7 +829,7 @@ const identity = await ctx.auth.getUserIdentity();
 
 **Areas for Enhancement:**
 - 🔴 **High Priority**:
-  - 🟡 Protected API routes with server-side authentication (utilities created, routes need updating)
+  - *(none — core flows, authentication, usage limits, and deployment are implemented)*
 - 🟡 **Medium Priority**:
   - Resume match score and progress tracking
   - Theme-based keyword grouping
@@ -829,6 +851,9 @@ The app has moved beyond just showing keywords to providing meaningful, actionab
 
 **Latest Implementation Updates** (as of latest codebase review):
 - ✅ **Subscription Tier Checking & Usage Limits**: Fully implemented with plan limits, usage tracking, Clerk webhook integration, frontend hooks, UI components, and API utilities
-- 🟡 **Protected API Routes**: Auth and usage utilities created, but API routes still need to be updated to use them (security gap remains)
+- ✅ **Protected API Routes**: All API routes now enforce server-side authentication and usage limits
 - ✅ **Error Handling**: Comprehensive error handling utilities with consistent response format
 - ✅ **Billing Period Management**: Automatic billing period calculation and reset based on subscription start date
+- ✅ **Production Payments**: Stripe account connected to Clerk production instance, credit card payments working
+- ✅ **Production Clerk Setup**: Production instance configured with custom domains, Google OAuth, and billing enabled
+- ✅ **Production Deployment**: Full production environment operational with separate dev/prod configurations
