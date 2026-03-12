@@ -266,11 +266,87 @@ Walk through them in this order:
        - You're using the **production** Clerk instance (not development).
        - The OAuth consent screen is published (if you're outside the test users list).
   
-  **For other social providers** (GitHub, etc.):
+  **To set up GitHub OAuth for production:**
+  
+  1. **In Clerk Dashboard** (production instance):
+     - Go to **Configure → User & authentication → Social connections**.
+     - Find **GitHub** in the list and click **Configure** or **Set up**.
+     - Clerk will show one or more **Redirect URI(s)** that you must add in GitHub.
+     - Leave the **Client ID** and **Client Secret** fields empty for now.
+  
+  2. **Create an OAuth app in GitHub**:
+     - Sign in to GitHub and go to **Settings → Developer settings → OAuth Apps**.
+       - For a personal GitHub account: click your profile → **Settings** → **Developer settings** → **OAuth Apps**.
+       - For a GitHub organization: go to the org → **Settings** → **Developer settings** → **OAuth Apps**.
+     - Click **New OAuth App**.
+     - Fill in:
+       - **Application name**: e.g. `RoleMirror Production` or `AI Resume Gen Production`.
+       - **Homepage URL**: `https://rolemirror.com`.
+       - **Authorization callback URL**: paste the **exact redirect URI** that Clerk showed for GitHub (from step 1).
+         - This typically looks like:
+           - `https://accounts.rolemirror.com/v1/oauth_callback` (if using custom Account Portal domain), or
+           - `https://<your-instance>.clerk.accounts.dev/v1/oauth_callback` (if using the default Clerk domain).
+     - Click **Register application**.
+     - After the app is created:
+       - Copy the **Client ID**.
+       - Click **Generate a new client secret** (or **Generate client secret**) and copy the **Client secret**.
+  
+  3. **Add GitHub credentials to Clerk**:
+     - Go back to Clerk Dashboard → **Configure → User & authentication → Social connections → GitHub**.
+     - Paste the **Client ID** from GitHub into the **Client ID** field.
+     - Paste the **Client secret** from GitHub into the **Client Secret** field.
+     - Click **Save** or **Apply**.
+     - GitHub should now show as **Configured** or display a green checkmark.
+  
+  4. **Test GitHub sign-in**:
+     - Go to your production site (`https://rolemirror.com`).
+     - Try signing in with GitHub.
+     - If you see errors:
+       - Confirm the **Authorization callback URL** in GitHub **exactly matches** the redirect URI Clerk shows.
+       - Make sure you're editing the **production** Clerk instance.
+       - If you changed domains (e.g. added `accounts.rolemirror.com`), re-check that both Clerk and GitHub are using the same URL.
+ 
+ TODO:
+  **To set up LinkedIn OAuth for production:**
+ 
+  1. **In Clerk Dashboard** (production instance):
+     - Go to **Configure → User & authentication → Social connections**.
+     - Find **LinkedIn** in the list and click **Configure** or **Set up**.
+     - Copy the **Redirect URI(s)** Clerk shows for LinkedIn (you’ll paste one into LinkedIn).
+     - Leave the **Client ID** and **Client Secret** fields empty for now.
+ 
+  2. **Create a LinkedIn application**:
+     - Go to the [LinkedIn Developer Portal](https://www.linkedin.com/developers/).
+     - Click **Create app** (or select an existing app if you already created one for production).
+     - Fill in the basic app details (name, company, logo, etc.) and submit.
+     - Once the app is created, open it and:
+       - Go to the **Auth** or **Authentication** section.
+       - Under **OAuth 2.0 / Redirect URLs**, add the **exact Redirect URI** that Clerk showed for LinkedIn, typically:
+         - `https://accounts.rolemirror.com/v1/oauth_callback` (if using the custom Account Portal domain), or
+         - `https://<your-instance>.clerk.accounts.dev/v1/oauth_callback` (if using the default Clerk domain).
+       - Save your changes.
+     - In the same section, copy the **Client ID** and **Client Secret** that LinkedIn generates.
+ 
+  3. **Add LinkedIn credentials to Clerk**:
+     - Go back to Clerk Dashboard → **Configure → User & authentication → Social connections → LinkedIn**.
+     - Paste the **Client ID** from LinkedIn into the **Client ID** field.
+     - Paste the **Client Secret** from LinkedIn into the **Client Secret** field.
+     - Click **Save** or **Apply**.
+     - LinkedIn should now show as **Configured** or display a green checkmark.
+ 
+  4. **Test LinkedIn sign-in**:
+     - Go to your production site (`https://rolemirror.com`).
+     - Try signing in with LinkedIn.
+     - If you see errors:
+       - Confirm the **Redirect URL** in LinkedIn **exactly matches** the Redirect URI Clerk shows.
+       - Make sure you’re using the **production** Clerk instance and the correct LinkedIn app (not a dev/sandbox app).
+       - If you updated domains, re-check that both Clerk and LinkedIn are using the same redirect URL.
+ 
+  **For other social providers** (e.g. X/Twitter, Facebook, Microsoft):**
   - Follow the same pattern:
     1. Configure the provider in Clerk (get the redirect URI).
-    2. Create OAuth app in the provider's developer console.
-    3. Add the redirect URI from Clerk to the provider's allowed redirect URIs.
+    2. Create an OAuth app in the provider's developer console.
+    3. Add the redirect URI from Clerk to the provider's allowed/redirect URIs.
     4. Copy the client ID and secret back to Clerk.
   
   **Important Notes:**

@@ -18,7 +18,6 @@ const clerkDomains = [
   'https://clerk.rolemirror.com',
   
   // Development Clerk instance - REPLACE THIS WITH YOUR DEV DOMAIN
-  // Uncomment and replace with your actual dev Clerk Frontend API URL:
   'https://handy-boxer-42.clerk.accounts.dev',
   
   // Optional: Also check Convex environment variable (if set in Convex dashboard)
