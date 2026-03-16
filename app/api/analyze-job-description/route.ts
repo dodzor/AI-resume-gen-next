@@ -10,6 +10,123 @@ function getOpenAIClient() {
   });
 }
 
+/**
+ * Attempts to fix common JSON issues that LLMs sometimes produce
+ */
+function fixCommonJSONIssues(jsonString: string): string {
+  let fixed = jsonString.trim();
+  
+  // Remove markdown code blocks if present
+  fixed = fixed.replace(/^```json\s*/i, '');
+  fixed = fixed.replace(/^```\s*/, '');
+  fixed = fixed.replace(/\s*```$/g, '');
+  
+  // Remove any leading/trailing whitespace
+  fixed = fixed.trim();
+  
+  // Try to extract JSON object if there's extra text
+  const jsonMatch = fixed.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    fixed = jsonMatch[0];
+  }
+  
+  // Fix trailing commas in arrays: [item1, item2,]
+  fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
+  
+  // Fix trailing commas in objects: {"key": "value",}
+  fixed = fixed.replace(/,(\s*})/g, '$1');
+  
+  // Fix missing commas between array elements: ["a" "b"] -> ["a", "b"]
+  fixed = fixed.replace(/(")\s+(")/g, '$1, $2');
+  
+  // Fix missing commas between object properties: {"a": 1 "b": 2} -> {"a": 1, "b": 2}
+  fixed = fixed.replace(/(\d+)\s+(")/g, '$1, $2');
+  fixed = fixed.replace(/(})\s+(")/g, '$1, $2');
+  fixed = fixed.replace(/(])\s+(")/g, '$1, $2');
+  
+  // Fix unescaped quotes in strings (basic attempt)
+  // This is tricky, so we'll be conservative
+  
+  return fixed;
+}
+
+/**
+ * Robust JSON parser with multiple fallback strategies
+ */
+function parseJSONWithFallback<T>(
+  rawText: string,
+  defaultValue: T,
+  context: string = 'JSON'
+): T {
+  if (!rawText || !rawText.trim()) {
+    console.warn(`${context}: Empty input, using default value`);
+    return defaultValue;
+  }
+  
+  const strategies = [
+    // Strategy 1: Direct parse
+    () => {
+      const cleaned = rawText.trim();
+      return JSON.parse(cleaned);
+    },
+    
+    // Strategy 2: Remove markdown and parse
+    () => {
+      let cleaned = rawText.trim();
+      cleaned = cleaned.replace(/^```json\s*/i, '');
+      cleaned = cleaned.replace(/^```\s*/, '');
+      cleaned = cleaned.replace(/\s*```$/g, '');
+      cleaned = cleaned.trim();
+      return JSON.parse(cleaned);
+    },
+    
+    // Strategy 3: Extract JSON object and parse
+    () => {
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      throw new Error('No JSON object found');
+    },
+    
+    // Strategy 4: Fix common issues and parse
+    () => {
+      const fixed = fixCommonJSONIssues(rawText);
+      return JSON.parse(fixed);
+    },
+    
+    // Strategy 5: Extract JSON and fix issues
+    () => {
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const fixed = fixCommonJSONIssues(jsonMatch[0]);
+        return JSON.parse(fixed);
+      }
+      throw new Error('No JSON object found after fixing');
+    },
+  ];
+  
+  // Try each strategy
+  for (let i = 0; i < strategies.length; i++) {
+    try {
+      const result = strategies[i]();
+      console.log(`${context}: Successfully parsed using strategy ${i + 1}`);
+      return result as T;
+    } catch (error: any) {
+      if (i === strategies.length - 1) {
+        // Last strategy failed, log the error with context
+        console.error(`${context}: All parsing strategies failed`);
+        console.error(`${context}: Original text (first 500 chars):`, rawText.substring(0, 500));
+        console.error(`${context}: Parse error:`, error.message);
+      }
+    }
+  }
+  
+  // All strategies failed, return default
+  console.warn(`${context}: Using default value after all parsing strategies failed`);
+  return defaultValue;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // 1. Authenticate user
@@ -228,36 +345,26 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
       tone = 'mid'; // Default to mid if unclear
     }
 
-    // Get keywords and parse JSON
-    let keywordsText = keywordsCompletion.choices[0].message.content.trim();
-    console.log('Keywords text:', keywordsText);
+    // Get keywords and parse JSON with robust fallback
+    const keywordsText = keywordsCompletion.choices[0].message.content;
+    console.log('Keywords text (first 500 chars):', keywordsText.substring(0, 500));
     
-    // Remove markdown code blocks if present
-    keywordsText = keywordsText.replace(/^```json\s*|\s*```$/g, '');
-    keywordsText = keywordsText.replace(/^```\s*|\s*```$/g, '');
+    const defaultKeywords = {
+      technicalSkills: [],
+      toolsFrameworks: [],
+      methodologies: [],
+      domainTerms: [],
+      qualifications: [],
+      responsibilities: []
+    };
     
-    let categorizedKeywords;
-    try {
-      categorizedKeywords = JSON.parse(keywordsText);
-      console.log('Categorized keywords:', categorizedKeywords);
-    } catch (error) {
-      console.error('Failed to parse keywords JSON:', error);
-      // Fallback: try to extract JSON from the response
-      const jsonMatch = keywordsText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        categorizedKeywords = JSON.parse(jsonMatch[0]);
-      } else {
-        // Ultimate fallback: return empty categories
-        categorizedKeywords = {
-          technicalSkills: [],
-          toolsFrameworks: [],
-          methodologies: [],
-          domainTerms: [],
-          qualifications: [],
-          responsibilities: []
-        };
-      }
-    }
+    const categorizedKeywords = parseJSONWithFallback(
+      keywordsText,
+      defaultKeywords,
+      'Keywords parsing'
+    );
+    
+    console.log('Categorized keywords:', categorizedKeywords);
 
     // Helper function to extract keyword string from either format (string or {keyword, count} object)
     const extractKeyword = (item: any): string => {
@@ -391,33 +498,23 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
     // Extract just the keywords in sorted order (for backward compatibility)
     const sortedKeywords = keywordsWithCounts.map(item => item.keyword);
 
-    // Parse themes data
-    let themesText = themesCompletion.choices[0].message.content.trim();
-    console.log('Themes text:', themesText);
+    // Parse themes data with robust fallback
+    const themesText = themesCompletion.choices[0].message.content;
+    console.log('Themes text (first 500 chars):', themesText.substring(0, 500));
     
-    // Remove markdown code blocks if present
-    themesText = themesText.replace(/^```json\s*|\s*```$/g, '');
-    themesText = themesText.replace(/^```\s*|\s*```$/g, '');
+    const defaultThemes = {
+      themes: [],
+      recommendations: [],
+      summary: ""
+    };
     
-    let themesData;
-    try {
-      themesData = JSON.parse(themesText);
-      console.log('Themes data:', themesData);
-    } catch (error) {
-      console.error('Failed to parse themes JSON:', error);
-      // Fallback: try to extract JSON from the response
-      const jsonMatch = themesText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        themesData = JSON.parse(jsonMatch[0]);
-      } else {
-        // Ultimate fallback: return empty themes
-        themesData = {
-          themes: [],
-          recommendations: [],
-          summary: ""
-        };
-      }
-    }
+    const themesData = parseJSONWithFallback(
+      themesText,
+      defaultThemes,
+      'Themes parsing'
+    );
+    
+    console.log('Themes data:', themesData);
 
     // Ensure all theme fields exist
     const themes = {
@@ -451,6 +548,7 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
   } catch (error: any) {
     console.error('OpenAI API Error:', error);
     
+    // Handle specific OpenAI API errors
     if (error.code === 'insufficient_quota') {
       return NextResponse.json(
         { 
@@ -471,10 +569,26 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
       );
     }
 
+    // Check if it's a JSON parsing error (shouldn't happen with new fallback, but just in case)
+    if (error.message && error.message.includes('JSON')) {
+      console.error('JSON parsing error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+      return NextResponse.json(
+        { 
+          error: 'Analysis Error',
+          message: 'We encountered an issue processing the job description. Please try again with a slightly different description, or contact support if the problem persists.' 
+        },
+        { status: 500 }
+      );
+    }
+
+    // Generic error response with user-friendly message
     return NextResponse.json(
       { 
-        error: 'Internal Server Error',
-        message: error.message || 'An unexpected error occurred' 
+        error: 'Analysis Error',
+        message: 'We encountered an issue analyzing the job description. Please try again, or contact support if the problem persists.' 
       },
       { status: 500 }
     );
