@@ -7,6 +7,7 @@ import { Id } from '@/convex/_generated/dataModel'
 import Result from './result'
 import Form from './form'
 import ResumeSwitcher from './ResumeSwitcher'
+import { UserButton } from '@clerk/nextjs'
 import { useUsageLimits } from '@/hooks/useUsageLimits'
 import UpgradeModal from './UpgradeModal'
 
@@ -359,43 +360,66 @@ export default function Content() {
       <>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="max-w-[1920px] mx-auto">
-          {/* Header */}
-          <div className="text-center py-6 px-4 sm:px-6">
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-2">🤖 AI Resume Generator</h1>
-            <p className="text-gray-600 text-base sm:text-lg">Paste a job description. We show you exactly what your resume needs to say — and why.</p>
-            
-            {/* Resume Switcher */}
-            {showResumeSwitcher && (
-              <div className="mt-4 flex justify-center">
-                <ResumeSwitcher
-                  resumes={resumes}
-                  currentResumeId={currentResumeId}
-                  onSelectResume={handleSelectResume}
-                  onCreateNew={handleCreateNew}
-                  isLoading={isLoadingResume}
-                />
-              </div>
-            )}
-            
-            {/* Auto-save status indicator */}
-            {hasStartedEditing && !isLoadingResume && (
-              <div className="mt-2 text-sm text-gray-500">
-                {isSaving ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="animate-spin">💾</span>
-                    <span>Saving...</span>
+          {/* Navigation bar */}
+          <header className="relative border-b border-gray-200 bg-white/80 backdrop-blur">
+            <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 pr-14 sm:px-6 sm:pr-16">
+              {/* Left: Brand */}
+              <div className="min-w-0 flex shrink-0 items-center gap-2">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
+                  <span className="text-lg font-semibold">RM</span>
+                </div>
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-base font-semibold tracking-tight text-slate-900">
+                    RoleMirror
                   </span>
-                ) : lastSaved ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span>✓</span>
-                    <span>Saved {lastSaved.toLocaleTimeString()}</span>
+                  <span className="text-xs text-gray-500">
+                    Job description intelligence
                   </span>
-                ) : null}
+                </div>
               </div>
-            )}
-          </div>
-  
-          <div className="px-4 sm:px-6 pb-6">
+
+              {/* Right: Resume switcher + autosave (reserve space for UserButton) */}
+              <div className="flex min-w-0 flex-1 flex-col items-end gap-1 text-right">
+                {showResumeSwitcher && (
+                  <ResumeSwitcher
+                    resumes={resumes}
+                    currentResumeId={currentResumeId}
+                    onSelectResume={handleSelectResume}
+                    onCreateNew={handleCreateNew}
+                    isLoading={isLoadingResume}
+                  />
+                )}
+
+                {hasStartedEditing && !isLoadingResume && (
+                  <div className="text-[11px] text-gray-500">
+                    {isSaving ? (
+                      <span className="flex items-center justify-end gap-1.5">
+                        <span className="animate-spin">💾</span>
+                        <span>Saving...</span>
+                      </span>
+                    ) : lastSaved ? (
+                      <span className="flex items-center justify-end gap-1.5">
+                        <span>✓</span>
+                        <span>Saved {lastSaved.toLocaleTimeString()}</span>
+                      </span>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* Pinned to the right edge of the header bar */}
+            <div className="absolute right-4 top-1/2 z-10 -translate-y-1/2 sm:right-6">
+              <UserButton
+                appearance={{
+                  elements: {
+                    userButtonAvatarBox: 'h-9 w-9',
+                  },
+                }}
+              />
+            </div>
+          </header>
+
+          <div className="px-4 pt-8 sm:px-6 pb-6">
             {isLoadingResume ? (
               <div className="max-w-5xl mx-auto mt-12 text-center">
                 <div className="animate-spin text-4xl mb-4">⏳</div>
@@ -479,7 +503,7 @@ export default function Content() {
   
           {/* Footer */}
           <div className="text-center py-6 px-4 text-gray-500 text-sm">
-            <p>Powered by AI • Generate professional resumes in seconds</p>
+            <p>© 2026 RoleMirror. All rights reserved.</p>
           </div>
         </div>
       </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { Authenticated, Unauthenticated } from 'convex/react'
-import { SignInButton, UserButton } from '@clerk/nextjs'
+import { SignInButton } from '@clerk/nextjs'
 
 import Content from '../components/content'
 
@@ -44,7 +44,8 @@ function LandingPage() {
         <section className="grid gap-10 md:grid-cols-2 md:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
-              AI-POWERED RESUME COACH
+              {/* AI-POWERED RESUME COACH */}
+              Job description intelligence
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 md:text-3xl lg:text-4xl">
               Mirror the role. Get the interview.
@@ -482,9 +483,6 @@ export default function Home() {
   return (
     <>
       <Authenticated>
-        <div className="flex justify-end p-4">
-          <UserButton />
-        </div>
         <Content />
       </Authenticated>
       <Unauthenticated>

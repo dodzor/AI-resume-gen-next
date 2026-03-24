@@ -207,7 +207,45 @@
 - ✅ **Custom Domain Ready**: Deployment and DNS steps documented in `VERCEL_DEPLOYMENT_CHANGES.md` for Namecheap → Vercel setup
 - ✅ **Production Clerk Environment**: Production Clerk keys (`pk_live_...`, `sk_live_...`) configured separately from dev keys
 - ✅ **Production Convex Configuration**: Convex deployment configured with production Clerk Frontend API URL
- - ✅ **Vercel Analytics**: `@vercel/analytics` installed and `<Analytics />` component added to `app/layout.tsx` to automatically track page views across all routes
+- ✅ **Vercel Analytics**: `@vercel/analytics` installed and `<Analytics />` component added to `app/layout.tsx` to automatically track page views across all routes
+
+#### 15. **Marketing Homepage & Hero Experience** ✅
+- ✅ **Unauthenticated Landing Page**: `app/page.tsx` now shows a marketing homepage for signed-out users, while authenticated users still see the in-app resume experience.
+- ✅ **Hero Section**:
+  - Headline: "Mirror the role. Get the interview."
+  - Subheadline: Explains that users paste a job description and see exactly what their resume needs to say and why.
+  - Primary CTA: "Analyze a job description" opens the Clerk sign-in modal.
+  - Supporting copy contrasting RoleMirror with traditional resume tools (formatting/templates vs. role alignment).
+- ✅ **Job Analysis Preview**:
+  - Right-side hero card visually previews analysis output: seniority & tone, top keywords, themes, and a "Resume Match Score" metric.
+  - Emphasizes theme extraction and what the role actually values, not just keywords.
+- ✅ **Before / After Transformation Section**:
+  - Three clear steps: 1) Job description pasted → 2) RoleMirror analysis → 3) Resume rewritten to match the role.
+  - Before/after bullet example styled as a wide card showing how vague bullets become specific, impact-focused lines.
+  - Copy reinforces the differentiator: "Resume tools help you write resumes. RoleMirror helps you understand what the job actually wants."
+- ✅ **Coach & Feature Grid**:
+  - "Your personal resume alignment coach" section with feature cards:
+    - Instant job analysis
+    - Targeted resume rewrites
+    - Keyword & theme coverage
+    - ATS optimization
+    - Usage-based freemium (with free-tier limits called out)
+  - Cards use strengthened borders and shadows for clear contrast.
+- ✅ **Deep-Dive + How It Works**:
+  - Explains how RoleMirror goes beyond keyword matching to capture themes like ownership, systems, mentorship.
+  - "How it works" list matches the product flow:
+    - 1️⃣ Paste a job description
+    - 2️⃣ RoleMirror analyzes keywords, themes and expectations
+    - 3️⃣ Rewrite your resume to match the role
+- ✅ **Social Proof & Testimonials**:
+  - Three testimonials (Senior Software Engineer, Product Designer, Data Scientist) highlighting gaps RoleMirror uncovered and the resulting interview uplift.
+- ✅ **CTAs & Pricing Hook**:
+  - Consistent CTA language ("Analyze a job description").
+  - Free plan messaging embedded in the feature grid (3 job analyses + 3 AI rewrites/month).
+- ✅ **Visual & UX Polish**:
+  - Section spacing tuned (`mt-20` / `mt-16`) for clearer separation.
+  - Card contrast improved via `border-slate-300` and `shadow-md`/`hover:shadow-lg`.
+  - Step arrows and centered labels clarify flows without overwhelming the layout.
 
 ---
 
