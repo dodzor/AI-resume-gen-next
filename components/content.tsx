@@ -47,6 +47,12 @@ const LAST_EDITED_RESUME_KEY = 'lastEditedResumeId'
 const LOADED_RESUME_DATA_KEY = 'loadedResumeData'
 
 export default function Content() {
+    const debugLog = (...args: any[]) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[ResumeFlowDebug]', ...args)
+      }
+    }
+
     // Form state - lifted up to parent
     const [formData, setFormData] = useState(getDefaultFormData())
     
@@ -85,15 +91,27 @@ export default function Content() {
     const isInitialMount = useRef(true)
     const isLoadingFromConvex = useRef(false)
     const lastLoadedResumeId = useRef<string | null>(null)
+    const justCreatedResumeId = useRef<string | null>(null)
     
     // Save function - called when user navigates steps
     const handleSave = useCallback(async () => {
       // Don't save if still loading from Convex
       if (isLoadingFromConvex.current) {
+        debugLog('handleSave:skipped:isLoadingFromConvex', {
+          currentResumeId,
+          currentStep,
+          maxStepReached,
+        })
         return
       }
       
       try {
+        debugLog('handleSave:start', {
+          currentResumeId,
+          currentStep,
+          maxStepReached,
+          name: formData.name,
+        })
         setIsSaving(true)
         const resumeId = await saveResume({
           resumeId: currentResumeId ?? undefined,
@@ -124,9 +142,23 @@ export default function Content() {
         setCurrentResumeId(resumeId)
         setLastSaved(new Date())
         setHasStartedEditing(true)
+        debugLog('handleSave:success', {
+          previousResumeId: currentResumeId,
+          savedResumeId: resumeId,
+          currentStep,
+          maxStepReached,
+        })
         
         // Hide preview when creating a new resume
         if (!currentResumeId && resumeId) {
+          // Mark this resume as newly created so load effect does not
+          // overwrite step navigation that happens right after first save.
+          justCreatedResumeId.current = resumeId
+          debugLog('handleSave:firstCreate', {
+            justCreatedResumeId: resumeId,
+            currentStep,
+            maxStepReached,
+          })
           setShowPreview(false)
         }
         
@@ -142,6 +174,14 @@ export default function Content() {
         }
       } catch (error: any) {
         console.error('Failed to save resume:', error)
+        debugLog('handleSave:error', {
+          error: error?.message,
+          code: error?.code,
+          upgradeRequired: error?.upgradeRequired,
+          currentResumeId,
+          currentStep,
+          maxStepReached,
+        })
         
         // Check if error is due to usage limit
         if (error?.upgradeRequired || error?.code === 'USAGE_LIMIT_EXCEEDED') {
@@ -160,9 +200,16 @@ export default function Content() {
       const loadResume = async () => {
         if (resumes === undefined) {
           // Still loading resumes
+          debugLog('loadResume:waitingForResumes')
           return
         }
         
+        debugLog('loadResume:start', {
+          resumesCount: resumes.length,
+          currentResumeId,
+          currentStep,
+          maxStepReached,
+        })
         setIsLoadingResume(true)
         isLoadingFromConvex.current = true
         
@@ -187,10 +234,15 @@ export default function Content() {
           
           // 3. Load the resume
           if (resumeToLoad) {
+            debugLog('loadResume:resumeSelected', {
+              resumeToLoad,
+              reason: lastEditedId === resumeToLoad ? 'localStorage' : 'mostRecent',
+            })
             setCurrentResumeId(resumeToLoad)
             // The getResume query will be called automatically via useQuery
           } else {
             // No resumes exist - start with empty form
+            debugLog('loadResume:noResumes:resetToDefaults')
             setFormData(getDefaultFormData())
             setCurrentResumeId(null)
             setCurrentStep(1)
@@ -200,6 +252,12 @@ export default function Content() {
           }
         } catch (error) {
           console.error('Error loading resume:', error)
+          debugLog('loadResume:error', {
+            error,
+            currentResumeId,
+            currentStep,
+            maxStepReached,
+          })
           setFormData(getDefaultFormData())
           setCurrentResumeId(null)
           isLoadingFromConvex.current = false
@@ -215,6 +273,15 @@ export default function Content() {
       if (currentResumeId && getResume) {
         // Check if we're actually switching to a different resume
         const isSwitchingResume = lastLoadedResumeId.current !== currentResumeId
+        debugLog('hydrateResume:start', {
+          currentResumeId,
+          lastLoadedResumeId: lastLoadedResumeId.current,
+          isSwitchingResume,
+          currentStep,
+          maxStepReached,
+          savedMaxStep: getResume.maxStepReached,
+          justCreatedResumeId: justCreatedResumeId.current,
+        })
         
         isLoadingFromConvex.current = true
         
@@ -263,18 +330,38 @@ export default function Content() {
           _id: currentResumeId
         })
         
+        const isJustCreatedResume = justCreatedResumeId.current === currentResumeId
+
         // Only restore step position when actually switching resumes, not when navigating
-        if (isSwitchingResume) {
+        if (isSwitchingResume && !isJustCreatedResume) {
           // Restore maxStepReached and set currentStep to next step
-          const savedMaxStep = getResume.maxStepReached || 0
+          const savedMaxStep = Math.max(1, getResume.maxStepReached || 1)
           setMaxStepReached(savedMaxStep)
           // Set currentStep to maxStepReached or 8 if it's greater than 8
           const nextStep = savedMaxStep >= 8 ? 8 : savedMaxStep
+          debugLog('hydrateResume:restoreStep', {
+            currentResumeId,
+            savedMaxStep,
+            nextStep,
+            currentStepBeforeSet: currentStep,
+          })
           setCurrentStep(nextStep)
         } else {
           // Just restore maxStepReached without changing currentStep
-          const savedMaxStep = getResume.maxStepReached || 0
+          const savedMaxStep = Math.max(1, getResume.maxStepReached || 1)
           setMaxStepReached(savedMaxStep)
+          debugLog('hydrateResume:preserveCurrentStep', {
+            currentResumeId,
+            savedMaxStep,
+            currentStepPreserved: currentStep,
+            isSwitchingResume,
+            isJustCreatedResume,
+          })
+        }
+
+        if (isJustCreatedResume) {
+          debugLog('hydrateResume:clearJustCreatedFlag', { currentResumeId })
+          justCreatedResumeId.current = null
         }
         
         // Update the last loaded resume ID
@@ -287,9 +374,15 @@ export default function Content() {
         setTimeout(() => {
           isLoadingFromConvex.current = false
           setIsLoadingResume(false)
+          debugLog('hydrateResume:done', {
+            currentResumeId,
+            currentStep,
+            maxStepReached,
+          })
         }, 100)
       } else if (currentResumeId === null && resumes && resumes.length === 0) {
         // No resumes exist
+        debugLog('hydrateResume:none')
         isLoadingFromConvex.current = false
         setIsLoadingResume(false)
       }
@@ -312,6 +405,15 @@ export default function Content() {
         setShowPreview(true)
       }
     }, [currentStep, formData.name])
+
+    useEffect(() => {
+      debugLog('state:stepChanged', {
+        currentStep,
+        maxStepReached,
+        currentResumeId,
+        isLoadingFromConvex: isLoadingFromConvex.current,
+      })
+    }, [currentStep, maxStepReached, currentResumeId])
     
     // Handler for creating new resume
     const handleCreateNew = useCallback(() => {

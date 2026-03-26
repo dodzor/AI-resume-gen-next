@@ -224,7 +224,7 @@ Each keyword object must have both "keyword" (string) and "count" (number) field
 
     // Third, extract themes and recommendations
     const themesPrompt = `Analyze the following job posting and identify:
-1. The core themes and values emphasized (e.g., ownership, system design, mentorship, scale, innovation, collaboration)
+1. The core themes and values emphasized 
 2. What the resume should demonstrate (specific capabilities, experiences, or achievements)
 3. Why these matter for this role
 
@@ -241,7 +241,8 @@ Return a JSON object with this structure:
     "What your resume should show 2",
     "What your resume should show 3"
   ],
-  "summary": "One sentence explaining what this job emphasizes (e.g., 'This job emphasizes ownership and system design.')"
+  "summary": "One sentence explaining what this job emphasizes (e.g., 'This job emphasizes ownership and system design.').
+              Use concrete themes that appear in the job description; avoid generic phrases unless the posting actually uses them."
 }
 
 Focus on actionable insights that tell the candidate what to emphasize in their resume. Return ONLY valid JSON, no other text or explanations.`;
