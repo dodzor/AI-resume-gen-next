@@ -494,6 +494,49 @@
   - **Enables analytics**: Track feature usage per user
   - **Security vulnerability**: Currently a major security gap that must be fixed before production
 
+#### 3. **Free Resume Keyword Scanner + Resume Upload/PDF Parsing**
+- **Current State**:
+  - Job description analysis exists for authenticated users only.
+  - No public scanner flow exists.
+  - No resume upload + PDF text extraction flow exists.
+- **Improvement Goal**:
+  - Add a free public scanner page where users can:
+    - Upload a resume PDF (text-based PDFs in v1)
+    - Paste a job description
+    - Get a match score, missing keywords, and 2-3 insights
+  - Gate "full rewrite" behind signup/login as the conversion event.
+- **v1 Scope**:
+  - Public scanner page (no auth required for scan)
+  - PDF text parsing only (no OCR for scanned image PDFs)
+  - Deterministic scoring and keyword gap logic (simple and transparent)
+  - Signup CTA to unlock full rewrite in authenticated app flow
+- **Implementation Outline**:
+  - **A. Public Scanner UI**:
+    - Add a dedicated scanner page in `app/` with upload + job description input.
+    - Show output cards: match score, missing keywords, and concise insights.
+  - **B. PDF Parsing API**:
+    - New API route to parse uploaded PDF file and return extracted plain text.
+    - Validate file type, file size, and empty/non-text extraction cases.
+  - **C. Scanner Analysis API**:
+    - New API route to compare resume text against job description keywords.
+    - Return:
+      - `matchScore` (weighted keyword coverage)
+      - `missingKeywords` (prioritized by job description frequency)
+      - `insights` (2-3 actionable recommendations)
+  - **D. Conversion Path**:
+    - Add "Unlock full rewrite" CTA in scanner results.
+    - Route users to Clerk signup/login modal before entering full rewrite flow.
+- **Success Criteria**:
+  - Users can complete scan end-to-end in under 60 seconds.
+  - Scanner always returns deterministic output for the same inputs.
+  - Clear error messages for invalid PDFs and non-text PDFs.
+  - Signup CTA is visible immediately after free results.
+- **Impact**:
+  - Creates a strong top-of-funnel acquisition feature with immediate value.
+  - Introduces a concrete "try before signup" experience.
+  - Converts high-intent users into authenticated rewrite users.
+  - Closes the current product gap around resume upload/parsing.
+
 ### 🟡 Medium Priority Improvements
 
 #### 1. **Keyword Importance Scoring Beyond Count**
