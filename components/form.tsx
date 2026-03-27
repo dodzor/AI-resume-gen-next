@@ -97,7 +97,7 @@ export default function Form({
     // Track info icon hover state: key = `${experienceIndex}-${bulletIndex}`
     const [showInfoTooltip, setShowInfoTooltip] = useState<Record<string, boolean>>({})
     // Track tooltip positions: key = `${experienceIndex}-${bulletIndex}`
-    const [tooltipPositions, setTooltipPositions] = useState<Record<string, { top: number; right: number }>>({})
+    const [tooltipPositions, setTooltipPositions] = useState<Record<string, { top: number; left: number }>>({})
     // Track tone info tooltip visibility
     const [showToneInfoTooltip, setShowToneInfoTooltip] = useState(false)
     // Track tone tooltip position
@@ -1349,7 +1349,7 @@ export default function Form({
                             )}
                         </button>
                         {index < STEPS.length - 1 && (
-                            <div className={`w-16 h-1 mx-1 rounded-full transition-all duration-200 ${
+                            <div className={`${showPreview ? 'w-2 md:w-4 lg:w-8' : 'w-4 md:w-8 lg:w-16'} h-1 mx-0.5 md:mx-1 rounded-full transition-all duration-200 ${
                                 step.id <= maxStepReached ? 'bg-green-500' : 'bg-gray-200'
                             }`} />
                         )}
@@ -1979,8 +1979,8 @@ export default function Form({
                                                                                     setTooltipPositions((prev) => ({
                                                                                         ...prev,
                                                                                         [key]: { 
-                                                                                            top: rect.bottom + 4, 
-                                                                                            right: window.innerWidth - rect.right 
+                                                                                            top: Math.max(12, rect.top),
+                                                                                            left: Math.min(rect.right, window.innerWidth - 332)
                                                                                         }
                                                                                     }))
                                                                                 }}
@@ -2017,8 +2017,9 @@ export default function Form({
                                                                                         className="fixed w-80 bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-[9999] pointer-events-auto"
                                                                                         style={{ 
                                                                                             maxWidth: 'min(320px, calc(100vw - 2rem))',
-                                                                                            top: position ? `${position.top}px` : 'auto',
-                                                                                            right: position ? `${position.right}px` : '1rem',
+                                                                                            top: position ? `${position.top}px` : '1rem',
+                                                                                            left: position ? `${position.left}px` : '1rem',
+                                                                                            transform: position ? 'translateY(-100%)' : 'none',
                                                                                             bottom: position ? 'auto' : '1rem'
                                                                                         }}
                                                                                     >
