@@ -11,18 +11,22 @@ function LandingPage() {
     <div className="min-h-screen bg-background text-foreground">
       {/* Top Navigation */}
       <header className="border-b border-border bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 md:px-6">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white">
-              <span className="text-lg font-semibold">RM</span>
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg">
+              <img
+                src="/logo.jpg"
+                alt="RoleMirror"
+                className="h-full w-full object-contain"
+              />
             </div>
             <div className="flex flex-col">
-              <span className="text-base font-semibold tracking-tight">
+              {/* <span className="text-base font-semibold tracking-tight">
                 RoleMirror
               </span>
               <span className="text-xs text-muted-foreground">
                 AI resume alignment coach
-              </span>
+              </span> */}
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -96,9 +100,9 @@ function LandingPage() {
                 </button>
               </SignInButton> */}
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">
+            {/* <p className="mt-3 text-xs text-muted-foreground">
               Designed for real hiring managers. Stop guessing. Start aligning.
-            </p>
+            </p> */}
           </div>
 
           {/* Right: Product preview */}

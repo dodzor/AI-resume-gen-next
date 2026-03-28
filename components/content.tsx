@@ -464,20 +464,27 @@ export default function Content() {
         <div className="max-w-[1920px] mx-auto">
           {/* Navigation bar */}
           <header className="relative border-b border-gray-200 bg-white/80 backdrop-blur">
-            <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 pr-14 sm:px-6 sm:pr-16">
+            <div className="flex max-w-6xl items-center justify-between gap-4 px-4 pr-14 sm:px-6 sm:pr-16">
               {/* Left: Brand */}
               <div className="min-w-0 flex shrink-0 items-center gap-2">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
+                {/* <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
                   <span className="text-lg font-semibold">RM</span>
+                </div> */}
+                <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg">
+                  <img
+                    src="/logo-mirror.jpg"
+                    alt="RoleMirror"
+                    className="h-full w-full object-contain"
+                  />
                 </div>
-                <div className="flex min-w-0 flex-col">
+                {/* <div className="flex min-w-0 flex-col">
                   <span className="text-base font-semibold tracking-tight text-slate-900">
                     RoleMirror
                   </span>
                   <span className="text-xs text-gray-500">
                     Job description intelligence
                   </span>
-                </div>
+                </div> */}
               </div>
 
               {/* Right: Resume switcher + autosave (reserve space for UserButton) */}
