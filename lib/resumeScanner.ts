@@ -36,8 +36,11 @@ const STOP_WORDS = new Set([
 
 const HIGH_VALUE_KEYWORDS = new Set([
   // languages / frameworks
-  'php','laravel','symfony','javascript','typescript','node','nodejs', 'node.js', 'vue.js', 'vuejs', 'react', 'reactjs', 'angular', 'angularjs', 'next.js', 'nextjs', 'nuxt.js', 'nuxtjs', 'svelte', 'sveltejs', 'solid', 'solidjs', 'lit', 'litjs', 'preact', 'preactjs', 'ember', 'emberjs', 'backbone', 'backbonejs', 'knockout', 'knockoutjs', 'jquery', 'jqueryui', 'bootstrap', 'bootstrapjs', 'tailwind', 'tailwindcss', 'sass', 'scss', 'less', 'stylus', 'styluscss', 'postcss', 'postcsscss', 'css', 'html', 'html5', 'css3', 'css4', 'css5', 'css6', 'css7', 'css8', 'css9', 'css10', 'css11', 'css12', 'css13', 'css14', 'css15', 'css16', 'css17', 'css18', 'css19', 'css20', 'css21', 'css22', 'css23', 'css24', 'css25', 'css26', 'css27', 'css28', 'css29', 'css30', 'css31', 'css32', 'css33', 'css34', 'css35', 'css36', 'css37', 'css38', 'css39', 'css40', 'css41', 'css42', 'css43', 'css44', 'css45', 'css46', 'css47', 'css48', 'css49', 'css50', 'css51', 'css52', 'css53', 'css54', 'css55', 'css56', 'css57', 'css58', 'css59', 'css60', 'css61', 'css62', 'css63', 'css64', 'css65', 'css66', 'css67', 'css68', 'css69', 'css70', 'css71', 'css72', 'css73', 'css74', 'css75', 'css76', 'css77', 'css78', 'css79', 'css80', 'css81', 'css82', 'css83', 'css84', 'css85', 'css86', 'css87', 'css88', 'css89', 'css90', 'css91', 'css92', 'css93', 'css94', 'css95', 'css96', 'css97', 'css98', 'css99', 'css100',
-
+  'php','laravel','symfony','javascript','typescript','node','nodejs', 'node.js', 'vue.js', 'vuejs', 'react', 'reactjs', 
+  'angular', 'angularjs', 'next.js', 'nextjs', 'nuxt.js', 'nuxtjs', 'svelte', 'sveltejs', 'solid', 'solidjs', 'lit', 'litjs', 
+  'preact', 'preactjs', 'ember', 'emberjs', 'backbone', 'backbonejs', 'knockout', 'knockoutjs', 'jquery', 'jqueryui', 
+  'bootstrap', 'bootstrapjs', 'tailwind', 'tailwindcss', 'sass', 'scss', 'less', 'stylus', 'styluscss', 'postcss', 
+  'postcsscss', 'css', 'html', 'html5', 'nest.js',
   // databases
   'mysql','postgresql','sql','nosql','redis','mongodb','elasticsearch',
 
@@ -60,7 +63,7 @@ const HIGH_VALUE_KEYWORDS = new Set([
   'nginx','apache','linux','bash','queue','caching'
 ]);
 
-const ARCHITECTURE_PHRASES = [
+export const ARCHITECTURE_PHRASES = [
   'distributed systems',
   'event driven architecture',
   'event-driven architecture',
@@ -90,7 +93,7 @@ const ARCHITECTURE_PHRASES = [
   'architecture review'
 ];
 
-const RESPONSIBILITY_PHRASES = [
+export const RESPONSIBILITY_PHRASES = [
   'code reviews',
   'peer reviews',
   'technical roadmap',
@@ -115,29 +118,29 @@ const RESPONSIBILITY_PHRASES = [
   'architecture decisions'
 ];
 
-const CONCEPT_CLUSTERS = {
+export const CONCEPT_CLUSTERS = {
   architecture: [
-    'architecture','design','system','systems'
+    'architecture','architectures','design','designs','system','systems'
   ],
 
   scalability: [
-    'scale','scaling','highload','performance','latency','throughput'
+    'scale','scales','scaling','highload','performance','performances','latency','latencies','throughput','throughputs'
   ],
 
   event_driven: [
-    'event','events','kafka','rabbitmq','pubsub','queue','stream'
+    'event','events','kafka','rabbitmq','pubsub','queue','queues','stream','streams'
   ],
 
   cloud: [
-    'aws','gcp','azure','cloud','infrastructure'
+    'aws','gcp','azure','cloud','clouds','infrastructure','infrastructures'
   ],
 
   devops: [
-    'ci','cd','cicd','pipeline','deployment','docker','kubernetes'
+    'ci','cd','cicd','pipeline','pipelines','deployment','deployments','docker','kubernetes'
   ],
 
   data: [
-    'database','sql','nosql','redis','cache','caching'
+    'database','databases','sql','nosql','redis','cache','caches','caching'
   ]
 };
 

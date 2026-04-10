@@ -537,6 +537,49 @@
   - Converts high-intent users into authenticated rewrite users.
   - Closes the current product gap around resume upload/parsing.
 
+#### 4. **Deterministic keyword-quality layer (LLM candidates → filtered / ranked for UI)**
+
+- **Problem**:
+  - `/api/analyze-job-description` asks the model for **important** keywords, but the pipeline still **sorts globally by occurrence count** (and keeps AI-provided counts when present).
+  - Generic JD language (**technical**, **complex**, **experience**, **strong**, etc.) often appears **many times**, so it can float to the top of the UI even when it is **low hiring signal**.
+  - Users judge the product on what they **see first** in keyword badges and lists—so noisy top terms hurt trust.
+
+- **Intent (clarification)**:
+  - This is **not** a pre-step before calling the LLM. The flow stays: **LLM proposes a candidate keyword set** (per category) → **deterministic layer** runs on that output → **filtered / re-ranked keywords** are what the app displays and passes downstream.
+  - The LLM remains good at **recall** (“what might matter”); the deterministic layer enforces **precision** (“what we should prominently show”).
+
+- **Proposed pipeline (server-side, same route or shared module)**:
+  1. **Ingest**: After `categorizedKeywords` is parsed (and after optional backward-compat shaping), treat each `{ keyword, count }` as a **candidate** (per category and/or flattened).
+  2. **Normalize**: Lowercase, trim, dedupe (case-insensitive); preserve multi-word phrases as single tokens where the model returned them.
+  3. **Hard filter (blocklist)**: Drop or **demote** known junk / generic resume-JD filler (shared list aligned with `lib/resumeScanner.ts` stop-word / fluff patterns: e.g. *technical, complex, deep, strong, experience, excellent, team, collaboration* when used as standalone tokens—tune list to avoid false positives on legitimate compounds).
+  4. **Signal boost (whitelist / dictionary)**: Always **retain and boost** high-signal tech/domain terms (languages, clouds, frameworks, data stores, messaging, common infra patterns)—reuse or extend `HIGH_VALUE_KEYWORDS` / the same concept as the scanner’s dictionary.
+  5. **Frequency sanity check**: Recompute or validate counts with existing `countKeywordOccurrences(title + job)` (already in route) so **display order** is not blindly trusting inflated AI counts; use **max of consistent sources** or prefer server count when AI count is missing or suspect.
+  6. **Composite score (deterministic)**: Replace “sort by raw count only” with something like:
+     - `displayScore = w_signal * signalBoost + w_occurrence * occurrenceCount - w_generic * genericPenalty`
+     - Occurrence becomes a **weak** signal; dictionary / category fit becomes **strong**.
+  7. **Optional cluster consistency** (reuse `CONCEPT_CLUSTERS` idea from `resumeScanner.ts`): If multiple clusters fire in the JD, boost related candidates so “distributed systems + kafka + event-driven” doesn’t require an exact phrase match for related terms to rank well.
+  8. **Output shape for UI**:
+     - **Primary list**: Top N keywords by `displayScore` (what badges and “most important” rows show).
+     - **Secondary / collapsed**: Lower-scored or frequency-only terms (optional), so nothing feels “hidden” but the UI doesn’t lead with noise.
+
+- **Where to implement**:
+  - **Primary hook**: [`app/api/analyze-job-description/route.ts`](app/api/analyze-job-description/route.ts) after JSON parse of categorized keywords, **before** building the final sorted `keywordsWithCounts` / response payload.
+  - **Shared library (recommended)**: Extract reusable **filter + score** helpers into e.g. `lib/keywordQuality.ts` and import from both the analyze route and `lib/resumeScanner.ts` so scanner and app analysis don’t diverge.
+
+- **Frontend impact** ([`components/form.tsx`](components/form.tsx) and any keyword badge UI):
+  - Consume **tiered or re-ranked** fields from the API if exposed (e.g. `keywordsPrimary`, `keywordsSecondary`), or keep a single list that is already cleaned server-side (minimal UI change).
+  - Optional: label groups **“Core hiring keywords”** vs **“Other terms from the posting”** for clarity.
+
+- **Success criteria**:
+  - On representative backend/frontend JDs, **stack technologies and role-specific tools** appear in the **first screen** of keyword UI.
+  - Generic high-frequency adjectives and JD boilerplate **do not** dominate the top of the list.
+  - Behavior is **deterministic** for the same JD + same model output (aside from LLM variance).
+
+- **Impact**:
+  - Aligns visible keyword UX with the product promise: **“what actually matters for this role”** rather than **“what repeats most often.”**
+
+- **Implementation status**: ✅ **Implemented** in [`lib/keywordQuality.ts`](lib/keywordQuality.ts), integrated in [`app/api/analyze-job-description/route.ts`](app/api/analyze-job-description/route.ts). API response includes optional `keywordsPrimary` / `keywordsSecondary` for UI; `keywords` and `keywordsWithCounts` use quality-ranked order and verified counts.
+
 ### 🟡 Medium Priority Improvements
 
 #### 1. **Keyword Importance Scoring Beyond Count**
