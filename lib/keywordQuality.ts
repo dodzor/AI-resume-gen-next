@@ -637,7 +637,8 @@ type ProcessedCategory = {
 };
 
 type ProcessedCategories = {
-  technicalSkills: ProcessedCategory;
+  mustHaveTechnicalTerms: ProcessedCategory;
+  niceToHaveTechnicalTerms: ProcessedCategory;
   toolsFrameworks: ProcessedCategory;
   methodologies: ProcessedCategory;
   domainTerms: ProcessedCategory;
@@ -649,7 +650,8 @@ export function applyQualityToCategorizedKeywords(
   processedCategories: ProcessedCategories,
   quality: KeywordQualityResult
 ): {
-  technicalSkills: string[];
+  mustHaveTechnicalTerms: string[];
+  niceToHaveTechnicalTerms: string[];
   toolsFrameworks: string[];
   methodologies: string[];
   domainTerms: string[];
@@ -678,7 +680,8 @@ export function applyQualityToCategorizedKeywords(
   };
 
   return {
-    technicalSkills: sortCategory(processedCategories.technicalSkills),
+    mustHaveTechnicalTerms: sortCategory(processedCategories.mustHaveTechnicalTerms),
+    niceToHaveTechnicalTerms: sortCategory(processedCategories.niceToHaveTechnicalTerms),
     toolsFrameworks: sortCategory(processedCategories.toolsFrameworks),
     methodologies: sortCategory(processedCategories.methodologies),
     domainTerms: sortCategory(processedCategories.domainTerms),

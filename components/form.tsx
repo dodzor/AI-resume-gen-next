@@ -748,7 +748,17 @@ export default function Form({
             const keywords = data.keywords || [] // Already sorted by occurrence count
             const keywordsWithCounts = data.keywordsWithCounts || [] // Keywords with occurrence counts
             const keywordsByCategory = data.keywordsByCategory || {
-                technicalSkills: [],
+                mustHaveTechnicalTerms: [],
+                niceToHaveTechnicalTerms: [],
+                toolsFrameworks: [],
+                methodologies: [],
+                domainTerms: [],
+                qualifications: [],
+                responsibilities: []
+            }
+            const rawKeywordsByCategory = data.keywordsByCategoryRaw || {
+                mustHaveTechnicalTerms: data.technicalTerms?.mustHave || [],
+                niceToHaveTechnicalTerms: data.technicalTerms?.niceToHave || [],
                 toolsFrameworks: [],
                 methodologies: [],
                 domainTerms: [],
@@ -768,6 +778,7 @@ export default function Form({
                 keywords: keywords, // Already sorted by occurrence count from API
                 keywordsWithCounts: keywordsWithCounts, // Store counts for visual styling
                 keywordsByCategory: keywordsByCategory,
+                rawKeywordsByCategory: rawKeywordsByCategory,
                 themes: themes.themes,
                 recommendations: themes.recommendations,
                 thematicSummary: themes.summary
@@ -849,16 +860,70 @@ export default function Form({
     }
 
     const getSkillsRelevantKeywords = (): string[] => {
+        const rawCategories = formData.rawKeywordsByCategory
+        if (rawCategories) {
+            const mustHave = rawCategories.mustHaveTechnicalTerms || []
+            const niceToHave = rawCategories.niceToHaveTechnicalTerms || []
+            const toolsFrameworks = rawCategories.toolsFrameworks || []
+            return [...mustHave, ...niceToHave, ...toolsFrameworks]
+        }
+
         if (!formData.keywordsByCategory) {
-            // Fallback to flat keywords array if categories don't exist
             return formData.keywords || []
         }
-        
-        // Only include Technical skills and Tools & frameworks for Skills section
-        const technicalSkills = formData.keywordsByCategory.technicalSkills || []
-        const toolsFrameworks = formData.keywordsByCategory.toolsFrameworks || []
-        
-        return [...technicalSkills, ...toolsFrameworks]
+
+        const kbc = formData.keywordsByCategory as Record<string, string[] | undefined>
+        const mustHave = kbc.mustHaveTechnicalTerms || []
+        const niceToHave = kbc.niceToHaveTechnicalTerms || []
+        const legacyTechnical = kbc.technicalSkills || []
+        const toolsFrameworks = kbc.toolsFrameworks || []
+
+        if (mustHave.length > 0 || niceToHave.length > 0) {
+            return [...mustHave, ...niceToHave, ...toolsFrameworks]
+        }
+
+        return [...legacyTechnical, ...toolsFrameworks]
+    }
+
+    const getDisplayKeywordCategories = (): Array<{ label: string; keywords: string[] }> => {
+        const rawCategories = formData.rawKeywordsByCategory
+        const base = (formData.keywordsByCategory || {}) as Record<string, string[] | undefined>
+        const source: Record<string, string[] | undefined> = rawCategories
+            ? { ...base, ...rawCategories }
+            : { ...base }
+
+        const legacyTechnicalSkills = Array.isArray((source as { technicalSkills?: string[] }).technicalSkills)
+            ? (source as { technicalSkills: string[] }).technicalSkills
+            : []
+        const mustHave = Array.isArray(source.mustHaveTechnicalTerms) ? source.mustHaveTechnicalTerms : []
+        const niceToHave = Array.isArray(source.niceToHaveTechnicalTerms) ? source.niceToHaveTechnicalTerms : []
+        const effectiveMustHave =
+            mustHave.length > 0 || niceToHave.length > 0 ? mustHave : legacyTechnicalSkills
+
+        const categoryOrder: Array<{ key: string; label: string }> = [
+            { key: 'mustHaveTechnicalTerms', label: 'Must Have Technical Terms' },
+            { key: 'niceToHaveTechnicalTerms', label: 'Nice to Have Technical Terms' },
+            { key: 'toolsFrameworks', label: 'Tools & Frameworks' },
+            { key: 'methodologies', label: 'Methodologies' },
+            { key: 'domainTerms', label: 'Domain Terms' },
+            { key: 'qualifications', label: 'Qualifications' },
+            { key: 'responsibilities', label: 'Responsibilities' }
+        ]
+
+        return categoryOrder
+            .map(({ key, label }) => {
+                let keywords: string[] = []
+                if (key === 'mustHaveTechnicalTerms') {
+                    keywords = effectiveMustHave
+                } else if (Array.isArray(source[key])) {
+                    keywords = source[key] as string[]
+                }
+                return {
+                    label,
+                    keywords: keywords.filter((keyword: string) => typeof keyword === 'string' && keyword.trim().length > 0)
+                }
+            })
+            .filter((category) => category.keywords.length > 0)
     }
 
     const calculateKeywordCoverage = () => {
@@ -1550,7 +1615,7 @@ export default function Form({
                                     </div>
                                 )}
 
-                                {formData.keywords && formData.keywords.length > 0 && (
+                                {getDisplayKeywordCategories().length > 0 && (
                                     <div className="mt-4 pt-4 border-t border-blue-200">
                                         <div className="flex items-center space-x-2 mb-2">
                                             <label className="block text-sm font-medium text-gray-700">Extracted Keywords:</label>
@@ -1578,35 +1643,38 @@ export default function Form({
                                                 </svg>
                                             </button>
                                         </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {formData.keywords
-                                                .map((keyword: string, index: number) => {
-                                                    // Keywords are already sorted by occurrence count from API
-                                                    const count = countKeywordOccurrences(keyword)
-                                                    const item = { keyword, count }
-                                                    // Visual weight based on occurrence count
-                                                    const isHighPriority = item.count >= 3
-                                                    const isMediumPriority = item.count >= 1 && item.count < 3
-                                                    const isLowPriority = item.count === 0
-                                                    
-                                                    const badgeClass = isHighPriority
-                                                        ? 'px-3 py-1 bg-white border-2 border-blue-600 text-blue-700 rounded-full text-xs font-bold'
-                                                        : isMediumPriority
-                                                        ? 'px-3 py-1 bg-white border border-blue-300 text-blue-700 rounded-full text-xs font-medium'
-                                                        : 'px-3 py-1 bg-white border border-gray-300 text-gray-600 rounded-full text-xs font-normal italic'
-                                                    
-                                                    return (
-                                                        <span
-                                                            key={index}
-                                                            className={badgeClass}
-                                                            title={item.count === 0 
-                                                                ? 'Extracted keyword (not explicitly mentioned in job description)' 
-                                                                : `Appears ${item.count} time${item.count !== 1 ? 's' : ''} in job description`}
-                                                        >
-                                                            {item.keyword} ({item.count})
-                                                        </span>
-                                                    )
-                                                })}
+                                        <div className="space-y-3">
+                                            {getDisplayKeywordCategories().map((category, categoryIndex) => (
+                                                <div key={categoryIndex}>
+                                                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+                                                        {category.label}
+                                                    </p>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {category.keywords.map((keyword: string, keywordIndex: number) => {
+                                                            const count = countKeywordOccurrences(keyword)
+                                                            const isHighPriority = count >= 3
+                                                            const isMediumPriority = count >= 1 && count < 3
+                                                            const badgeClass = isHighPriority
+                                                                ? 'px-3 py-1 bg-white border-2 border-blue-600 text-blue-700 rounded-full text-xs font-bold'
+                                                                : isMediumPriority
+                                                                ? 'px-3 py-1 bg-white border border-blue-300 text-blue-700 rounded-full text-xs font-medium'
+                                                                : 'px-3 py-1 bg-white border border-gray-300 text-gray-600 rounded-full text-xs font-normal italic'
+
+                                                            return (
+                                                                <span
+                                                                    key={`${category.label}-${keywordIndex}-${keyword}`}
+                                                                    className={badgeClass}
+                                                                    title={count === 0
+                                                                        ? 'Extracted keyword (not explicitly mentioned in job description)'
+                                                                        : `Appears ${count} time${count !== 1 ? 's' : ''} in job description`}
+                                                                >
+                                                                    {keyword} ({count})
+                                                                </span>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                         
                                         {/* Keywords Info Tooltip */}
@@ -2662,44 +2730,44 @@ export default function Form({
                                     
                                     <div className="mt-4">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Suggested Keywords (Technical Skills & Tools)
+                                            Suggested Keywords (Raw Output by Category)
                                         </label>
-                                    <div className="flex flex-wrap gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                                        {skillsKeywords
-                                            .map((keyword: string) => ({
-                                                keyword,
-                                                count: countKeywordOccurrences(keyword),
-                                                isAdded: isKeywordInSkills(keyword)
-                                            }))
-                                            .sort((a: { keyword: string; count: number; isAdded: boolean }, b: { keyword: string; count: number; isAdded: boolean }) => {
-                                                // Sort: added keywords first, then by count
-                                                if (a.isAdded !== b.isAdded) {
-                                                    return a.isAdded ? 1 : -1
-                                                }
-                                                return b.count - a.count
-                                            })
-                                            .map((item: { keyword: string; count: number; isAdded: boolean }, index: number) => (
-                                            <button
-                                                key={index}
-                                                type="button"
-                                                onClick={() => !item.isAdded && addKeywordToSkills(item.keyword)}
-                                                disabled={item.isAdded}
-                                                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                                                    item.isAdded
-                                                        ? 'bg-green-100 border border-green-300 text-green-700 cursor-default'
-                                                        : 'bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400 cursor-pointer active:scale-95'
-                                                }`}
-                                                title={item.isAdded ? 'Already in your skills' : `Click to add "${item.keyword}" (appears ${item.count} time${item.count !== 1 ? 's' : ''} in job description)`}
-                                            >
-                                                {item.keyword}
-                                                {item.isAdded && (
-                                                    <span className="ml-1.5">✓</span>
-                                                )}
-                                            </button>
-                                        ))}
-                                </div>
+                                        <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
+                                            {getDisplayKeywordCategories().map((category, categoryIndex) => (
+                                                <div key={categoryIndex}>
+                                                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+                                                        {category.label}
+                                                    </p>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {category.keywords.map((keyword: string, keywordIndex: number) => {
+                                                            const count = countKeywordOccurrences(keyword)
+                                                            const isAdded = isKeywordInSkills(keyword)
+                                                            return (
+                                                                <button
+                                                                    key={`${category.label}-${keywordIndex}-${keyword}`}
+                                                                    type="button"
+                                                                    onClick={() => !isAdded && addKeywordToSkills(keyword)}
+                                                                    disabled={isAdded}
+                                                                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                                                                        isAdded
+                                                                            ? 'bg-green-100 border border-green-300 text-green-700 cursor-default'
+                                                                            : 'bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400 cursor-pointer active:scale-95'
+                                                                    }`}
+                                                                    title={isAdded ? 'Already in your skills' : `Click to add "${keyword}" (appears ${count} time${count !== 1 ? 's' : ''} in job description)`}
+                                                                >
+                                                                    {keyword}
+                                                                    {isAdded && (
+                                                                        <span className="ml-1.5">✓</span>
+                                                                    )}
+                                                                </button>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                 <p className="mt-2 text-xs text-gray-500">
-                                    Click on keywords to add them to your skills. Green badges indicate keywords already in your list.
+                                    Keywords are grouped by category from the raw extraction output. Click any keyword to add it to your skills.
                                 </p>
                                 </div>
                                 </>

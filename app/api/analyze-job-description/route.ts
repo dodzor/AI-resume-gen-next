@@ -213,6 +213,12 @@ Return ONLY one word: "junior", "mid", or "senior". Do not include any other tex
 - Required qualifications (certifications, degrees, specific requirements)
 - Key responsibilities (action verbs, responsibilities mentioned)
 
+**Technical terms requirement split (mandatory):**
+Extract ALL concrete technical terms into two arrays:
+- "mustHaveTechnicalTerms": terms required/preferred as core requirements (e.g. "What we're looking for", "Requirements", "Required", responsibilities that imply required stack)
+- "niceToHaveTechnicalTerms": terms explicitly listed as optional/bonus (e.g. "Nice to Have", "Preferred", "Plus")
+Do not skip terms because they appear only once. Keep exact standard names (e.g. AWS, Azure, GCP, Docker, Kafka, RabbitMQ, JWT, OAuth2, PostgreSQL).
+
 **Architecture & system design (must extract when the posting mentions them):**
 Include multi-word phrases and concepts exactly as they appear or in standard form, e.g. distributed systems, microservices, service-oriented architecture, event-driven architecture, system design, scalability, high availability, resilience, fault tolerance, load balancing, horizontal/vertical scaling, design patterns, SOLID principles, clean architecture, domain-driven design, DDD, CQRS, event sourcing, performance tuning, code quality. Place these in "methodologies" or "domainTerms" depending on whether they read as engineering practice vs system/domain emphasis.
 
@@ -220,10 +226,16 @@ Include multi-word phrases and concepts exactly as they appear or in standard fo
 Include phrases such as on-call rotation, incident response, production support, code reviews, peer reviews, mentoring, coaching, knowledge sharing, automated testing, test automation, stakeholder communication, cross-functional collaboration, technical roadmap, project ownership, technical leadership, architecture decisions. Place these primarily in "responsibilities"; use "qualifications" when framed as hard requirements.
 
 **Technology stack clusters (capture the full picture):**
-Extract related technologies as written: cloud platforms (AWS, GCP, Azure), containers and orchestration (Docker, Kubernetes), databases and stores (SQL, NoSQL, Redis, etc.), messaging and queues (Kafka, SQS, RabbitMQ, Pub/Sub), APIs (REST, GraphQL, OpenAPI), CI/CD and pipelines, monitoring/observability if named. Spread these across "technicalSkills", "toolsFrameworks", and "methodologies" as appropriate.
+Extract related technologies as written: cloud platforms (AWS, GCP, Azure), containers and orchestration (Docker, Kubernetes), databases and stores (SQL, NoSQL, Redis, etc.), messaging and queues (Kafka, SQS, RabbitMQ, Pub/Sub), APIs (REST, GraphQL, OpenAPI), CI/CD and pipelines, monitoring/observability if named. Classify each concrete technology into "mustHaveTechnicalTerms" vs "niceToHaveTechnicalTerms" based on how the posting frames it; put tools/libraries in "toolsFrameworks" and process/architecture phrases in "methodologies" or "domainTerms" as appropriate.
 
-**Named cloud providers (mandatory when the posting names them):**
-If the job description names specific clouds (e.g. AWS, Amazon Web Services, Azure, Microsoft Azure, GCP, Google Cloud Platform, Oracle Cloud, DigitalOcean), you MUST include each named provider as its own keyword entry with the standard short form when possible (AWS, Azure, GCP) and an accurate occurrence count. Do not omit them in favor of generic phrases like "cloud platforms" or "cloud experience" when concrete names appear in the text.
+**Named cloud providers (highest-priority mandatory rule):**
+Run this check BEFORE all other keyword selection. If the job description names specific clouds (e.g. AWS, Amazon Web Services, Azure, Microsoft Azure, GCP, Google Cloud Platform, Oracle Cloud, DigitalOcean), you MUST include each named provider as its own keyword entry with the standard short form when possible (AWS, Azure, GCP), even if mentioned only once and even if listed under "nice to have". Do not omit them in favor of generic phrases like "cloud platforms" or "cloud experience" when concrete names appear in the text.
+
+**Cloud extraction enforcement:**
+- First pass: explicitly scan the full posting for cloud provider names and aliases.
+- Normalize aliases to canonical short forms when standard (Amazon Web Services -> AWS, Microsoft Azure -> Azure, Google Cloud Platform -> GCP).
+- Add each detected provider to output before adding generic cloud terms.
+- Final validation before returning JSON: if any provider name/alias appears in the posting, the corresponding canonical provider keyword MUST appear in at least one output category.
 
 **Quality rules:**
 - Include important terms even if they appear only once (hiring signals beat raw frequency).
@@ -234,19 +246,20 @@ Job Title: ${title}
 Job Description:
 ${job}
 
-IMPORTANT: For each keyword, count how many times it appears in the job description (case-insensitive). Then sort keywords within each category by occurrence count (highest first). If two keywords have the same count, maintain alphabetical order.
+IMPORTANT: Return only the keyword strings by category. Do not include counts. Backend logic will deterministically count occurrences and sort results.
 
 Return the keywords in the following JSON format:
 {
-  "technicalSkills": [{"keyword": "keyword1", "count": 5}, {"keyword": "keyword2", "count": 3}, ...],
-  "toolsFrameworks": [{"keyword": "keyword1", "count": 4}, {"keyword": "keyword2", "count": 2}, ...],
-  "methodologies": [{"keyword": "keyword1", "count": 3}, {"keyword": "keyword2", "count": 1}, ...],
-  "domainTerms": [{"keyword": "keyword1", "count": 2}, {"keyword": "keyword2", "count": 0}, ...],
-  "qualifications": [{"keyword": "keyword1", "count": 3}, {"keyword": "keyword2", "count": 1}, ...],
-  "responsibilities": [{"keyword": "keyword1", "count": 4}, {"keyword": "keyword2", "count": 2}, ...]
+  "mustHaveTechnicalTerms": ["keyword1", "keyword2", ...],
+  "niceToHaveTechnicalTerms": ["keyword1", "keyword2", ...],
+  "toolsFrameworks": ["keyword1", "keyword2", ...],
+  "methodologies": ["keyword1", "keyword2", ...],
+  "domainTerms": ["keyword1", "keyword2", ...],
+  "qualifications": ["keyword1", "keyword2", ...],
+  "responsibilities": ["keyword1", "keyword2", ...]
 }
 
-Each keyword object must have both "keyword" (string) and "count" (number) fields. Keywords should be sorted by count (descending) within each category. Only include keywords that are relevant to a resume. Return ONLY valid JSON, no other text or explanations.`;
+Only include keywords that are relevant to a resume. Return ONLY valid JSON, no other text or explanations.`;
 
     // Third, extract themes and recommendations
     const themesPrompt = `Analyze the following job posting and identify:
@@ -376,8 +389,11 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
     const keywordsText = keywordsCompletion.choices[0].message.content;
     // console.log('Keywords text (first 500 chars):', keywordsText.substring(0, 500));
     
+    console.log('Keywords text:', keywordsText);
+
     const defaultKeywords = {
-      technicalSkills: [],
+      mustHaveTechnicalTerms: [],
+      niceToHaveTechnicalTerms: [],
       toolsFrameworks: [],
       methodologies: [],
       domainTerms: [],
@@ -400,48 +416,58 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
       return '';
     };
 
-    // Helper function to extract count from either format
-    const extractCount = (item: any, keyword: string): number => {
-      if (item && typeof item === 'object' && typeof item.count === 'number') {
-        return item.count;
-      }
-      return -1; // Indicate count not provided by AI
-    };
-
     // Process each category - handle both old format (strings) and new format (objects with counts)
     const processCategory = (categoryArray: any[]): { keywords: string[], keywordsWithCounts: Array<{keyword: string, count: number}> } => {
       if (!Array.isArray(categoryArray)) {
         return { keywords: [], keywordsWithCounts: [] };
       }
 
-      const keywordsWithCounts = categoryArray
+      const keywords = categoryArray
         .map((item: any) => {
           const keyword = extractKeyword(item);
           if (!keyword) return null;
-          const aiCount = extractCount(item, keyword);
-          return { keyword, aiCount };
+          return keyword;
         })
-        .filter((item): item is { keyword: string, aiCount: number } => item !== null);
+        .filter((item): item is string => item !== null);
 
       return {
-        keywords: keywordsWithCounts.map(item => item.keyword),
-        keywordsWithCounts: keywordsWithCounts.map(item => ({ keyword: item.keyword, count: item.aiCount }))
+        keywords,
+        keywordsWithCounts: keywords.map((keyword) => ({ keyword, count: -1 }))
       };
     };
 
-    // Process all categories
+    const mustHaveTechnicalTerms = processCategory(categorizedKeywords.mustHaveTechnicalTerms).keywords;
+    const niceToHaveTechnicalTerms = processCategory(categorizedKeywords.niceToHaveTechnicalTerms).keywords;
+    const rawToolsFrameworks = processCategory(categorizedKeywords.toolsFrameworks).keywords;
+    const rawMethodologies = processCategory(categorizedKeywords.methodologies).keywords;
+    const rawDomainTerms = processCategory(categorizedKeywords.domainTerms).keywords;
+    const rawQualifications = processCategory(categorizedKeywords.qualifications).keywords;
+    const rawResponsibilities = processCategory(categorizedKeywords.responsibilities).keywords;
+
+    // Process all categories (technical split only; no merged technicalSkills)
     const processedCategories = {
-      technicalSkills: processCategory(categorizedKeywords.technicalSkills),
-      toolsFrameworks: processCategory(categorizedKeywords.toolsFrameworks),
-      methodologies: processCategory(categorizedKeywords.methodologies),
-      domainTerms: processCategory(categorizedKeywords.domainTerms),
-      qualifications: processCategory(categorizedKeywords.qualifications),
-      responsibilities: processCategory(categorizedKeywords.responsibilities)
+      mustHaveTechnicalTerms: processCategory(mustHaveTechnicalTerms),
+      niceToHaveTechnicalTerms: processCategory(niceToHaveTechnicalTerms),
+      toolsFrameworks: processCategory(rawToolsFrameworks),
+      methodologies: processCategory(rawMethodologies),
+      domainTerms: processCategory(rawDomainTerms),
+      qualifications: processCategory(rawQualifications),
+      responsibilities: processCategory(rawResponsibilities)
     };
 
-    // Create keywords structure for backward compatibility (just keyword strings)
+    const rawKeywordsByCategory = {
+      mustHaveTechnicalTerms,
+      niceToHaveTechnicalTerms,
+      toolsFrameworks: rawToolsFrameworks,
+      methodologies: rawMethodologies,
+      domainTerms: rawDomainTerms,
+      qualifications: rawQualifications,
+      responsibilities: rawResponsibilities,
+    };
+
     const keywordsRaw = {
-      technicalSkills: processedCategories.technicalSkills.keywords,
+      mustHaveTechnicalTerms: processedCategories.mustHaveTechnicalTerms.keywords,
+      niceToHaveTechnicalTerms: processedCategories.niceToHaveTechnicalTerms.keywords,
       toolsFrameworks: processedCategories.toolsFrameworks.keywords,
       methodologies: processedCategories.methodologies.keywords,
       domainTerms: processedCategories.domainTerms.keywords,
@@ -449,19 +475,9 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
       responsibilities: processedCategories.responsibilities.keywords
     };
 
-    // Collect all keywords with AI-provided counts
-    const allKeywordsWithAICounts = [
-      ...processedCategories.technicalSkills.keywordsWithCounts,
-      ...processedCategories.toolsFrameworks.keywordsWithCounts,
-      ...processedCategories.methodologies.keywordsWithCounts,
-      ...processedCategories.domainTerms.keywordsWithCounts,
-      ...processedCategories.qualifications.keywordsWithCounts,
-      ...processedCategories.responsibilities.keywordsWithCounts
-    ];
-
-    // Create a flat list of all keywords for backward compatibility
     const allKeywords = [
-      ...keywordsRaw.technicalSkills,
+      ...keywordsRaw.mustHaveTechnicalTerms,
+      ...keywordsRaw.niceToHaveTechnicalTerms,
       ...keywordsRaw.toolsFrameworks,
       ...keywordsRaw.methodologies,
       ...keywordsRaw.domainTerms,
@@ -471,7 +487,7 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
 
     const combinedTextLower = `${title} ${job}`.toLowerCase();
 
-    // Count occurrences of each keyword in the job description (backend fallback + quality verification)
+    // Count occurrences of each keyword in the job description (deterministic backend counting)
     const countKeywordOccurrences = (keyword: string): number => {
       const keywordLower = keyword.toLowerCase();
 
@@ -484,15 +500,8 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
       return matches ? matches.length : 0;
     };
 
-    const qualityCandidates =
-      allKeywordsWithAICounts.length > 0
-        ? allKeywordsWithAICounts.map((item: { keyword: string; count: number }) => ({
-            keyword: item.keyword,
-            aiCount: item.count,
-          }))
-        : allKeywords.map((keyword: string) => ({ keyword, aiCount: -1 }));
+    const qualityCandidates = allKeywords.map((keyword: string) => ({ keyword, aiCount: -1 }));
 
-    // console.log('All keywords with AI counts:', allKeywordsWithAICounts);
     // console.log('All keywords:', allKeywords);
     console.log('Keywords raw:', keywordsRaw);
     console.log('Quality candidates:', qualityCandidates);
@@ -524,7 +533,8 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
     );
 
     const keywords = {
-      technicalSkills: keywordsByCategoryQuality.technicalSkills,
+      mustHaveTechnicalTerms: keywordsByCategoryQuality.mustHaveTechnicalTerms,
+      niceToHaveTechnicalTerms: keywordsByCategoryQuality.niceToHaveTechnicalTerms,
       toolsFrameworks: keywordsByCategoryQuality.toolsFrameworks,
       methodologies: keywordsByCategoryQuality.methodologies,
       domainTerms: keywordsByCategoryQuality.domainTerms,
@@ -575,6 +585,11 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
       keywordsWithCounts: keywordsWithCounts, // Verified counts + quality-ranked order
       keywordsPrimary: keywordQuality.keywordsPrimary,
       keywordsSecondary: keywordQuality.keywordsSecondary,
+      technicalTerms: {
+        mustHave: mustHaveTechnicalTerms,
+        niceToHave: niceToHaveTechnicalTerms,
+      },
+      keywordsByCategoryRaw: rawKeywordsByCategory, // Raw LLM category output (unfiltered order)
       keywordsByCategory: keywords, // Categorized, filtered and re-ordered by quality score
       themes: themes.themes,
       recommendations: themes.recommendations,

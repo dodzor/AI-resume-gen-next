@@ -30,12 +30,22 @@ const getDefaultFormData = () => ({
   summary: '',
   keywords: [] as string[],
   keywordsByCategory: {
-    technicalSkills: [] as string[],
+    mustHaveTechnicalTerms: [] as string[],
+    niceToHaveTechnicalTerms: [] as string[],
     toolsFrameworks: [] as string[],
     methodologies: [] as string[],
     domainTerms: [] as string[],
     qualifications: [] as string[],
     responsibilities: [] as string[]
+  },
+  rawKeywordsByCategory: null as null | {
+    mustHaveTechnicalTerms?: string[],
+    niceToHaveTechnicalTerms?: string[],
+    toolsFrameworks?: string[],
+    methodologies?: string[],
+    domainTerms?: string[],
+    qualifications?: string[],
+    responsibilities?: string[]
   },
   themes: [] as string[],
   recommendations: [] as string[],
@@ -309,14 +319,44 @@ export default function Content() {
           tone: getResume.tone || '',
           summary: getResume.summary || '',
           keywords: getResume.keywords || [],
-          keywordsByCategory: getResume.keywordsByCategory || {
-            technicalSkills: [],
-            toolsFrameworks: [],
-            methodologies: [],
-            domainTerms: [],
-            qualifications: [],
-            responsibilities: []
-          },
+          keywordsByCategory: (() => {
+            const kbc = getResume.keywordsByCategory as
+              | {
+                  mustHaveTechnicalTerms?: string[]
+                  niceToHaveTechnicalTerms?: string[]
+                  technicalSkills?: string[]
+                  toolsFrameworks?: string[]
+                  methodologies?: string[]
+                  domainTerms?: string[]
+                  qualifications?: string[]
+                  responsibilities?: string[]
+                }
+              | undefined
+            if (!kbc) {
+              return {
+                mustHaveTechnicalTerms: [],
+                niceToHaveTechnicalTerms: [],
+                toolsFrameworks: [],
+                methodologies: [],
+                domainTerms: [],
+                qualifications: [],
+                responsibilities: []
+              }
+            }
+            const must = kbc.mustHaveTechnicalTerms?.length
+              ? kbc.mustHaveTechnicalTerms
+              : kbc.technicalSkills || []
+            return {
+              mustHaveTechnicalTerms: must,
+              niceToHaveTechnicalTerms: kbc.niceToHaveTechnicalTerms || [],
+              toolsFrameworks: kbc.toolsFrameworks || [],
+              methodologies: kbc.methodologies || [],
+              domainTerms: kbc.domainTerms || [],
+              qualifications: kbc.qualifications || [],
+              responsibilities: kbc.responsibilities || []
+            }
+          })(),
+          rawKeywordsByCategory: null,
           themes: getResume.themes || [],
           recommendations: getResume.recommendations || [],
           thematicSummary: getResume.thematicSummary || ''
