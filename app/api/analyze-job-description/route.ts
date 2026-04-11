@@ -213,7 +213,7 @@ Return ONLY one word: "junior", "mid", or "senior". Do not include any other tex
 - Required qualifications (certifications, degrees, specific requirements)
 - Key responsibilities (action verbs, responsibilities mentioned)
 
-**Technical terms requirement split (mandatory):**
+**IMPORTANT: Technical terms requirement split (mandatory):**
 Extract ALL concrete technical terms into two arrays:
 - "mustHaveTechnicalTerms": terms required/preferred as core requirements (e.g. "What we're looking for", "Requirements", "Required", responsibilities that imply required stack)
 - "niceToHaveTechnicalTerms": terms explicitly listed as optional/bonus (e.g. "Nice to Have", "Preferred", "Plus")
