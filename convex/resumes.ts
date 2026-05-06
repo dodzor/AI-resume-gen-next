@@ -50,6 +50,15 @@ export const saveResume = mutation({
       qualifications: v.optional(v.array(v.string())),
       responsibilities: v.optional(v.array(v.string())),
     })),
+    keywordsWithCounts: v.optional(
+      v.array(
+        v.object({
+          keyword: v.string(),
+          count: v.number(),
+          weight: v.number(),
+        })
+      )
+    ),
     themes: v.optional(v.array(v.string())),
     recommendations: v.optional(v.array(v.string())),
     thematicSummary: v.optional(v.string()),

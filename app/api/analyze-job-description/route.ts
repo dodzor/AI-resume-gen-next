@@ -6,11 +6,6 @@ import {
   applyQualityToCategorizedKeywords,
   rankLLMKeywordCandidates,
 } from '@/lib/keywordQuality';
-import {
-  ARCHITECTURE_PHRASES,
-  CONCEPT_CLUSTERS,
-  RESPONSIBILITY_PHRASES,
-} from '@/lib/resumeScanner';
 
 // Lazy-initialize OpenAI client to avoid build-time errors
 function getOpenAIClient() {
@@ -485,45 +480,37 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
       ...keywordsRaw.responsibilities
     ];
 
+    const qualityCandidates = allKeywords.map((keyword: string) => ({ keyword, aiCount: -1 }));
+
     const combinedTextLower = `${title} ${job}`.toLowerCase();
 
-    // Count occurrences of each keyword in the job description (deterministic backend counting)
     const countKeywordOccurrences = (keyword: string): number => {
       const keywordLower = keyword.toLowerCase();
-
-      // Escape special regex characters in the keyword
       const escapedKeyword = keywordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-      // Use word boundaries to match whole words only (case-insensitive)
       const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'gi');
       const matches = combinedTextLower.match(regex);
       return matches ? matches.length : 0;
     };
 
-    const qualityCandidates = allKeywords.map((keyword: string) => ({ keyword, aiCount: -1 }));
-
-    // console.log('All keywords:', allKeywords);
     console.log('Keywords raw:', keywordsRaw);
-    console.log('Quality candidates:', qualityCandidates);
-    // console.log('Combined text lower:', combinedTextLower);
-    // console.log('Count keyword occurrences:', countKeywordOccurrences);
 
     const keywordQuality = rankLLMKeywordCandidates(
       qualityCandidates,
       combinedTextLower,
       countKeywordOccurrences,
       {
-        architecturePhrases: ARCHITECTURE_PHRASES,
-        responsibilityPhrases: RESPONSIBILITY_PHRASES,
-        conceptClusters: CONCEPT_CLUSTERS,
-        excludeFromPrimaryKeywords: processedCategories.responsibilities.keywords,
         jobTitleLower: title.trim().toLowerCase(),
+        mustHaveTechnicalTerms: keywordsRaw.mustHaveTechnicalTerms,
+        qualifications: keywordsRaw.qualifications,
       }
     );
-    console.log('Keyword quality:', keywordQuality);
 
-    const keywordsWithCounts: Array<{ keyword: string; count: number }> =
-      keywordQuality.keywordsWithCounts.map(({ keyword, count }) => ({ keyword, count }));
+    const keywordsWithCounts: Array<{ keyword: string; count: number; weight: number }> =
+      keywordQuality.keywordsWithCounts.map(({ keyword, count, displayScore }) => ({
+        keyword,
+        count,
+        weight: displayScore,
+      }));
 
     const sortedKeywords = keywordsWithCounts.map((item) => item.keyword);
 
@@ -581,16 +568,16 @@ Focus on actionable insights that tell the candidate what to emphasize in their 
     return NextResponse.json({
       success: true,
       tone: tone,
-      keywords: sortedKeywords, // Deterministic quality ranking (see lib/keywordQuality.ts)
-      keywordsWithCounts: keywordsWithCounts, // Verified counts + quality-ranked order
+      keywords: sortedKeywords,
+      keywordsWithCounts: keywordsWithCounts,
       keywordsPrimary: keywordQuality.keywordsPrimary,
       keywordsSecondary: keywordQuality.keywordsSecondary,
       technicalTerms: {
         mustHave: mustHaveTechnicalTerms,
         niceToHave: niceToHaveTechnicalTerms,
       },
-      keywordsByCategoryRaw: rawKeywordsByCategory, // Raw LLM category output (unfiltered order)
-      keywordsByCategory: keywords, // Categorized, filtered and re-ordered by quality score
+      keywordsByCategoryRaw: rawKeywordsByCategory,
+      keywordsByCategory: keywords,
       themes: themes.themes,
       recommendations: themes.recommendations,
       summary: themes.summary

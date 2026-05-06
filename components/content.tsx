@@ -47,6 +47,7 @@ const getDefaultFormData = () => ({
     qualifications?: string[],
     responsibilities?: string[]
   },
+  keywordsWithCounts: [] as { keyword: string; count: number; weight: number }[],
   themes: [] as string[],
   recommendations: [] as string[],
   thematicSummary: ''
@@ -142,6 +143,9 @@ export default function Content() {
           summary: formData.summary || undefined,
           keywords: formData.keywords || undefined,
           keywordsByCategory: formData.keywordsByCategory || undefined,
+          keywordsWithCounts: formData.keywordsWithCounts?.length
+            ? formData.keywordsWithCounts
+            : undefined,
           themes: formData.themes || undefined,
           recommendations: formData.recommendations || undefined,
           thematicSummary: formData.thematicSummary || undefined,
@@ -357,6 +361,7 @@ export default function Content() {
             }
           })(),
           rawKeywordsByCategory: null,
+          keywordsWithCounts: getResume.keywordsWithCounts ?? [],
           themes: getResume.themes || [],
           recommendations: getResume.recommendations || [],
           thematicSummary: getResume.thematicSummary || ''

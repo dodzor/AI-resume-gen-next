@@ -745,8 +745,8 @@ export default function Form({
         
             // Update formData with the analyzed tone, keywords, and themes
             const tone = data.tone || 'mid'
-            const keywords = data.keywords || [] // Already sorted by occurrence count
-            const keywordsWithCounts = data.keywordsWithCounts || [] // Keywords with occurrence counts
+            const keywords = data.keywords || [] // Sorted by keyword weight (high → low)
+            const keywordsWithCounts = data.keywordsWithCounts || [] // { keyword, count, weight }
             const keywordsByCategory = data.keywordsByCategory || {
                 mustHaveTechnicalTerms: [],
                 niceToHaveTechnicalTerms: [],
@@ -775,8 +775,8 @@ export default function Form({
             setFormData((prev: any) => ({
                 ...prev,
                 tone: tone,
-                keywords: keywords, // Already sorted by occurrence count from API
-                keywordsWithCounts: keywordsWithCounts, // Store counts for visual styling
+                keywords: keywords,
+                keywordsWithCounts: keywordsWithCounts,
                 keywordsByCategory: keywordsByCategory,
                 rawKeywordsByCategory: rawKeywordsByCategory,
                 themes: themes.themes,
@@ -825,6 +825,20 @@ export default function Form({
         const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'gi')
         const matches = combinedText.match(regex)
         return matches ? matches.length : 0
+    }
+
+    /** Total keyword weight from job analysis (occurrence + must-have + title bonuses), or JD count as fallback. */
+    const getKeywordWeight = (keyword: string): number => {
+        if (formData.keywordsWithCounts && Array.isArray(formData.keywordsWithCounts)) {
+            const found = formData.keywordsWithCounts.find(
+                (item: { keyword: string; weight?: number }) =>
+                    item.keyword.toLowerCase() === keyword.toLowerCase()
+            )
+            if (found && typeof found.weight === 'number') {
+                return found.weight
+            }
+        }
+        return countKeywordOccurrences(keyword)
     }
 
     const isKeywordInSkills = (keyword: string): boolean => {
@@ -885,7 +899,10 @@ export default function Form({
         return [...legacyTechnical, ...toolsFrameworks]
     }
 
-    const getDisplayKeywordCategories = (): Array<{ label: string; keywords: string[] }> => {
+    const getDisplayKeywordCategories = (options?: {
+        /** Hide Tools & Frameworks in job-analysis chips, bullet pickers, and raw suggested keywords only. */
+        omitToolsFrameworks?: boolean
+    }): Array<{ label: string; keywords: string[] }> => {
         const rawCategories = formData.rawKeywordsByCategory
         const base = (formData.keywordsByCategory || {}) as Record<string, string[] | undefined>
         const source: Record<string, string[] | undefined> = rawCategories
@@ -900,7 +917,7 @@ export default function Form({
         const effectiveMustHave =
             mustHave.length > 0 || niceToHave.length > 0 ? mustHave : legacyTechnicalSkills
 
-        const categoryOrder: Array<{ key: string; label: string }> = [
+        const categoryOrderFull: Array<{ key: string; label: string }> = [
             { key: 'mustHaveTechnicalTerms', label: 'Must Have Technical Terms' },
             { key: 'niceToHaveTechnicalTerms', label: 'Nice to Have Technical Terms' },
             { key: 'toolsFrameworks', label: 'Tools & Frameworks' },
@@ -909,6 +926,10 @@ export default function Form({
             { key: 'qualifications', label: 'Qualifications' },
             { key: 'responsibilities', label: 'Responsibilities' }
         ]
+
+        const categoryOrder = options?.omitToolsFrameworks
+            ? categoryOrderFull.filter((c) => c.key !== 'toolsFrameworks')
+            : categoryOrderFull
 
         return categoryOrder
             .map(({ key, label }) => {
@@ -1640,7 +1661,7 @@ export default function Form({
                                     </div>
                                 )}
 
-                                {getDisplayKeywordCategories().length > 0 && (
+                                {getDisplayKeywordCategories({ omitToolsFrameworks: true }).length > 0 && (
                                     <div className="mt-4 pt-4 border-t border-blue-200">
                                         <div className="flex items-center space-x-2 mb-2">
                                             <label className="block text-sm font-medium text-gray-700">Extracted Keywords:</label>
@@ -1669,16 +1690,17 @@ export default function Form({
                                             </button>
                                         </div>
                                         <div className="space-y-3">
-                                            {getDisplayKeywordCategories().map((category, categoryIndex) => (
+                                            {getDisplayKeywordCategories({ omitToolsFrameworks: true }).map((category, categoryIndex) => (
                                                 <div key={categoryIndex}>
                                                     <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
                                                         {category.label}
                                                     </p>
                                                     <div className="flex flex-wrap gap-2">
                                                         {category.keywords.map((keyword: string, keywordIndex: number) => {
-                                                            const count = countKeywordOccurrences(keyword)
-                                                            const isHighPriority = count >= 3
-                                                            const isMediumPriority = count >= 1 && count < 3
+                                                            const weight = getKeywordWeight(keyword)
+                                                            const occ = countKeywordOccurrences(keyword)
+                                                            const isHighPriority = weight >= 5
+                                                            const isMediumPriority = weight >= 2 && weight < 5
                                                             const badgeClass = isHighPriority
                                                                 ? 'px-3 py-1 bg-white border-2 border-blue-600 text-blue-700 rounded-full text-xs font-bold'
                                                                 : isMediumPriority
@@ -1689,11 +1711,14 @@ export default function Form({
                                                                 <span
                                                                     key={`${category.label}-${keywordIndex}-${keyword}`}
                                                                     className={badgeClass}
-                                                                    title={count === 0
-                                                                        ? 'Extracted keyword (not explicitly mentioned in job description)'
-                                                                        : `Appears ${count} time${count !== 1 ? 's' : ''} in job description`}
+                                                                    title={
+                                                                        occ === 0
+                                                                            ? `Weight ${weight} — extracted term (no word-boundary match in job posting)`
+                                                                            : `Weight ${weight} — appears ${occ} time${occ !== 1 ? 's' : ''} in job posting`
+                                                                    }
                                                                 >
-                                                                    {keyword} ({count})
+                                                                    {keyword}
+                                                                    {/* ({weight}) */}
                                                                 </span>
                                                             )
                                                         })}
@@ -1735,7 +1760,7 @@ export default function Form({
                                                             <li>When rewriting bullet points, select relevant keywords to incorporate</li>
                                                             <li>Keywords are automatically suggested based on the bullet point content</li>
                                                             <li>Only include keywords that naturally fit the context of your work</li>
-                                                            <li>The numbers show how many times each keyword appears in your resume</li>
+                                                            <li>The number in parentheses is keyword weight (posting mentions + must-have + title bonuses)</li>
                                                         </ul>
                                                     </div>
                                                 </div>
@@ -1939,7 +1964,7 @@ export default function Form({
                                         {(() => {
                                             const bullets = parseBullets(exp.description || '')
                                             const displayBullets = bullets.length > 0 ? bullets : ['']
-                                            const keywordCategories = getDisplayKeywordCategories()
+                                            const keywordCategories = getDisplayKeywordCategories({ omitToolsFrameworks: true })
                                             const totalExtractedKeywordCount = getAllExtractedKeywordsFlat().length
                                             
                                             return (
@@ -1968,10 +1993,11 @@ export default function Form({
                                                                                 </p>
                                                                                 <div className="flex flex-wrap gap-1.5">
                                                                                     {category.keywords.map((keyword: string, kwIndex: number) => {
-                                                                                        const count = countKeywordOccurrences(keyword)
+                                                                                        const weight = getKeywordWeight(keyword)
+                                                                                        const occ = countKeywordOccurrences(keyword)
                                                                                         const isSelected = selected.includes(keyword)
-                                                                                        const isHighPriority = count >= 3
-                                                                                        const isMediumPriority = count >= 1 && count < 3
+                                                                                        const isHighPriority = weight >= 5
+                                                                                        const isMediumPriority = weight >= 2 && weight < 5
                                                                                         const buttonClass = isSelected
                                                                                             ? 'px-2 py-0.5 rounded text-xs transition-all duration-200 cursor-pointer bg-blue-600 border-2 border-blue-700 text-white font-bold'
                                                                                             : isHighPriority
@@ -1987,11 +2013,12 @@ export default function Form({
                                                                                                 className={buttonClass}
                                                                                                 title={isSelected
                                                                                                     ? 'Click to deselect'
-                                                                                                    : count === 0
-                                                                                                    ? `Click to select "${keyword}" (extracted keyword, not explicitly mentioned)`
-                                                                                                    : `Click to select "${keyword}" (appears ${count} time${count !== 1 ? 's' : ''} in job description)`}
+                                                                                                    : occ === 0
+                                                                                                    ? `Click to select "${keyword}" (weight ${weight})`
+                                                                                                    : `Click to select "${keyword}" (weight ${weight}; ${occ} mention${occ !== 1 ? 's' : ''} in posting)`}
                                                                                             >
                                                                                                 {keyword}
+                                                                                                {/* ({weight}) */}
                                                                                                 {isSelected && <span className="ml-1">✓</span>}
                                                                                             </button>
                                                                                         )
@@ -2169,16 +2196,17 @@ export default function Form({
                                                                                                     </div>
                                                                                                 )}
                                                                                                 
-                                                                                                {getDisplayKeywordCategories().length > 0 && (
+                                                                                                {getDisplayKeywordCategories({ omitToolsFrameworks: true }).length > 0 && (
                                                                                                     <div className="space-y-2">
                                                                                                         <p className="text-xs font-medium text-gray-700 mb-1">Keywords to incorporate:</p>
-                                                                                                        {getDisplayKeywordCategories().map((category, cIdx) => (
+                                                                                                        {getDisplayKeywordCategories({ omitToolsFrameworks: true }).map((category, cIdx) => (
                                                                                                             <div key={cIdx}>
                                                                                                                 <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">{category.label}</p>
                                                                                                                 <div className="flex flex-wrap gap-1">
                                                                                                                     {category.keywords.slice(0, 4).map((keyword: string, kwIndex: number) => (
                                                                                                                         <span key={kwIndex} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">
                                                                                                                             {keyword}
+                                                                                                                            {/* ({getKeywordWeight(keyword)}) */}
                                                                                                                         </span>
                                                                                                                     ))}
                                                                                                                     {category.keywords.length > 4 && (
@@ -2760,14 +2788,15 @@ export default function Form({
                                             Suggested Keywords (Raw Output by Category)
                                         </label>
                                         <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
-                                            {getDisplayKeywordCategories().map((category, categoryIndex) => (
+                                            {getDisplayKeywordCategories({ omitToolsFrameworks: true }).map((category, categoryIndex) => (
                                                 <div key={categoryIndex}>
                                                     <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
                                                         {category.label}
                                                     </p>
                                                     <div className="flex flex-wrap gap-2">
                                                         {category.keywords.map((keyword: string, keywordIndex: number) => {
-                                                            const count = countKeywordOccurrences(keyword)
+                                                            const weight = getKeywordWeight(keyword)
+                                                            const occ = countKeywordOccurrences(keyword)
                                                             const isAdded = isKeywordInSkills(keyword)
                                                             return (
                                                                 <button
@@ -2780,9 +2809,14 @@ export default function Form({
                                                                             ? 'bg-green-100 border border-green-300 text-green-700 cursor-default'
                                                                             : 'bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400 cursor-pointer active:scale-95'
                                                                     }`}
-                                                                    title={isAdded ? 'Already in your skills' : `Click to add "${keyword}" (appears ${count} time${count !== 1 ? 's' : ''} in job description)`}
+                                                                    title={
+                                                                        isAdded
+                                                                            ? 'Already in your skills'
+                                                                            : `Click to add "${keyword}" (weight ${weight}${occ > 0 ? `; ${occ} mention${occ !== 1 ? 's' : ''} in posting` : ''})`
+                                                                    }
                                                                 >
                                                                     {keyword}
+                                                                    {/* ({weight}) */}
                                                                     {isAdded && (
                                                                         <span className="ml-1.5">✓</span>
                                                                     )}

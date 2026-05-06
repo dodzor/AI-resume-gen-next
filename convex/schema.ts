@@ -66,7 +66,16 @@ export default defineSchema({
       qualifications: v.optional(v.array(v.string())),
       responsibilities: v.optional(v.array(v.string())),
     })),
-    
+    keywordsWithCounts: v.optional(
+      v.array(
+        v.object({
+          keyword: v.string(),
+          count: v.number(),
+          weight: v.number(),
+        })
+      )
+    ),
+
     // Themes and Recommendations
     themes: v.optional(v.array(v.string())), // Core themes identified from job description
     recommendations: v.optional(v.array(v.string())), // What the resume should show
