@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { TEMPLATES, TemplateId } from '../lib/templates'
 
 import { generateFileName } from '../lib/pdfUtils'
@@ -80,6 +80,8 @@ export default function Form({
     } | null>(null)
     // Track selected keywords for each bullet: key = `${experienceIndex}-${bulletIndex}`
     const [selectedKeywords, setSelectedKeywords] = useState<Record<string, string[]>>({})
+    // Ensures we auto-seed bullet keyword selections only once per form load.
+    const hasInitializedSelectedKeywords = useRef(false)
     // Expand/collapse JD keyword preview per bullet: key = `${experienceIndex}-${bulletIndex}`
     const [expandedBulletKeywords, setExpandedBulletKeywords] = useState<Record<string, boolean>>({})
     // Track which bullet just got rewritten to show tooltip: key = `${experienceIndex}-${bulletIndex}`
@@ -168,6 +170,46 @@ export default function Form({
         return [{ role: '', company: '', dates: '', description: '' }]
     }
     const experiences = getExperiences()
+
+    // Auto-select detected keywords for existing bullets once after form data and JD keywords are available.
+    useEffect(() => {
+        if (hasInitializedSelectedKeywords.current) return
+
+        const allKeywords = getAllExtractedKeywordsFlat()
+        if (allKeywords.length === 0) return
+        if (!Array.isArray(formData.experiences) || formData.experiences.length === 0) return
+
+        const nextSelected: Record<string, string[]> = {}
+
+        formData.experiences.forEach((experience: any, experienceIndex: number) => {
+            const bullets = (experience?.description || '')
+                .split('\n')
+                .map((line: string) => line.replace(/^[-*•]\s*/, ''))
+
+            bullets.forEach((bullet: string, bulletIndex: number) => {
+                if (!bullet.trim()) return
+
+                const detectedKeywords: string[] = []
+                const bulletLower = bullet.toLowerCase()
+
+                allKeywords.forEach((keyword: string) => {
+                    const keywordLower = keyword.toLowerCase()
+                    const escapedKeyword = keywordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                    const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'i')
+                    if (regex.test(bulletLower)) {
+                        detectedKeywords.push(keyword)
+                    }
+                })
+
+                if (detectedKeywords.length > 0) {
+                    nextSelected[`${experienceIndex}-${bulletIndex}`] = detectedKeywords
+                }
+            })
+        })
+
+        setSelectedKeywords((prev) => ({ ...nextSelected, ...prev }))
+        hasInitializedSelectedKeywords.current = true
+    }, [formData.experiences, formData.rawKeywordsByCategory, formData.keywordsByCategory, formData.keywords])
 
     const handleExperienceChange = (index: number, field: string, value: string) => {
         setFormData((prev: any) => {
