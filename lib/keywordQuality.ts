@@ -55,6 +55,63 @@ function countOccurrencesInLower(textLower: string, keyword: string): number {
   return (textLower.match(regex) ?? []).length;
 }
 
+const KEYWORD_MATCH_STOPWORDS = new Set([
+  'a', 'an', 'and', 'as', 'at', 'be', 'by', 'for', 'from', 'in', 'into', 'of', 'on', 'or', 'the', 'to', 'with',
+  'implement', 'implemented', 'implementing',
+  'build', 'built', 'building',
+  'develop', 'developed', 'developing',
+  'design', 'designed', 'designing',
+  'create', 'created', 'creating',
+  'optimize', 'optimized', 'optimizing',
+  'integrate', 'integrated', 'integrating',
+  'manage', 'managed', 'managing',
+  'lead', 'led', 'leading',
+  'support', 'supported', 'supporting',
+]);
+
+export function tokenizeForKeywordMatch(text: string): string[] {
+  if (!text || !text.trim()) return [];
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9+#./\s-]/g, ' ')
+    .split(/[\s/-]+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+export function isMeaningfulToken(token: string): boolean {
+  const t = token.trim().toLowerCase();
+  if (!t) return false;
+  if (KEYWORD_MATCH_STOPWORDS.has(t)) return false;
+  // drop very short alphabetic tokens; keep short tech tokens like c# / c++ by allowing non-alpha
+  if (/^[a-z]+$/.test(t) && t.length <= 2) return false;
+  return true;
+}
+
+export function keywordMatchesTextLoose(keyword: string, text: string): boolean {
+  const kw = keyword.trim();
+  const target = text.trim();
+  if (!kw || !target) return false;
+
+  const escaped = escapeRegExp(kw.toLowerCase());
+  const exactRegex = new RegExp(`\\b${escaped}\\b`, 'i');
+  if (exactRegex.test(target.toLowerCase())) return true;
+
+  const keywordTokens = tokenizeForKeywordMatch(kw).filter(isMeaningfulToken);
+  const textTokenSet = new Set(tokenizeForKeywordMatch(target).filter(isMeaningfulToken));
+  if (!keywordTokens.length || !textTokenSet.size) return false;
+
+  let overlapCount = 0;
+  for (const token of keywordTokens) {
+    if (textTokenSet.has(token)) {
+      overlapCount += 1;
+    }
+  }
+
+  const threshold = keywordTokens.length >= 2 ? 2 : 1;
+  return overlapCount >= threshold;
+}
+
 function mergeCandidates(candidates: LLMKeywordCandidate[]): LLMKeywordCandidate[] {
   const map = new Map<string, LLMKeywordCandidate>();
 

@@ -7,6 +7,7 @@ import { generateFileName } from '../lib/pdfUtils'
 import { validatePDFContent } from '../lib/pdfErrorHandler'
 import { generateSimplePreview } from '../lib/utils'
 import { useUsageLimits } from '@/hooks/useUsageLimits'
+import { keywordMatchesTextLoose } from '@/lib/keywordQuality'
 import UsageGatedButton from './UsageGatedButton'
 import UsageDisplay from './UsageDisplay'
 import UpgradeModal from './UpgradeModal'
@@ -189,17 +190,7 @@ export default function Form({
             bullets.forEach((bullet: string, bulletIndex: number) => {
                 if (!bullet.trim()) return
 
-                const detectedKeywords: string[] = []
-                const bulletLower = bullet.toLowerCase()
-
-                allKeywords.forEach((keyword: string) => {
-                    const keywordLower = keyword.toLowerCase()
-                    const escapedKeyword = keywordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                    const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'i')
-                    if (regex.test(bulletLower)) {
-                        detectedKeywords.push(keyword)
-                    }
-                })
+                const detectedKeywords = detectKeywordsInText(bullet)
 
                 if (detectedKeywords.length > 0) {
                     nextSelected[`${experienceIndex}-${bulletIndex}`] = detectedKeywords
@@ -1311,15 +1302,10 @@ export default function Form({
             return []
         }
         
-        const textLower = text.toLowerCase()
         const detectedKeywords: string[] = []
         
         allKeywords.forEach((keyword: string) => {
-            const keywordLower = keyword.toLowerCase()
-            // Use word boundaries to match whole words (case-insensitive)
-            const escapedKeyword = keywordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-            const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'i')
-            if (regex.test(textLower)) {
+            if (keywordMatchesTextLoose(keyword, text)) {
                 detectedKeywords.push(keyword)
             }
         })

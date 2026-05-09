@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { requireAuth } from '@/lib/api-auth';
 import { checkUsageLimit, incrementUsageAfterAction } from '@/lib/api-usage';
+import { keywordMatchesTextLoose } from '@/lib/keywordQuality';
 
 // Lazy-initialize OpenAI client to avoid build-time errors
 function getOpenAIClient() {
@@ -195,14 +196,8 @@ Return ONLY the rewritten bullet point as a single line of text, without any pre
     // Detect which keywords were actually incorporated into the rewritten bullet
     const incorporatedKeywords: string[] = [];
     if (keywords && Array.isArray(keywords) && keywords.length > 0) {
-      const rewrittenLower = rewrittenBullet.toLowerCase();
       keywords.forEach((keyword: string) => {
-        const keywordLower = keyword.toLowerCase();
-        // Check if keyword appears in the rewritten bullet (case-insensitive, whole word match)
-        // Use word boundaries to match whole words
-        const escapedKeyword = keywordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
-        if (regex.test(rewrittenLower)) {
+        if (keywordMatchesTextLoose(keyword, rewrittenBullet)) {
           incorporatedKeywords.push(keyword);
         }
       });
