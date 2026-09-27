@@ -7,9 +7,14 @@ import { Id } from '@/convex/_generated/dataModel'
 import Result from './result'
 import Form from './form'
 import ResumeSwitcher from './ResumeSwitcher'
+import ResumeEntryGate from './ResumeEntryGate'
 import { UserButton } from '@clerk/nextjs'
 import { useUsageLimits } from '@/hooks/useUsageLimits'
 import UpgradeModal from './UpgradeModal'
+import { mergeImportedResume } from '@/lib/mergeResumeImport'
+import type { ResumeImportPayload } from '@/lib/resumeImportSchema'
+import type { ResumeMergeMode } from '@/lib/mergeResumeImport'
+import type { ActionType } from '@/lib/plan-limits'
 
 // Default empty form data
 const getDefaultFormData = () => ({
@@ -80,6 +85,15 @@ export default function Content() {
     // Usage limits and upgrade modal state
     const { canCreateResume, plan } = useUsageLimits()
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+    const [upgradeModalAction, setUpgradeModalAction] = useState<ActionType>('create_resume')
+
+    /** Pre–step-1 flow: import PDF vs start fresh (`null` until first load resolves). */
+    const [resumeEntryPhase, setResumeEntryPhase] = useState<
+      'choose' | 'import_upload' | 'import_review' | 'done' | null
+    >(null)
+    const [resumeImportText, setResumeImportText] = useState('')
+    const [resumeImportFileName, setResumeImportFileName] = useState('')
+    const [importMeta, setImportMeta] = useState<{ fileName: string; importedAt: number } | null>(null)
     
     // Convex queries and mutations
     const resumes = useQuery(api.resumes.getUserResumes) // Get all user resumes
@@ -199,6 +213,7 @@ export default function Content() {
         
         // Check if error is due to usage limit
         if (error?.upgradeRequired || error?.code === 'USAGE_LIMIT_EXCEEDED') {
+          setUpgradeModalAction('create_resume')
           setShowUpgradeModal(true)
           return
         }
@@ -261,6 +276,10 @@ export default function Content() {
             setCurrentResumeId(null)
             setCurrentStep(1)
             setMaxStepReached(1)
+            setResumeEntryPhase('choose')
+            setImportMeta(null)
+            setResumeImportText('')
+            setResumeImportFileName('')
             isLoadingFromConvex.current = false
             setIsLoadingResume(false)
           }
@@ -274,6 +293,7 @@ export default function Content() {
           })
           setFormData(getDefaultFormData())
           setCurrentResumeId(null)
+          setResumeEntryPhase('choose')
           isLoadingFromConvex.current = false
           setIsLoadingResume(false)
         }
@@ -369,6 +389,8 @@ export default function Content() {
         
         setFormData(mappedFormData)
         setGeneratedResume(getResume.generatedResume || '')
+        setResumeEntryPhase('done')
+        setImportMeta(null)
         setLoadedResumeData({
           ...mappedFormData,
           generatedResume: getResume.generatedResume || '',
@@ -470,11 +492,56 @@ export default function Content() {
       setCurrentStep(1)
       setMaxStepReached(1)
       setShowPreview(false) // Hide preview when starting a new resume
+      setResumeEntryPhase('choose')
+      setImportMeta(null)
+      setResumeImportText('')
+      setResumeImportFileName('')
       lastLoadedResumeId.current = null
       localStorage.removeItem(LAST_EDITED_RESUME_KEY)
       isLoadingFromConvex.current = false
       setIsLoadingResume(false)
     }, [])
+
+    const handleStartFreshFromGate = useCallback(() => {
+      setImportMeta(null)
+      setResumeEntryPhase('done')
+    }, [])
+
+    const handlePdfParsed = useCallback((text: string, fileName: string) => {
+      setResumeImportText(text)
+      setResumeImportFileName(fileName)
+    }, [])
+
+    const handleClearImport = useCallback(() => {
+      setResumeImportText('')
+      setResumeImportFileName('')
+    }, [])
+
+    const handleFinishImport = useCallback(
+      (data: ResumeImportPayload, mode: ResumeMergeMode) => {
+        setFormData((prev) => mergeImportedResume(prev as Record<string, unknown>, data, mode) as typeof prev)
+        setImportMeta({ fileName: resumeImportFileName || 'resume.pdf', importedAt: Date.now() })
+        setResumeEntryPhase('done')
+      },
+      [resumeImportFileName]
+    )
+
+    const handleImportUpgradeRequired = useCallback(() => {
+      setUpgradeModalAction('ai_rewrite')
+      setShowUpgradeModal(true)
+    }, [])
+
+    const handleReimport = useCallback(() => {
+      if (
+        !confirm(
+          'Re-import a PDF? You can merge extracted data again (by default only empty fields are filled).'
+        )
+      ) {
+        return
+      }
+      handleClearImport()
+      setResumeEntryPhase('import_upload')
+    }, [handleClearImport])
     
     // Handler for switching resumes
     const handleSelectResume = useCallback((resumeId: Id<'resumes'>) => {
@@ -502,6 +569,11 @@ export default function Content() {
     
     // Show resume switcher if resumes exist or if we're not in initial loading
     const showResumeSwitcher = (resumes && resumes.length > 0) || (!isLoadingResume && resumes !== undefined)
+
+    const showResumeEntryGate =
+      resumeEntryPhase === 'choose' ||
+      resumeEntryPhase === 'import_upload' ||
+      resumeEntryPhase === 'import_review'
     
     return (
       <>
@@ -574,7 +646,19 @@ export default function Content() {
           </header>
 
           <div className="px-4 pt-8 sm:px-6 pb-6">
-            {isLoadingResume ? (
+            {showResumeEntryGate && resumeEntryPhase !== null ? (
+              <ResumeEntryGate
+                phase={resumeEntryPhase}
+                onPhaseChange={setResumeEntryPhase}
+                resumeImportText={resumeImportText}
+                resumeImportFileName={resumeImportFileName}
+                onPdfParsed={handlePdfParsed}
+                onClearImport={handleClearImport}
+                onStartFresh={handleStartFreshFromGate}
+                onFinishImport={handleFinishImport}
+                onUpgradeRequired={handleImportUpgradeRequired}
+              />
+            ) : isLoadingResume ? (
               <div className="max-w-5xl mx-auto mt-12 text-center">
                 <div className="animate-spin text-4xl mb-4">⏳</div>
                 <p className="text-gray-600">Loading resume...</p>
@@ -597,6 +681,8 @@ export default function Content() {
                         setShowPreview={setShowPreview}
                         onSave={handleSave}
                         currentResumeId={currentResumeId}
+                        importMeta={importMeta}
+                        onReimport={handleReimport}
                       />
                     )}
                 <Result 
@@ -631,6 +717,8 @@ export default function Content() {
                         setMaxStepReached={setMaxStepReached}
                         onSave={handleSave}
                         currentResumeId={currentResumeId}
+                        importMeta={importMeta}
+                        onReimport={handleReimport}
                       />
                     </div>
                   </div>
@@ -666,7 +754,7 @@ export default function Content() {
       <UpgradeModal
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
-        action="create_resume"
+        action={upgradeModalAction}
         plan={plan}
       />
       </>

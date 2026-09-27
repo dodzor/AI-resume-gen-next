@@ -35,7 +35,6 @@ export default function UsageGatedButton({
 }: UsageGatedButtonProps) {
   const { plan, isLoading: usageLoading } = useUsageLimits()
   const { allowed, remaining, upgradeRequired, isLoading: actionLoading } = useCanPerformAction(action)
-  console.log('allowed', allowed)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   const isLoading = usageLoading || actionLoading

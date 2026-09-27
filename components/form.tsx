@@ -29,6 +29,8 @@ interface FormProps {
   setMaxStepReached?: (step: number) => void
   onSave?: () => Promise<void>
   currentResumeId?: string | null
+  importMeta?: { fileName: string; importedAt: number } | null
+  onReimport?: () => void
 }
 
 const STEPS = [
@@ -57,7 +59,9 @@ export default function Form({
   maxStepReached: externalMaxStepReached,
   setMaxStepReached: setExternalMaxStepReached,
   onSave,
-  currentResumeId
+  currentResumeId,
+  importMeta,
+  onReimport
 }: FormProps) {
     const [internalCurrentStep, setInternalCurrentStep] = useState(1)
     const [internalShowPreview, setInternalShowPreview] = useState(true)
@@ -1504,6 +1508,26 @@ export default function Form({
                     {STEPS[currentStep - 1].description}
                 </p>
             </div>
+            {importMeta && (
+                <div className="mt-4 flex flex-col items-stretch gap-2 rounded-lg border border-blue-200 bg-blue-50/90 px-4 py-3 text-left sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-blue-900">
+                        <span className="font-semibold">Imported from PDF</span>
+                        <span className="text-blue-800"> — {importMeta.fileName}</span>
+                        <span className="block text-xs font-normal text-blue-700/90">
+                            {new Date(importMeta.importedAt).toLocaleString()}
+                        </span>
+                    </p>
+                    {onReimport && (
+                        <button
+                            type="button"
+                            onClick={onReimport}
+                            className="shrink-0 rounded-md border border-blue-300 bg-white px-3 py-1.5 text-sm font-medium text-blue-800 hover:bg-blue-100"
+                        >
+                            Re-import PDF
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
         )
     }

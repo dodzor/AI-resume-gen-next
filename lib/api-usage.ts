@@ -184,6 +184,7 @@ export function getActionTypeForRoute(routePath: string): ActionType | null {
     '/api/rewrite-bullet': 'ai_rewrite',
     '/api/improve-experience': 'ai_rewrite',
     '/api/generate-summary': 'ai_rewrite',
+    '/api/resume/import-text': 'ai_rewrite',
     '/api/generate-resume': 'create_resume',
     '/api/generate-pdf': 'export',
   };
