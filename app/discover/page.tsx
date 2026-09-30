@@ -1,9 +1,61 @@
 import Link from "next/link"
-import { fetchGreenhouseJobs } from "@/lib/greenhouseJobs"
+import { fetchGreenhouseJobs, loadJobCategories } from "@/lib/greenhouseJobs"
+import { isJobCategorySlug, JOB_CATEGORIES } from "@/lib/jobCategories"
+
+const PAGE_SIZE = 20
 
 export const metadata = {
   title: "Discover jobs",
   description: "Open roles from a Greenhouse job board.",
+}
+
+function parsePage(value: string | string[] | undefined, pageCount: number) {
+  const raw = Array.isArray(value) ? value[0] : value
+  const parsed = Number(raw)
+  if (!Number.isInteger(parsed) || parsed < 1) return 1
+  return Math.min(parsed, pageCount)
+}
+
+function parseQuery(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value
+  return (raw ?? "").trim().slice(0, 80)
+}
+
+function discoverHref(page: number, category?: string, query?: string) {
+  const params = new URLSearchParams()
+  if (category) params.set("category", category)
+  if (query) params.set("q", query)
+  if (page > 1) params.set("page", String(page))
+  const search = params.toString()
+  return search ? `/discover?${search}` : "/discover"
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function titleTokenMatchers(query: string) {
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => {
+      if (token.length <= 3) {
+        const pattern = new RegExp(`\\b${escapeRegExp(token)}\\b`, "i")
+        return (title: string, _lower: string) => pattern.test(title)
+      }
+      return (_title: string, lower: string) => lower.includes(token)
+    })
+}
+
+function countMatchedCategories<T extends string>(jobs: Array<{ url: string }>, byUrl: Map<string, T>) {
+  const counts = new Map<string, number>()
+  for (const job of jobs) {
+    const slug = byUrl.get(job.url)
+    if (!slug) continue
+    counts.set(slug, (counts.get(slug) ?? 0) + 1)
+  }
+  return counts
 }
 
 function formatUpdatedAt(value: string) {
@@ -17,17 +69,51 @@ function formatUpdatedAt(value: string) {
   })
 }
 
-export default async function DiscoverPage() {
+export default async function DiscoverPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    page?: string | string[]
+    category?: string | string[]
+    q?: string | string[]
+  }>
+}) {
+  const { page: pageParam, category: categoryParam, q: queryParam } = await searchParams
+  const requestedCategory = Array.isArray(categoryParam) ? categoryParam[0] : categoryParam
+  const category = requestedCategory && isJobCategorySlug(requestedCategory) ? requestedCategory : undefined
+  const query = parseQuery(queryParam)
+  const unknownCategory = Boolean(requestedCategory) && !category
   let jobs: Awaited<ReturnType<typeof fetchGreenhouseJobs>> = []
   let loadError = false
 
   try {
-    jobs = await fetchGreenhouseJobs(10)
+    jobs = await fetchGreenhouseJobs()
   } catch {
     loadError = true
   }
 
-  const companyName = jobs[0]?.companyName ?? "Greenhouse"
+  const categories = await loadJobCategories()
+  const matchers = titleTokenMatchers(query)
+  const titleMatched =
+    matchers.length === 0
+      ? jobs
+      : jobs.filter((job) => {
+          const lower = job.title.toLowerCase()
+          return matchers.every((matches) => matches(job.title, lower))
+        })
+  const visibleJobs = category
+    ? titleMatched.filter((job) => categories.byUrl.get(job.url) === category)
+    : titleMatched
+  const matchedCounts =
+    matchers.length === 0 ? null : countMatchedCategories(titleMatched, categories.byUrl)
+  const categoryLabel = JOB_CATEGORIES.find((item) => item.slug === category)?.label
+  const companyCount = new Set(visibleJobs.map((job) => job.companyName)).size
+  const pageCount = Math.max(1, Math.ceil(visibleJobs.length / PAGE_SIZE))
+  const page = parsePage(pageParam, visibleJobs.length === 0 ? 1 : pageCount)
+  const start = (page - 1) * PAGE_SIZE
+  const pageJobs = visibleJobs.slice(start, start + PAGE_SIZE)
+  const rangeStart = visibleJobs.length === 0 ? 0 : start + 1
+  const rangeEnd = start + pageJobs.length
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -50,27 +136,134 @@ export default async function DiscoverPage() {
           Greenhouse
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
-          Open roles at {companyName}
+          Open roles
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          The first 10 postings from the public Greenhouse job board.
+          {query
+            ? categoryLabel
+              ? `${categoryLabel} roles matching "${query}"${companyCount > 0 ? ` across ${companyCount.toLocaleString()} companies` : ""}.`
+              : companyCount > 0
+                ? `Roles matching "${query}" across ${companyCount.toLocaleString()} companies.`
+                : `Roles matching "${query}".`
+            : categoryLabel
+              ? `${categoryLabel} roles from public Greenhouse job boards${companyCount > 0 ? ` across ${companyCount.toLocaleString()} companies` : ""}.`
+              : companyCount > 0
+                ? `Open postings from public Greenhouse job boards across ${companyCount.toLocaleString()} companies.`
+                : "Open postings from public Greenhouse job boards."}
         </p>
+
+        <form method="get" action="/discover" className="mt-6 flex gap-2">
+          {category ? <input type="hidden" name="category" value={category} /> : null}
+          <label className="sr-only" htmlFor="role-title-search">
+            Search by role title
+          </label>
+          <input
+            id="role-title-search"
+            type="search"
+            name="q"
+            defaultValue={query}
+            placeholder="Search by role title"
+            maxLength={80}
+            className="min-w-0 flex-1 rounded-md border border-border bg-white px-3 py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-blue-600"
+          />
+          <button
+            type="submit"
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
+          >
+            Search
+          </button>
+          {query ? (
+            <Link
+              href={discoverHref(1, category)}
+              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
+            >
+              Clear
+            </Link>
+          ) : null}
+        </form>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href={discoverHref(1, undefined, query)}
+            className={`rounded-full border px-3 py-1 text-sm ${
+              category
+                ? "border-border text-foreground hover:bg-muted/60"
+                : "border-blue-600 bg-blue-600 text-white"
+            }`}
+          >
+            All
+          </Link>
+          {JOB_CATEGORIES.map((item) => {
+            const count = matchedCounts
+              ? (matchedCounts.get(item.slug) ?? 0)
+              : (categories.counts.get(item.slug) ?? 0)
+            const selected = item.slug === category
+            return (
+              <Link
+                key={item.slug}
+                href={discoverHref(1, item.slug, query)}
+                className={`rounded-full border px-3 py-1 text-sm ${
+                  selected
+                    ? "border-blue-600 bg-blue-600 text-white"
+                    : "border-border text-foreground hover:bg-muted/60"
+                }`}
+              >
+                {item.label}
+                {count > 0 ? ` (${count.toLocaleString()})` : ""}
+              </Link>
+            )
+          })}
+        </div>
 
         {loadError ? (
           <p className="mt-8 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             Greenhouse jobs could not be loaded. Try again in a moment.
           </p>
-        ) : jobs.length === 0 ? (
-          <p className="mt-8 text-sm text-muted-foreground">No open roles were returned.</p>
+        ) : unknownCategory ? (
+          <p className="mt-8 text-sm text-muted-foreground">That category is not available.</p>
+        ) : visibleJobs.length === 0 ? (
+          <p className="mt-8 text-sm text-muted-foreground">
+            {query
+              ? categoryLabel
+                ? `No ${categoryLabel} roles match "${query}".`
+                : `No roles match "${query}".`
+              : categoryLabel
+                ? `No open roles in ${categoryLabel}.`
+                : "No open roles were returned."}
+          </p>
         ) : (
-          <ol className="mt-8 divide-y divide-border rounded-xl border border-border bg-white">
-            {jobs.map((job, index) => {
+          <>
+            <div className="mt-6 flex items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              {rangeStart.toLocaleString()}–{rangeEnd.toLocaleString()} of {visibleJobs.length.toLocaleString()}
+            </p>
+            <div className="flex items-center gap-2">
+              {page > 1 ? (
+                <Link
+                  href={discoverHref(page - 1, category, query)}
+                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
+                >
+                  Previous
+                </Link>
+              ) : null}
+              {page < pageCount ? (
+                <Link
+                  href={discoverHref(page + 1, category, query)}
+                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
+                >
+                  Next
+                </Link>
+              ) : null}
+            </div>
+            </div>
+            <ol className="mt-4 divide-y divide-border rounded-xl border border-border bg-white">
+            {pageJobs.map((job, index) => {
               const updated = formatUpdatedAt(job.updatedAt)
               return (
-                <li key={job.id} className="px-4 py-4 md:px-5">
+                <li key={`${job.boardToken}-${job.id}`} className="px-4 py-4 md:px-5">
                   <div className="flex items-start gap-3">
-                    <span className="mt-0.5 w-6 shrink-0 text-sm font-medium text-slate-400">
-                      {index + 1}
+                    <span className="mt-0.5 w-14 shrink-0 text-right text-sm font-medium tabular-nums text-slate-400">
+                      {(start + index + 1).toLocaleString()}
                     </span>
                     <div className="min-w-0">
                       <a
@@ -82,7 +275,7 @@ export default async function DiscoverPage() {
                         {job.title}
                       </a>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {job.location}
+                        {job.companyName} · {job.location}
                         {updated ? ` · Updated ${updated}` : ""}
                       </p>
                     </div>
@@ -90,7 +283,8 @@ export default async function DiscoverPage() {
                 </li>
               )
             })}
-          </ol>
+            </ol>
+          </>
         )}
       </main>
     </div>
