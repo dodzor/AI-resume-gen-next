@@ -3,10 +3,19 @@ import path from "path"
 // Board tokens from the Last Round AI ATS company directory (CC-BY-4.0), August 2026.
 import boardTokens from "./greenhouseBoards.json"
 import { categorizeJobs, type JobCategoryRecord, type JobCategorySlug } from "./jobCategories"
+import {
+  buildSearchPostings,
+  decodeSearchIndex,
+  encodeSearchIndex,
+  plainTextFromGreenhouseContent,
+  type JobSearchIndex,
+} from "./jobSearch"
 
 const CACHE_PATH = path.join(process.cwd(), ".cache", "greenhouse-jobs.json")
 const CATEGORIES_PATH = path.join(process.cwd(), ".cache", "greenhouse-job-categories.json")
+const SEARCH_INDEX_PATH = path.join(process.cwd(), ".cache", "greenhouse-job-search.bin")
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000
+const SEARCH_REFRESH_COOLDOWN_MS = 30 * 60 * 1000
 const CONCURRENCY = 16
 
 export type GreenhouseJobListing = {
@@ -26,8 +35,14 @@ type GreenhouseJobsResponse = {
     company_name?: string
     absolute_url?: string
     updated_at?: string
+    content?: string
     location?: { name?: string }
   }>
+}
+
+type MappedBoard = {
+  jobs: GreenhouseJobListing[]
+  texts: string[]
 }
 
 type CacheFile = {
@@ -43,6 +58,8 @@ type CategoryIndex = {
 let memory: CacheFile | null = null
 let loadedStamp = 0
 let categoryMemory: { stamp: number; index: CategoryIndex } | null = null
+let searchMemory: { stamp: number; index: JobSearchIndex } | null = null
+let searchRefreshNotBefore = 0
 let refreshInFlight: Promise<GreenhouseJobListing[]> | null = null
 
 function isFresh(cache: CacheFile) {
@@ -62,13 +79,12 @@ async function readDisk(): Promise<CacheFile | null> {
   }
 }
 
-function mapJobs(boardToken: string, data: GreenhouseJobsResponse): GreenhouseJobListing[] {
-  const jobs = Array.isArray(data.jobs) ? data.jobs : []
-  return jobs.flatMap((job) => {
-    if (typeof job.id !== "number" || !job.title || !job.absolute_url) {
-      return []
-    }
-    return [{
+function mapBoard(boardToken: string, data: GreenhouseJobsResponse): MappedBoard {
+  const jobs: GreenhouseJobListing[] = []
+  const texts: string[] = []
+  for (const job of data.jobs ?? []) {
+    if (typeof job.id !== "number" || !job.title || !job.absolute_url) continue
+    jobs.push({
       id: job.id,
       boardToken,
       title: job.title,
@@ -76,22 +92,25 @@ function mapJobs(boardToken: string, data: GreenhouseJobsResponse): GreenhouseJo
       location: job.location?.name || "Location not listed",
       url: job.absolute_url,
       updatedAt: job.updated_at || "",
-    }]
-  })
+    })
+    texts.push(plainTextFromGreenhouseContent(job.content || ""))
+  }
+  return { jobs, texts }
 }
 
-async function fetchBoard(boardToken: string): Promise<GreenhouseJobListing[]> {
-  const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(boardToken)}/jobs`
+async function fetchBoard(boardToken: string): Promise<MappedBoard> {
+  const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(boardToken)}/jobs?content=true`
+  const empty = { jobs: [], texts: [] }
   try {
-    let response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(20000) })
+    let response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(30000) })
     if (response.status === 429) {
       await new Promise((resolve) => setTimeout(resolve, 1000))
-      response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(20000) })
+      response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(30000) })
     }
-    if (!response.ok) return []
-    return mapJobs(boardToken, (await response.json()) as GreenhouseJobsResponse)
+    if (!response.ok) return empty
+    return mapBoard(boardToken, (await response.json()) as GreenhouseJobsResponse)
   } catch {
-    return []
+    return empty
   }
 }
 
@@ -115,27 +134,36 @@ export async function refreshGreenhouseJobs(): Promise<GreenhouseJobListing[]> {
   if (refreshInFlight) return refreshInFlight
 
   refreshInFlight = (async () => {
+    await loadNewestCache()
     let completed = 0
     const boards = await mapPool(boardTokens, CONCURRENCY, async (boardToken) => {
-      const jobs = await fetchBoard(boardToken)
+      const board = await fetchBoard(boardToken)
       completed += 1
       if (completed % 500 === 0 || completed === boardTokens.length) {
         console.log(`Fetched ${completed}/${boardTokens.length} boards`)
       }
-      return jobs
+      return board
     })
     const seen = new Set<string>()
-    const jobs = boards.flat().filter((job) => {
-      if (seen.has(job.url)) return false
-      seen.add(job.url)
-      return true
-    })
+    const jobs: GreenhouseJobListing[] = []
+    const texts: string[] = []
+    for (const board of boards) {
+      for (let index = 0; index < board.jobs.length; index++) {
+        const job = board.jobs[index]
+        if (seen.has(job.url)) continue
+        seen.add(job.url)
+        jobs.push(job)
+        texts.push(board.texts[index] || "")
+      }
+      board.texts = []
+    }
 
     if (jobs.length === 0) {
       throw new Error("Greenhouse returned no jobs")
     }
 
     if (memory && jobs.length < memory.jobs.length * 0.9) {
+      searchRefreshNotBefore = Date.now() + SEARCH_REFRESH_COOLDOWN_MS
       console.warn(
         `Greenhouse refresh returned ${jobs.length} roles; keeping ${memory.jobs.length}`
       )
@@ -150,6 +178,7 @@ export async function refreshGreenhouseJobs(): Promise<GreenhouseJobListing[]> {
     memory = cache
     loadedStamp = (await fs.stat(CACHE_PATH)).mtimeMs
     await writeJobCategories(jobs)
+    await writeSearchIndex(texts)
     return jobs
   })().finally(() => {
     refreshInFlight = null
@@ -203,6 +232,64 @@ async function ensureJobCategories(jobs: GreenhouseJobListing[]) {
   await writeJobCategories(jobs)
 }
 
+async function writeSearchIndex(texts: string[]) {
+  const postings = buildSearchPostings(texts)
+  const encoded = encodeSearchIndex(texts.length, postings)
+  const tempPath = `${SEARCH_INDEX_PATH}.tmp`
+  await fs.mkdir(path.dirname(SEARCH_INDEX_PATH), { recursive: true })
+  await fs.writeFile(tempPath, encoded)
+  await fs.rename(tempPath, SEARCH_INDEX_PATH)
+  searchMemory = {
+    stamp: (await fs.stat(SEARCH_INDEX_PATH)).mtimeMs,
+    index: { jobCount: texts.length, postings },
+  }
+  console.log(`Indexed ${postings.size} words for description search (${encoded.length} bytes)`)
+}
+
+async function searchIndexMatches(jobCount: number) {
+  try {
+    const [jobStat, indexStat] = await Promise.all([
+      fs.stat(CACHE_PATH),
+      fs.stat(SEARCH_INDEX_PATH),
+    ])
+    if (indexStat.mtimeMs < jobStat.mtimeMs) return false
+    const handle = await fs.open(SEARCH_INDEX_PATH, "r")
+    try {
+      const header = Buffer.alloc(16)
+      const { bytesRead } = await handle.read(header, 0, 16, 0)
+      if (bytesRead < 16 || header.toString("utf8", 0, 4) !== "GHJS" || header.readUInt32LE(4) !== 1) {
+        return false
+      }
+      return header.readUInt32LE(8) === jobCount
+    } finally {
+      await handle.close()
+    }
+  } catch {
+    return false
+  }
+}
+
+export async function loadJobSearchIndex(jobCount: number): Promise<JobSearchIndex | null> {
+  let stamp = 0
+  let jobStamp = 0
+  try {
+    stamp = (await fs.stat(SEARCH_INDEX_PATH)).mtimeMs
+    jobStamp = (await fs.stat(CACHE_PATH)).mtimeMs
+  } catch {
+    return null
+  }
+  if (stamp < jobStamp) return null
+
+  if (!searchMemory || searchMemory.stamp !== stamp) {
+    const encoded = await fs.readFile(SEARCH_INDEX_PATH)
+    const index = decodeSearchIndex(encoded)
+    if (!index) return null
+    searchMemory = { stamp, index }
+  }
+  if (searchMemory.index.jobCount !== jobCount) return null
+  return searchMemory.index
+}
+
 export async function loadJobCategories(): Promise<CategoryIndex> {
   let categoryStamp = 0
   try {
@@ -244,6 +331,9 @@ export async function fetchGreenhouseJobs(): Promise<GreenhouseJobListing[]> {
   const cached = await loadNewestCache()
   if (cached && isFresh(cached)) {
     await ensureJobCategories(cached.jobs)
+    if (Date.now() >= searchRefreshNotBefore && !(await searchIndexMatches(cached.jobs.length))) {
+      void refreshGreenhouseJobs()
+    }
     return cached.jobs
   }
   if (cached) {

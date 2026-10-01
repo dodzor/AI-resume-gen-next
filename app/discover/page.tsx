@@ -1,6 +1,7 @@
 import Link from "next/link"
-import { fetchGreenhouseJobs, loadJobCategories } from "@/lib/greenhouseJobs"
+import { fetchGreenhouseJobs, loadJobCategories, loadJobSearchIndex } from "@/lib/greenhouseJobs"
 import { isJobCategorySlug, JOB_CATEGORIES } from "@/lib/jobCategories"
+import { descriptionMatchPositions } from "@/lib/jobSearch"
 
 const PAGE_SIZE = 20
 
@@ -94,18 +95,40 @@ export default async function DiscoverPage({
 
   const categories = await loadJobCategories()
   const matchers = titleTokenMatchers(query)
-  const titleMatched =
-    matchers.length === 0
-      ? jobs
-      : jobs.filter((job) => {
-          const lower = job.title.toLowerCase()
-          return matchers.every((matches) => matches(job.title, lower))
-        })
+  const searchIndex = matchers.length === 0 ? null : await loadJobSearchIndex(jobs.length)
+  const descriptionPositions = searchIndex ? descriptionMatchPositions(query, searchIndex) : null
+  const descriptionSearchReady = descriptionPositions !== null
+  const matchedInDescription = new Set<(typeof jobs)[number]>()
+  let matchedJobs: typeof jobs
+  if (matchers.length === 0) {
+    matchedJobs = jobs
+  } else {
+    const titleHits: typeof jobs = []
+    const titlePositions = new Set<number>()
+    for (let index = 0; index < jobs.length; index++) {
+      const job = jobs[index]
+      const lower = job.title.toLowerCase()
+      if (!matchers.every((matches) => matches(job.title, lower))) continue
+      titleHits.push(job)
+      titlePositions.add(index)
+    }
+    const descriptionHits: typeof jobs = []
+    if (descriptionPositions) {
+      for (const position of descriptionPositions) {
+        if (titlePositions.has(position)) continue
+        const job = jobs[position]
+        if (!job) continue
+        descriptionHits.push(job)
+        matchedInDescription.add(job)
+      }
+    }
+    matchedJobs = titleHits.concat(descriptionHits)
+  }
   const visibleJobs = category
-    ? titleMatched.filter((job) => categories.byUrl.get(job.url) === category)
-    : titleMatched
+    ? matchedJobs.filter((job) => categories.byUrl.get(job.url) === category)
+    : matchedJobs
   const matchedCounts =
-    matchers.length === 0 ? null : countMatchedCategories(titleMatched, categories.byUrl)
+    matchers.length === 0 ? null : countMatchedCategories(matchedJobs, categories.byUrl)
   const categoryLabel = JOB_CATEGORIES.find((item) => item.slug === category)?.label
   const companyCount = new Set(visibleJobs.map((job) => job.companyName)).size
   const pageCount = Math.max(1, Math.ceil(visibleJobs.length / PAGE_SIZE))
@@ -154,15 +177,15 @@ export default async function DiscoverPage({
 
         <form method="get" action="/discover" className="mt-6 flex gap-2">
           {category ? <input type="hidden" name="category" value={category} /> : null}
-          <label className="sr-only" htmlFor="role-title-search">
-            Search by role title
+          <label className="sr-only" htmlFor="role-search">
+            Search titles and descriptions
           </label>
           <input
-            id="role-title-search"
+            id="role-search"
             type="search"
             name="q"
             defaultValue={query}
-            placeholder="Search by role title"
+            placeholder="Search titles and descriptions"
             maxLength={80}
             className="min-w-0 flex-1 rounded-md border border-border bg-white px-3 py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-blue-600"
           />
@@ -181,6 +204,12 @@ export default async function DiscoverPage({
             </Link>
           ) : null}
         </form>
+
+        {query && !descriptionSearchReady ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Descriptions are still indexing. These results match titles only.
+          </p>
+        ) : null}
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Link
@@ -278,6 +307,9 @@ export default async function DiscoverPage({
                         {job.companyName} · {job.location}
                         {updated ? ` · Updated ${updated}` : ""}
                       </p>
+                      {matchedInDescription.has(job) ? (
+                        <p className="mt-1 text-xs font-medium text-blue-700">Matched in description</p>
+                      ) : null}
                     </div>
                   </div>
                 </li>
