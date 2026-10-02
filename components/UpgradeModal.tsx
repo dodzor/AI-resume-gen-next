@@ -1,6 +1,7 @@
 'use client'
 
-import { Fragment } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import type { ActionType, PlanTier } from '@/lib/plan-limits'
 
@@ -23,7 +24,13 @@ export default function UpgradeModal({
   plan = 'free',
   message,
 }: UpgradeModalProps) {
-  if (!isOpen) return null
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!isOpen || !mounted) return null
 
   // Get context-specific message
   const getMessage = (): string => {
@@ -65,7 +72,7 @@ export default function UpgradeModal({
     return baseFeatures
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
@@ -149,6 +156,7 @@ export default function UpgradeModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
