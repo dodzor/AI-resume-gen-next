@@ -1,10 +1,14 @@
 import Link from "next/link"
 import { CountrySelect } from "@/components/CountrySelect"
 import { RemoteCheckbox } from "@/components/RemoteCheckbox"
+import { ResumeMatchToggle } from "@/components/ResumeMatchToggle"
+import { discoverHref } from "@/lib/discoverHref"
 import { fetchGreenhouseJobs, loadJobCategories, loadJobSearchIndex } from "@/lib/greenhouseJobs"
 import { isJobCategorySlug, JOB_CATEGORIES } from "@/lib/jobCategories"
 import { countryFromParam, countrySlug, countriesInLocation } from "@/lib/jobCountries"
-import { descriptionMatchPositions } from "@/lib/jobSearch"
+import { descriptionMatchPositions, resumeMatchPositions } from "@/lib/jobSearch"
+import { loadMatchResume } from "@/lib/loadMatchResume"
+import { resumeMatchLabel, resumeSearchTerms } from "@/lib/resumeMatch"
 
 const PAGE_SIZE = 20
 
@@ -25,21 +29,11 @@ function parseQuery(value: string | string[] | undefined) {
   return (raw ?? "").trim().slice(0, 80)
 }
 
-function discoverHref(
-  page: number,
-  category?: string,
-  query?: string,
-  remote?: boolean,
-  country?: string,
-) {
-  const params = new URLSearchParams()
-  if (category) params.set("category", category)
-  if (query) params.set("q", query)
-  if (remote) params.set("remote", "1")
-  if (country) params.set("country", country)
-  if (page > 1) params.set("page", String(page))
-  const search = params.toString()
-  return search ? `/discover?${search}` : "/discover"
+function parseResume(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value
+  const trimmed = (raw ?? "").trim()
+  if (!trimmed || trimmed.length > 128) return undefined
+  return trimmed
 }
 
 function isRemoteLocation(location: string) {
@@ -52,16 +46,26 @@ function listingLead(
   query: string,
   companyCount: number,
   countryLabel?: string,
+  resumeLabel?: string,
 ) {
   const companies = companyCount > 0 ? ` across ${companyCount.toLocaleString()} companies` : ""
   const where = countryLabel ? ` in ${countryLabel}` : ""
+  const matchedTo = resumeLabel ? ` matched to ${resumeLabel}` : ""
   if (query) {
     const scope = categoryLabel
       ? `${remote ? "Remote " : ""}${categoryLabel} roles`
       : remote
         ? "Remote roles"
         : "Roles"
-    return `${scope} matching "${query}"${where}${companies}.`
+    return `${scope} matching "${query}"${matchedTo}${where}${companies}.`
+  }
+  if (resumeLabel) {
+    const scope = categoryLabel
+      ? `${remote ? "Remote " : ""}${categoryLabel} roles`
+      : remote
+        ? "Remote roles"
+        : "Roles"
+    return `${scope} matched to ${resumeLabel}${where}${companies}.`
   }
   if (categoryLabel) {
     return `${remote ? "Remote " : ""}${categoryLabel} roles${where} from public Greenhouse job boards${companies}.`
@@ -82,13 +86,26 @@ function emptyListing(
   categoryLabel: string | undefined,
   query: string,
   countryLabel?: string,
+  resumeLabel?: string,
+  resumeHasNoTerms?: boolean,
 ) {
   const where = countryLabel ? ` in ${countryLabel}` : ""
+  if (resumeHasNoTerms) {
+    return resumeLabel
+      ? `${resumeLabel} has no roles or skills to match.`
+      : "This resume has no roles or skills to match."
+  }
   if (query) {
     const remoteWord = remote ? "remote " : ""
     return categoryLabel
       ? `No ${remoteWord}${categoryLabel} roles match "${query}"${where}.`
       : `No ${remoteWord}roles match "${query}"${where}.`
+  }
+  if (resumeLabel) {
+    const remoteWord = remote ? "remote " : ""
+    return categoryLabel
+      ? `No ${remoteWord}${categoryLabel} roles match ${resumeLabel}${where}.`
+      : `No ${remoteWord}roles match ${resumeLabel}${where}.`
   }
   if (categoryLabel && countryLabel) {
     return remote
@@ -152,6 +169,7 @@ export default async function DiscoverPage({
     q?: string | string[]
     remote?: string | string[]
     country?: string | string[]
+    resume?: string | string[]
   }>
 }) {
   const {
@@ -160,6 +178,7 @@ export default async function DiscoverPage({
     q: queryParam,
     remote: remoteParam,
     country: countryParam,
+    resume: resumeParam,
   } = await searchParams
   const requestedCategory = Array.isArray(categoryParam) ? categoryParam[0] : categoryParam
   const category = requestedCategory && isJobCategorySlug(requestedCategory) ? requestedCategory : undefined
@@ -169,9 +188,11 @@ export default async function DiscoverPage({
   const requestedCountry = Array.isArray(countryParam) ? countryParam[0] : countryParam
   const country = countryFromParam(requestedCountry)
   const countryParamSlug = country ? countrySlug(country) : undefined
+  const requestedResume = parseResume(resumeParam)
   const unknownCategory = Boolean(requestedCategory) && !category
   let jobs: Awaited<ReturnType<typeof fetchGreenhouseJobs>> = []
   let loadError = false
+  const resumePromise = requestedResume ? loadMatchResume(requestedResume) : Promise.resolve(null)
 
   try {
     jobs = await fetchGreenhouseJobs()
@@ -179,34 +200,63 @@ export default async function DiscoverPage({
     loadError = true
   }
 
+  const matchResume = await resumePromise
+  const resumeMissing = matchResume?.status === "missing"
+  const loadedResume = matchResume?.status === "ok" ? matchResume.resume : null
+  const { titleRoles, skillTerms } = loadedResume
+    ? resumeSearchTerms(loadedResume)
+    : { titleRoles: [] as string[][], skillTerms: [] as string[] }
+  const resumeHasNoTerms = Boolean(loadedResume) && titleRoles.length === 0 && skillTerms.length === 0
+  const resumeLabel = loadedResume && !resumeHasNoTerms ? resumeMatchLabel(loadedResume) : undefined
   const categories = await loadJobCategories()
   const matchers = titleTokenMatchers(query)
-  const searchIndex = matchers.length === 0 ? null : await loadJobSearchIndex(jobs.length)
-  const descriptionPositions = searchIndex ? descriptionMatchPositions(query, searchIndex) : null
-  const descriptionSearchReady = descriptionPositions !== null
+  const needsIndex = matchers.length > 0 || skillTerms.length > 0 || titleRoles.length > 0
+  const searchIndex = needsIndex ? await loadJobSearchIndex(jobs.length) : null
+  const descriptionPositions = searchIndex && matchers.length > 0 ? descriptionMatchPositions(query, searchIndex) : null
+  const descriptionSearchReady = matchers.length === 0 || descriptionPositions !== null
+  const skillsSearchReady = skillTerms.length === 0 || searchIndex !== null
   const matchedInDescription = new Set<(typeof jobs)[number]>()
-  let matchedJobs: typeof jobs
-  if (matchers.length === 0) {
-    matchedJobs = jobs
-  } else {
-    const titleHits: typeof jobs = []
+  const queryPositions = new Set<number>()
+  if (matchers.length > 0) {
     const titlePositions = new Set<number>()
     for (let index = 0; index < jobs.length; index++) {
       const job = jobs[index]
       const lower = job.title.toLowerCase()
       if (!matchers.every((matches) => matches(job.title, lower))) continue
-      titleHits.push(job)
+      queryPositions.add(index)
       titlePositions.add(index)
     }
-    const descriptionHits: typeof jobs = []
     if (descriptionPositions) {
       for (const position of descriptionPositions) {
-        if (titlePositions.has(position)) continue
-        const job = jobs[position]
-        if (!job) continue
-        descriptionHits.push(job)
-        matchedInDescription.add(job)
+        if (titlePositions.has(position) || !jobs[position]) continue
+        queryPositions.add(position)
+        matchedInDescription.add(jobs[position])
       }
+    }
+  }
+  const resumeOrder = resumeLabel
+    ? resumeMatchPositions(titleRoles, skillTerms, jobs.map((job) => job.title), searchIndex)
+    : null
+  let matchedJobs: typeof jobs
+  if (resumeHasNoTerms) {
+    matchedJobs = []
+  } else if (resumeOrder) {
+    matchedJobs = []
+    for (const index of resumeOrder) {
+      if (matchers.length > 0 && !queryPositions.has(index)) continue
+      const job = jobs[index]
+      if (job) matchedJobs.push(job)
+    }
+  } else if (matchers.length === 0) {
+    matchedJobs = jobs
+  } else {
+    const titleHits: typeof jobs = []
+    const descriptionHits: typeof jobs = []
+    for (let index = 0; index < jobs.length; index++) {
+      if (!queryPositions.has(index)) continue
+      const job = jobs[index]
+      if (matchedInDescription.has(job)) descriptionHits.push(job)
+      else titleHits.push(job)
     }
     matchedJobs = titleHits.concat(descriptionHits)
   }
@@ -218,7 +268,9 @@ export default async function DiscoverPage({
     ? listedJobs.filter((job) => categories.byUrl.get(job.url) === category)
     : listedJobs
   const matchedCounts =
-    matchers.length === 0 && !remote && !country ? null : countMatchedCategories(listedJobs, categories.byUrl)
+    matchers.length === 0 && !remote && !country && !resumeLabel && !resumeHasNoTerms
+      ? null
+      : countMatchedCategories(listedJobs, categories.byUrl)
   const countryScope = category
     ? remoteFiltered.filter((job) => categories.byUrl.get(job.url) === category)
     : remoteFiltered
@@ -233,13 +285,13 @@ export default async function DiscoverPage({
     .map(([name, count]) => ({
       value: countrySlug(name),
       label: `${name} (${count.toLocaleString()})`,
-      href: discoverHref(1, category, query, remote, countrySlug(name)),
+      href: discoverHref(1, category, query, remote, countrySlug(name), requestedResume),
     }))
   if (country && countryParamSlug && !countryOptions.some((option) => option.value === countryParamSlug)) {
     countryOptions.push({
       value: countryParamSlug,
       label: `${country} (0)`,
-      href: discoverHref(1, category, query, remote, countryParamSlug),
+      href: discoverHref(1, category, query, remote, countryParamSlug, requestedResume),
     })
   }
   countryOptions.sort((a, b) => a.label.localeCompare(b.label))
@@ -276,13 +328,14 @@ export default async function DiscoverPage({
           Open roles
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {listingLead(remote, categoryLabel, query, companyCount, country)}
+          {listingLead(remote, categoryLabel, query, companyCount, country, resumeLabel)}
         </p>
 
         <form method="get" action="/discover" className="mt-6 flex gap-2">
           {category ? <input type="hidden" name="category" value={category} /> : null}
           {remote ? <input type="hidden" name="remote" value="1" /> : null}
           {countryParamSlug ? <input type="hidden" name="country" value={countryParamSlug} /> : null}
+          {requestedResume ? <input type="hidden" name="resume" value={requestedResume} /> : null}
           <label className="sr-only" htmlFor="role-search">
             Search titles and descriptions
           </label>
@@ -303,7 +356,7 @@ export default async function DiscoverPage({
           </button>
           {query ? (
             <Link
-              href={discoverHref(1, category, undefined, remote, countryParamSlug)}
+              href={discoverHref(1, category, undefined, remote, countryParamSlug, requestedResume)}
               className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
             >
               Clear
@@ -312,25 +365,35 @@ export default async function DiscoverPage({
         </form>
 
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <RemoteCheckbox checked={remote} href={discoverHref(1, category, query, !remote, countryParamSlug)} />
+          <RemoteCheckbox checked={remote} href={discoverHref(1, category, query, !remote, countryParamSlug, requestedResume)} />
+          <ResumeMatchToggle
+            activeResumeId={requestedResume}
+            category={category}
+            query={query}
+            remote={remote}
+            country={countryParamSlug}
+          />
           <CountrySelect
             value={countryParamSlug ?? ""}
             options={[
-              { value: "", label: "Any country", href: discoverHref(1, category, query, remote) },
+              { value: "", label: "Any country", href: discoverHref(1, category, query, remote, undefined, requestedResume) },
               ...countryOptions,
             ]}
           />
         </div>
 
-        {query && !descriptionSearchReady ? (
+        {(query && !descriptionSearchReady) || (skillTerms.length > 0 && !skillsSearchReady) ? (
           <p className="mt-3 text-sm text-muted-foreground">
             Descriptions are still indexing. These results match titles only.
           </p>
         ) : null}
+        {resumeMissing ? (
+          <p className="mt-3 text-sm text-muted-foreground">That resume could not be loaded.</p>
+        ) : null}
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Link
-            href={discoverHref(1, undefined, query, remote, countryParamSlug)}
+            href={discoverHref(1, undefined, query, remote, countryParamSlug, requestedResume)}
             className={`rounded-full border px-3 py-1 text-sm ${
               category
                 ? "border-border text-foreground hover:bg-muted/60"
@@ -347,7 +410,7 @@ export default async function DiscoverPage({
             return (
               <Link
                 key={item.slug}
-                href={discoverHref(1, item.slug, query, remote, countryParamSlug)}
+                href={discoverHref(1, item.slug, query, remote, countryParamSlug, requestedResume)}
                 className={`rounded-full border px-3 py-1 text-sm ${
                   selected
                     ? "border-blue-600 bg-blue-600 text-white"
@@ -369,7 +432,7 @@ export default async function DiscoverPage({
           <p className="mt-8 text-sm text-muted-foreground">That category is not available.</p>
         ) : visibleJobs.length === 0 ? (
           <p className="mt-8 text-sm text-muted-foreground">
-            {emptyListing(remote, categoryLabel, query, country)}
+            {emptyListing(remote, categoryLabel, query, country, resumeLabel, resumeHasNoTerms)}
           </p>
         ) : (
           <>
@@ -380,7 +443,7 @@ export default async function DiscoverPage({
             <div className="flex items-center gap-2">
               {page > 1 ? (
                 <Link
-                  href={discoverHref(page - 1, category, query, remote, countryParamSlug)}
+                  href={discoverHref(page - 1, category, query, remote, countryParamSlug, requestedResume)}
                   className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
                 >
                   Previous
@@ -388,7 +451,7 @@ export default async function DiscoverPage({
               ) : null}
               {page < pageCount ? (
                 <Link
-                  href={discoverHref(page + 1, category, query, remote, countryParamSlug)}
+                  href={discoverHref(page + 1, category, query, remote, countryParamSlug, requestedResume)}
                   className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
                 >
                   Next

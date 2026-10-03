@@ -193,6 +193,95 @@ function postingsForTerm(term: string, index: JobSearchIndex) {
   return out
 }
 
+const TITLE_MATCH_WEIGHT = 3
+
+function titleTermMatcher(term: string) {
+  if (term.length <= 3) {
+    const pattern = new RegExp(`\\b${term}\\b`, "i")
+    return (title: string, _lower: string) => pattern.test(title)
+  }
+  return (_title: string, lower: string) => lower.includes(term)
+}
+
+function termWeight(term: string, jobCount: number, index: JobSearchIndex | null) {
+  const df = index?.postings.get(term)?.length ?? 0
+  const idf = Math.log((jobCount + 1) / (df + 1))
+  return idf
+}
+
+function isCommonTerm(term: string, index: JobSearchIndex | null, limit: number) {
+  const df = index?.postings.get(term)?.length
+  return df !== undefined && df > limit
+}
+
+export function resumeMatchPositions(
+  titleRoles: string[][],
+  skillTerms: string[],
+  titles: string[],
+  index: JobSearchIndex | null,
+) {
+  const jobCount = titles.length
+  if (jobCount === 0 || (titleRoles.length === 0 && skillTerms.length === 0)) return []
+
+  const scores = new Float64Array(jobCount)
+  const qualifies = new Uint8Array(jobCount)
+  const skillHits = new Uint16Array(jobCount)
+  const usableIndex = index && index.jobCount === jobCount ? index : null
+  const distinctiveLimit = Math.max(1, Math.floor(jobCount * 0.1))
+  let distinctiveSkills = 0
+
+  if (usableIndex) {
+    for (const term of skillTerms) {
+      const list = usableIndex.postings.get(term)
+      if (!list || list.length === 0 || list.length > distinctiveLimit) continue
+      distinctiveSkills += 1
+      const weight = termWeight(term, jobCount, usableIndex)
+      for (const id of list) {
+        if (id >= jobCount) continue
+        scores[id] += weight
+        skillHits[id] += 1
+      }
+    }
+  }
+
+  const minSkillHits = distinctiveSkills <= 1 ? 1 : 2
+  for (let id = 0; id < jobCount; id++) {
+    if (skillHits[id] >= minSkillHits) qualifies[id] = 1
+  }
+
+  const lowers = titles.map((title) => title.toLowerCase())
+  for (const role of titleRoles) {
+    const matchers = role.map((term) => ({
+      matches: titleTermMatcher(term),
+      weight: TITLE_MATCH_WEIGHT * termWeight(term, jobCount, usableIndex),
+      common: isCommonTerm(term, usableIndex, distinctiveLimit),
+    }))
+    const singleCommonWord = matchers.length === 1 && matchers[0].common
+    if (singleCommonWord) continue
+    for (let id = 0; id < jobCount; id++) {
+      let weight = 0
+      let matched = true
+      for (const matcher of matchers) {
+        if (!matcher.matches(titles[id], lowers[id])) {
+          matched = false
+          break
+        }
+        weight += matcher.weight
+      }
+      if (!matched || weight <= 0) continue
+      scores[id] += weight
+      qualifies[id] = 1
+    }
+  }
+
+  const ranked: number[] = []
+  for (let id = 0; id < jobCount; id++) {
+    if (qualifies[id] === 1 && scores[id] > 0) ranked.push(id)
+  }
+  ranked.sort((left, right) => scores[right] - scores[left] || left - right)
+  return ranked
+}
+
 export function descriptionMatchPositions(query: string, index: JobSearchIndex) {
   const terms = descriptionQueryTerms(query)
   if (terms.length === 0 || index.jobCount === 0) return EMPTY
