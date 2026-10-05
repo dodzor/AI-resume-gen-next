@@ -16,9 +16,19 @@ const STOPWORDS = new Set([
 const EMPTY = new Uint32Array()
 const MAX_TOKEN_LENGTH = 64
 
+const INDEX_VERSION = 2
+const ANCHOR_DF_RATIO = 0.03
+
+export type SkillTerm = {
+  term: string
+  acronym: boolean
+  fromRole?: boolean
+}
+
 export type JobSearchIndex = {
   jobCount: number
   postings: Map<string, Uint32Array>
+  acronyms: Map<string, Uint32Array>
 }
 
 function decodeEntities(value: string) {
@@ -58,10 +68,30 @@ function keepToken(token: string) {
   return token.length > 1 && token.length <= MAX_TOKEN_LENGTH && !STOPWORDS.has(token)
 }
 
-export function tokenize(text: string) {
-  const matches = fold(text).match(/[a-z0-9]+/g)
+function isAcronym(raw: string) {
+  let letters = 0
+  for (const char of raw) {
+    if (char >= "0" && char <= "9") continue
+    if (char < "A" || char > "Z") return false
+    letters += 1
+  }
+  return letters >= 2
+}
+
+export function tokenizeWithCase(text: string): SkillTerm[] {
+  const matches = text.match(/[\p{L}\p{N}]+/gu)
   if (!matches) return []
-  return matches.filter(keepToken)
+  const tokens: SkillTerm[] = []
+  for (const raw of matches) {
+    const term = fold(raw).match(/[a-z0-9]+/g)?.join("") ?? ""
+    if (!keepToken(term)) continue
+    tokens.push({ term, acronym: isAcronym(raw) })
+  }
+  return tokens
+}
+
+export function tokenize(text: string) {
+  return tokenizeWithCase(text).map((token) => token.term)
 }
 
 export function descriptionQueryTerms(query: string) {
@@ -75,41 +105,51 @@ export function descriptionQueryTerms(query: string) {
   return terms
 }
 
-export function buildSearchPostings(texts: string[]) {
-  const lists = new Map<string, number[]>()
-  for (let jobIndex = 0; jobIndex < texts.length; jobIndex++) {
-    const text = texts[jobIndex]
-    texts[jobIndex] = ""
-    const seen = new Set<string>()
-    for (const token of tokenize(text)) {
-      if (seen.has(token)) continue
-      seen.add(token)
-      const list = lists.get(token)
-      if (list) list.push(jobIndex)
-      else lists.set(token, [jobIndex])
-    }
-  }
+function addPosting(lists: Map<string, number[]>, token: string, jobIndex: number) {
+  const list = lists.get(token)
+  if (list) list.push(jobIndex)
+  else lists.set(token, [jobIndex])
+}
 
+function freezePostings(lists: Map<string, number[]>) {
   const postings = new Map<string, Uint32Array>()
   for (const [token, list] of lists) postings.set(token, Uint32Array.from(list))
   return postings
 }
 
-export function encodeSearchIndex(jobCount: number, postings: Map<string, Uint32Array>) {
-  const entries = [...postings.entries()]
-  let size = 16
+export function buildSearchPostings(texts: string[]) {
+  const lists = new Map<string, number[]>()
+  const acronymLists = new Map<string, number[]>()
+  for (let jobIndex = 0; jobIndex < texts.length; jobIndex++) {
+    const text = texts[jobIndex]
+    texts[jobIndex] = ""
+    const seen = new Set<string>()
+    const seenAcronyms = new Set<string>()
+    for (const token of tokenizeWithCase(text)) {
+      if (!seen.has(token.term)) {
+        seen.add(token.term)
+        addPosting(lists, token.term, jobIndex)
+      }
+      if (!token.acronym || seenAcronyms.has(token.term)) continue
+      seenAcronyms.add(token.term)
+      addPosting(acronymLists, token.term, jobIndex)
+    }
+  }
+
+  return { postings: freezePostings(lists), acronyms: freezePostings(acronymLists) }
+}
+
+function measureEntries(entries: [string, Uint32Array][]) {
+  let size = 0
   const words = entries.map(([word, list]) => {
     const bytes = Buffer.from(word)
     size += 2 + bytes.length + 4 + list.byteLength
     return { bytes, list }
   })
+  return { size, words }
+}
 
-  const buffer = Buffer.allocUnsafe(size)
-  buffer.write("GHJS", 0, "utf8")
-  buffer.writeUInt32LE(1, 4)
-  buffer.writeUInt32LE(jobCount, 8)
-  buffer.writeUInt32LE(entries.length, 12)
-  let offset = 16
+function writeEntries(buffer: Buffer, offset: number, words: Array<{ bytes: Buffer; list: Uint32Array }>) {
   for (const { bytes, list } of words) {
     buffer.writeUInt16LE(bytes.length, offset)
     offset += 2
@@ -120,18 +160,32 @@ export function encodeSearchIndex(jobCount: number, postings: Map<string, Uint32
     Buffer.from(list.buffer, list.byteOffset, list.byteLength).copy(buffer, offset)
     offset += list.byteLength
   }
+  return offset
+}
+
+export function encodeSearchIndex(
+  jobCount: number,
+  postings: Map<string, Uint32Array>,
+  acronyms: Map<string, Uint32Array> = new Map(),
+) {
+  const words = measureEntries([...postings.entries()])
+  const acronymWords = measureEntries([...acronyms.entries()])
+  const size = 16 + words.size + 4 + acronymWords.size
+  const buffer = Buffer.allocUnsafe(size)
+  buffer.write("GHJS", 0, "utf8")
+  buffer.writeUInt32LE(INDEX_VERSION, 4)
+  buffer.writeUInt32LE(jobCount, 8)
+  buffer.writeUInt32LE(postings.size, 12)
+  let offset = writeEntries(buffer, 16, words.words)
+  buffer.writeUInt32LE(acronyms.size, offset)
+  offset += 4
+  offset = writeEntries(buffer, offset, acronymWords.words)
   if (offset !== size) throw new Error("Search index size mismatch")
   return buffer
 }
 
-export function decodeSearchIndex(buffer: Buffer): JobSearchIndex | null {
-  if (buffer.length < 16 || buffer.toString("utf8", 0, 4) !== "GHJS") return null
-  if (buffer.readUInt32LE(4) !== 1) return null
-  const jobCount = buffer.readUInt32LE(8)
-  const tokenCount = buffer.readUInt32LE(12)
+function readPostings(buffer: Buffer, offset: number, tokenCount: number) {
   const postings = new Map<string, Uint32Array>()
-  let offset = 16
-
   for (let index = 0; index < tokenCount; index++) {
     if (offset + 2 > buffer.length) return null
     const wordLength = buffer.readUInt16LE(offset)
@@ -145,12 +199,27 @@ export function decodeSearchIndex(buffer: Buffer): JobSearchIndex | null {
     if (offset + byteLength > buffer.length) return null
     const copy = Buffer.allocUnsafe(byteLength)
     buffer.copy(copy, 0, offset, offset + byteLength)
-    const list = new Uint32Array(copy.buffer, copy.byteOffset, count)
-    postings.set(word, list)
+    postings.set(word, new Uint32Array(copy.buffer, copy.byteOffset, count))
     offset += byteLength
   }
+  return { postings, offset }
+}
 
-  return { jobCount, postings }
+export function decodeSearchIndex(buffer: Buffer): JobSearchIndex | null {
+  if (buffer.length < 16 || buffer.toString("utf8", 0, 4) !== "GHJS") return null
+  const version = buffer.readUInt32LE(4)
+  if (version !== 1 && version !== INDEX_VERSION) return null
+  const jobCount = buffer.readUInt32LE(8)
+  const tokenCount = buffer.readUInt32LE(12)
+  const words = readPostings(buffer, 16, tokenCount)
+  if (!words) return null
+  if (version === 1) return { jobCount, postings: words.postings, acronyms: new Map() }
+
+  if (words.offset + 4 > buffer.length) return null
+  const acronymCount = buffer.readUInt32LE(words.offset)
+  const acronyms = readPostings(buffer, words.offset + 4, acronymCount)
+  if (!acronyms) return null
+  return { jobCount, postings: words.postings, acronyms: acronyms.postings }
 }
 
 function intersectSorted(left: Uint32Array, right: Uint32Array) {
@@ -209,14 +278,17 @@ function termWeight(term: string, jobCount: number, index: JobSearchIndex | null
   return idf
 }
 
-function isCommonTerm(term: string, index: JobSearchIndex | null, limit: number) {
-  const df = index?.postings.get(term)?.length
-  return df !== undefined && df > limit
+function skillPostings(term: SkillTerm, index: JobSearchIndex) {
+  if (term.acronym) {
+    const acronyms = index.acronyms.get(term.term)
+    if (acronyms && acronyms.length > 0) return acronyms
+  }
+  return index.postings.get(term.term)
 }
 
 export function resumeMatchPositions(
   titleRoles: string[][],
-  skillTerms: string[],
+  skillTerms: SkillTerm[],
   titles: string[],
   index: JobSearchIndex | null,
 ) {
@@ -225,28 +297,40 @@ export function resumeMatchPositions(
 
   const scores = new Float64Array(jobCount)
   const qualifies = new Uint8Array(jobCount)
-  const skillHits = new Uint16Array(jobCount)
+  const anchorHits = new Uint8Array(jobCount)
+  const titleMatched = new Uint8Array(jobCount)
   const usableIndex = index && index.jobCount === jobCount ? index : null
-  const distinctiveLimit = Math.max(1, Math.floor(jobCount * 0.1))
-  let distinctiveSkills = 0
+  const anchorLimit = Math.max(1, Math.floor(jobCount * ANCHOR_DF_RATIO))
+  let anchorTerms = 0
 
   if (usableIndex) {
+    const prepared: Array<{ list: Uint32Array; weight: number; anchor: boolean; fromRole: boolean; acronym: boolean }> = []
     for (const term of skillTerms) {
-      const list = usableIndex.postings.get(term)
-      if (!list || list.length === 0 || list.length > distinctiveLimit) continue
-      distinctiveSkills += 1
-      const weight = termWeight(term, jobCount, usableIndex)
-      for (const id of list) {
+      const list = skillPostings(term, usableIndex)
+      if (!list || list.length === 0) continue
+      const anchor = list.length <= anchorLimit
+      if (anchor) anchorTerms += 1
+      prepared.push({
+        list,
+        weight: Math.log((jobCount + 1) / (list.length + 1)),
+        anchor,
+        fromRole: Boolean(term.fromRole),
+        acronym: term.acronym,
+      })
+    }
+    for (const item of prepared) {
+      for (const id of item.list) {
         if (id >= jobCount) continue
-        scores[id] += weight
-        skillHits[id] += 1
+        scores[id] += item.weight
+        if (item.fromRole && (item.anchor || !item.acronym)) qualifies[id] = 1
+        if (item.anchor && anchorHits[id] < 255) anchorHits[id] += 1
       }
     }
   }
 
-  const minSkillHits = distinctiveSkills <= 1 ? 1 : 2
+  const minAnchors = anchorTerms >= 2 ? 2 : 1
   for (let id = 0; id < jobCount; id++) {
-    if (skillHits[id] >= minSkillHits) qualifies[id] = 1
+    if (anchorHits[id] >= minAnchors) qualifies[id] = 1
   }
 
   const lowers = titles.map((title) => title.toLowerCase())
@@ -254,10 +338,7 @@ export function resumeMatchPositions(
     const matchers = role.map((term) => ({
       matches: titleTermMatcher(term),
       weight: TITLE_MATCH_WEIGHT * termWeight(term, jobCount, usableIndex),
-      common: isCommonTerm(term, usableIndex, distinctiveLimit),
     }))
-    const singleCommonWord = matchers.length === 1 && matchers[0].common
-    if (singleCommonWord) continue
     for (let id = 0; id < jobCount; id++) {
       let weight = 0
       let matched = true
@@ -270,6 +351,7 @@ export function resumeMatchPositions(
       }
       if (!matched || weight <= 0) continue
       scores[id] += weight
+      titleMatched[id] = 1
       qualifies[id] = 1
     }
   }
@@ -278,7 +360,11 @@ export function resumeMatchPositions(
   for (let id = 0; id < jobCount; id++) {
     if (qualifies[id] === 1 && scores[id] > 0) ranked.push(id)
   }
-  ranked.sort((left, right) => scores[right] - scores[left] || left - right)
+  ranked.sort((left, right) => {
+    const byTitle = titleMatched[right] - titleMatched[left]
+    if (byTitle !== 0) return byTitle
+    return scores[right] - scores[left] || left - right
+  })
   return ranked
 }
 

@@ -1,4 +1,4 @@
-import { tokenize } from "@/lib/jobSearch"
+import { tokenizeWithCase, type SkillTerm } from "@/lib/jobSearch"
 
 export const LAST_EDITED_RESUME_KEY = "lastEditedResumeId"
 
@@ -12,27 +12,54 @@ const ROLE_FILLER = new Set([
   "head", "chief", "vice", "assistant", "experienced", "temporary", "contract", "remote",
 ])
 
-function uniqueTerms(text: string) {
-  const terms: string[] = []
-  const seen = new Set<string>()
-  for (const token of tokenize(text)) {
-    if (seen.has(token)) continue
-    seen.add(token)
-    terms.push(token)
+const GENERIC_ROLE = new Set([
+  "developer", "developers", "engineer", "engineers", "engineering", "programmer", "development",
+  "backend", "frontend", "fullstack", "software", "manager", "management", "analyst", "designer",
+  "architect", "consultant", "specialist", "officer", "director", "coordinator",
+])
+
+function uniqueSkillTerms(text: string) {
+  const byTerm = new Map<string, SkillTerm>()
+  for (const token of tokenizeWithCase(text)) {
+    const existing = byTerm.get(token.term)
+    if (!existing) byTerm.set(token.term, token)
+    else if (token.acronym) existing.acronym = true
   }
-  return terms
+  return [...byTerm.values()]
 }
 
 export function resumeSearchTerms(resume: {
   experiences: Array<{ role: string }>
   skills: string
   portfolioProjects: Array<{ toolsSkills: string }>
+  jobTitle?: string
 }) {
-  const titleRoles = resume.experiences
-    .map((entry) => uniqueTerms(entry.role).filter((term) => !ROLE_FILLER.has(term)))
-    .filter((terms) => terms.length > 0)
-  const skillTerms = uniqueTerms(
+  const titleRoles: string[][] = []
+  const seenRoles = new Set<string>()
+  const roleSkills: SkillTerm[] = []
+  const roleTexts = [...resume.experiences.map((entry) => entry.role), resume.jobTitle ?? ""]
+  for (const role of roleTexts) {
+    const title: string[] = []
+    for (const token of tokenizeWithCase(role)) {
+      if (ROLE_FILLER.has(token.term) || GENERIC_ROLE.has(token.term)) continue
+      roleSkills.push({ ...token, fromRole: true })
+      if (!token.acronym) title.push(token.term)
+    }
+    const key = title.join(" ")
+    if (!key || seenRoles.has(key)) continue
+    seenRoles.add(key)
+    titleRoles.push(title)
+  }
+  const skillTerms = uniqueSkillTerms(
     [resume.skills, ...resume.portfolioProjects.map((project) => project.toolsSkills)].filter(Boolean).join(" "),
   )
+  for (const token of roleSkills) {
+    const existing = skillTerms.find((term) => term.term === token.term)
+    if (!existing) skillTerms.push(token)
+    else {
+      if (token.acronym) existing.acronym = true
+      if (token.fromRole) existing.fromRole = true
+    }
+  }
   return { titleRoles, skillTerms }
 }

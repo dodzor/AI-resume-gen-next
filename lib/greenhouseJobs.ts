@@ -233,17 +233,19 @@ async function ensureJobCategories(jobs: GreenhouseJobListing[]) {
 }
 
 async function writeSearchIndex(texts: string[]) {
-  const postings = buildSearchPostings(texts)
-  const encoded = encodeSearchIndex(texts.length, postings)
+  const { postings, acronyms } = buildSearchPostings(texts)
+  const encoded = encodeSearchIndex(texts.length, postings, acronyms)
   const tempPath = `${SEARCH_INDEX_PATH}.tmp`
   await fs.mkdir(path.dirname(SEARCH_INDEX_PATH), { recursive: true })
   await fs.writeFile(tempPath, encoded)
   await fs.rename(tempPath, SEARCH_INDEX_PATH)
   searchMemory = {
     stamp: (await fs.stat(SEARCH_INDEX_PATH)).mtimeMs,
-    index: { jobCount: texts.length, postings },
+    index: { jobCount: texts.length, postings, acronyms },
   }
-  console.log(`Indexed ${postings.size} words for description search (${encoded.length} bytes)`)
+  console.log(
+    `Indexed ${postings.size} words and ${acronyms.size} acronyms for description search (${encoded.length} bytes)`,
+  )
 }
 
 async function searchIndexMatches(jobCount: number) {
@@ -257,7 +259,8 @@ async function searchIndexMatches(jobCount: number) {
     try {
       const header = Buffer.alloc(16)
       const { bytesRead } = await handle.read(header, 0, 16, 0)
-      if (bytesRead < 16 || header.toString("utf8", 0, 4) !== "GHJS" || header.readUInt32LE(4) !== 1) {
+      const version = header.readUInt32LE(4)
+      if (bytesRead < 16 || header.toString("utf8", 0, 4) !== "GHJS" || (version !== 1 && version !== 2)) {
         return false
       }
       return header.readUInt32LE(8) === jobCount

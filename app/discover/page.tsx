@@ -6,7 +6,7 @@ import { discoverHref } from "@/lib/discoverHref"
 import { fetchGreenhouseJobs, loadJobCategories, loadJobSearchIndex } from "@/lib/greenhouseJobs"
 import { isJobCategorySlug, JOB_CATEGORIES } from "@/lib/jobCategories"
 import { countryFromParam, countrySlug, countriesInLocation } from "@/lib/jobCountries"
-import { descriptionMatchPositions, resumeMatchPositions } from "@/lib/jobSearch"
+import { descriptionMatchPositions, resumeMatchPositions, type SkillTerm } from "@/lib/jobSearch"
 import { loadMatchResume } from "@/lib/loadMatchResume"
 import { resumeMatchLabel, resumeSearchTerms } from "@/lib/resumeMatch"
 
@@ -205,7 +205,7 @@ export default async function DiscoverPage({
   const loadedResume = matchResume?.status === "ok" ? matchResume.resume : null
   const { titleRoles, skillTerms } = loadedResume
     ? resumeSearchTerms(loadedResume)
-    : { titleRoles: [] as string[][], skillTerms: [] as string[] }
+    : { titleRoles: [] as string[][], skillTerms: [] as SkillTerm[] }
   const resumeHasNoTerms = Boolean(loadedResume) && titleRoles.length === 0 && skillTerms.length === 0
   const resumeLabel = loadedResume && !resumeHasNoTerms ? resumeMatchLabel(loadedResume) : undefined
   const categories = await loadJobCategories()

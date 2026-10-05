@@ -31,6 +31,12 @@ function LandingPage() {
           </div>
           <div className="flex items-center gap-3">
             <Link
+              href="/discover"
+              className="hidden rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60 md:inline-flex"
+            >
+              Discover jobs
+            </Link>
+            <Link
               href="/free-resume-scanner"
               className="hidden rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100 md:inline-flex"
             >
@@ -83,6 +89,12 @@ function LandingPage() {
               </span>
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Link
+                href="/discover"
+                className="inline-flex items-center justify-center rounded-md border border-border bg-white px-5 py-2 text-sm font-semibold text-foreground shadow-sm hover:bg-muted/60"
+              >
+                Discover jobs
+              </Link>
               <Link
                 href="/free-resume-scanner"
                 className="inline-flex items-center justify-center rounded-md border border-blue-300 bg-blue-50 px-5 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-100"
