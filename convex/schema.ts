@@ -126,6 +126,10 @@ export default defineSchema({
   // read softwareJobs without loading the posting body.
   softwareJobDescriptions: defineTable({
     text: v.string(),
+    remote: v.optional(v.boolean()),
+  }).searchIndex("search_text", {
+    searchField: "text",
+    filterFields: ["remote"],
   }),
 
   softwareJobs: defineTable({
@@ -137,5 +141,35 @@ export default defineSchema({
     url: v.string(),
     updatedAt: v.string(),
     descriptionId: v.id("softwareJobDescriptions"),
-  }).index("by_url", ["url"]),
+    remote: v.optional(v.boolean()),
+    countries: v.optional(v.array(v.string())),
+  })
+    .index("by_url", ["url"])
+    .index("by_remote", ["remote"])
+    .index("by_description", ["descriptionId"])
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["remote"],
+    }),
+
+  softwareJobCountries: defineTable({
+    jobId: v.id("softwareJobs"),
+    country: v.string(),
+    remote: v.boolean(),
+  })
+    .index("by_country_remote", ["country", "remote"])
+    .index("by_job", ["jobId"]),
+
+  softwareCatalog: defineTable({
+    total: v.number(),
+    remoteTotal: v.number(),
+    countries: v.array(
+      v.object({
+        name: v.string(),
+        count: v.number(),
+        remoteCount: v.number(),
+      }),
+    ),
+    updatedAt: v.number(),
+  }),
 });

@@ -6,11 +6,13 @@ import { api } from "../convex/_generated/api"
 import type { Doc, Id } from "../convex/_generated/dataModel"
 import boardTokens from "./greenhouseBoards.json"
 import { categoryForTitle } from "./jobCategories"
+import { countriesInLocation, isRemoteLocation } from "./jobCountries"
 import { plainTextFromGreenhouseContent } from "./jobSearch"
 
 const LIST_CONCURRENCY = 16
 const CONTENT_BATCH = 8
 const DELETE_BATCH = 100
+const FACET_BATCH = 20
 const STAMP_PAGE_SIZE = 200
 const MAX_TEXT_BYTES = 800_000
 
@@ -32,6 +34,8 @@ export type ListedSoftwareJob = {
   location: string
   url: string
   updatedAt: string
+  remote: boolean
+  countries: string[]
 }
 
 export type StoredSoftwareJob = {
@@ -40,6 +44,17 @@ export type StoredSoftwareJob = {
   boardToken: string
   url: string
   updatedAt: string
+  remote?: boolean
+  countries?: string[]
+}
+
+function sameFacets(stored: StoredSoftwareJob, listed: ListedSoftwareJob) {
+  if (typeof stored.remote !== "boolean" || !stored.countries) return false
+  if (stored.remote !== listed.remote || stored.countries.length !== listed.countries.length) return false
+  for (let index = 0; index < listed.countries.length; index++) {
+    if (stored.countries[index] !== listed.countries[index]) return false
+  }
+  return true
 }
 
 export function planSoftwareJobSync(
@@ -64,11 +79,16 @@ export function planSoftwareJobSync(
   }
 
   const toFetch: ListedSoftwareJob[] = []
+  const toPatch: ListedSoftwareJob[] = []
   let unchanged = 0
   for (const job of listedByUrl.values()) {
     const stamp = storedByUrl.get(job.url)
-    if (stamp && stamp.updatedAt === job.updatedAt) unchanged += 1
-    else toFetch.push(job)
+    if (!stamp || stamp.updatedAt !== job.updatedAt) {
+      toFetch.push(job)
+      continue
+    }
+    if (sameFacets(stamp, job)) unchanged += 1
+    else toPatch.push(job)
   }
 
   for (const job of storedByUrl.values()) {
@@ -76,7 +96,7 @@ export function planSoftwareJobSync(
     if (!listedByUrl.has(job.url)) toDelete.push(job)
   }
 
-  return { unchanged, toFetch, toDelete }
+  return { unchanged, toFetch, toPatch, toDelete }
 }
 
 const envFromFile = new Set<string>()
@@ -128,14 +148,17 @@ async function fetchJson(url: string): Promise<unknown | null> {
 function toListedJob(boardToken: string, job: GreenhouseJob): ListedSoftwareJob | null {
   if (typeof job.id !== "number" || !job.title || !job.absolute_url) return null
   if (categoryForTitle(job.title) !== "software") return null
+  const location = job.location?.name || "Location not listed"
   return {
     greenhouseId: job.id,
     boardToken,
     title: job.title,
     companyName: job.company_name || boardToken,
-    location: job.location?.name || "Location not listed",
+    location,
     url: job.absolute_url,
     updatedAt: job.updated_at || "",
+    remote: isRemoteLocation(location),
+    countries: [...countriesInLocation(location)].sort(),
   }
 }
 
@@ -187,6 +210,8 @@ async function loadStoredJobs(convex: ConvexHttpClient, secret: string) {
         boardToken: job.boardToken,
         url: job.url,
         updatedAt: job.updatedAt,
+        remote: job.remote,
+        countries: job.countries ? [...job.countries] : undefined,
       })
     }
     if (page.isDone) break
@@ -236,7 +261,7 @@ export async function syncSoftwareJobs() {
 
   const plan = planSoftwareJobSync(listed, stored, fetchedBoards)
   console.log(
-    `${plan.unchanged} unchanged, ${plan.toFetch.length} to fetch, ${plan.toDelete.length} to delete, ${failedBoards} boards failed`,
+    `${plan.unchanged} unchanged, ${plan.toPatch.length} to update filters, ${plan.toFetch.length} to fetch, ${plan.toDelete.length} to delete, ${failedBoards} boards failed`,
   )
 
   let deleted = 0
@@ -244,6 +269,20 @@ export async function syncSoftwareJobs() {
     const ids = plan.toDelete.slice(start, start + DELETE_BATCH).map((job) => job.id)
     const result = await convex.mutation(api.softwareJobs.deleteSoftwareJobs, { secret, ids })
     deleted += result.deleted
+  }
+
+  let patched = 0
+  for (let start = 0; start < plan.toPatch.length; start += FACET_BATCH) {
+    const jobs = plan.toPatch.slice(start, start + FACET_BATCH).map((job) => ({
+      url: job.url,
+      remote: job.remote,
+      countries: job.countries,
+    }))
+    const result = await convex.mutation(api.softwareJobs.patchSoftwareJobFacets, { secret, jobs })
+    patched += result.patched
+    if (patched % 500 < FACET_BATCH || start + FACET_BATCH >= plan.toPatch.length) {
+      console.log(`Updated filters on ${patched} software jobs`)
+    }
   }
 
   let upserted = 0
@@ -264,7 +303,10 @@ export async function syncSoftwareJobs() {
           console.warn(`Skipping ${job.url}: description is too large`)
           return
         }
-        jobs.push({ ...job, text })
+        jobs.push({
+          ...job,
+          text,
+        })
       }),
     )
     if (jobs.length === 0) continue
@@ -276,8 +318,31 @@ export async function syncSoftwareJobs() {
     }
   }
 
+  if (failedBoards === 0) {
+    const seen = new Set<string>()
+    const countryCounts = new Map<string, { count: number; remoteCount: number }>()
+    let total = 0
+    let remoteTotal = 0
+    for (const job of listed) {
+      if (seen.has(job.url)) continue
+      seen.add(job.url)
+      total += 1
+      if (job.remote) remoteTotal += 1
+      for (const name of job.countries) {
+        const current = countryCounts.get(name) ?? { count: 0, remoteCount: 0 }
+        current.count += 1
+        if (job.remote) current.remoteCount += 1
+        countryCounts.set(name, current)
+      }
+    }
+    const countries = [...countryCounts.entries()]
+      .map(([name, counts]) => ({ name, count: counts.count, remoteCount: counts.remoteCount }))
+      .sort((left, right) => left.name.localeCompare(right.name))
+    await convex.mutation(api.softwareJobs.setSoftwareCatalog, { secret, total, remoteTotal, countries })
+  }
+
   console.log(
-    `Software sync finished: ${upserted} upserted, ${plan.unchanged} unchanged, ${deleted} deleted, ${contentFailed} content fetches failed, ${skipped} skipped`,
+    `Software sync finished: ${upserted} upserted, ${plan.unchanged} unchanged, ${patched} filters updated, ${deleted} deleted, ${contentFailed} content fetches failed, ${skipped} skipped`,
   )
 }
 

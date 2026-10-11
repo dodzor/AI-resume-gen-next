@@ -545,6 +545,10 @@ export function countryFromParam(value: string | undefined) {
   return NAME_BY_SLUG.get(trimmed.toLowerCase()) ?? NAME_BY_LOWER.get(trimmed.toLowerCase())
 }
 
+export function isRemoteLocation(location: string) {
+  return /\bremote\b/i.test(location)
+}
+
 export function countriesInLocation(location: string): readonly string[] {
   const cached = parsed.get(location)
   if (cached) return cached

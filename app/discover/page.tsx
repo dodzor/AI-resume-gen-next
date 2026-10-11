@@ -3,25 +3,27 @@ import { CountrySelect } from "@/components/CountrySelect"
 import { RemoteCheckbox } from "@/components/RemoteCheckbox"
 import { ResumeMatchToggle } from "@/components/ResumeMatchToggle"
 import { discoverHref } from "@/lib/discoverHref"
-import { fetchGreenhouseJobs, loadJobCategories, loadJobSearchIndex } from "@/lib/greenhouseJobs"
+import { countryOptionSlug, loadDiscoverJobs } from "@/lib/loadDiscoverJobs"
 import { isJobCategorySlug, JOB_CATEGORIES } from "@/lib/jobCategories"
-import { countryFromParam, countrySlug, countriesInLocation } from "@/lib/jobCountries"
-import { descriptionMatchPositions, resumeMatchPositions, type SkillTerm } from "@/lib/jobSearch"
+import { countryFromParam, countrySlug } from "@/lib/jobCountries"
+import type { SkillTerm } from "@/lib/jobSearch"
 import { loadMatchResume } from "@/lib/loadMatchResume"
 import { resumeMatchLabel, resumeSearchTerms } from "@/lib/resumeMatch"
 
 const PAGE_SIZE = 20
 
+export const dynamic = "force-dynamic"
+
 export const metadata = {
   title: "Discover jobs",
-  description: "Open roles from a Greenhouse job board.",
+  description: "Open software roles from public Greenhouse job boards.",
 }
 
-function parsePage(value: string | string[] | undefined, pageCount: number) {
+function parsePage(value: string | string[] | undefined) {
   const raw = Array.isArray(value) ? value[0] : value
   const parsed = Number(raw)
   if (!Number.isInteger(parsed) || parsed < 1) return 1
-  return Math.min(parsed, pageCount)
+  return parsed
 }
 
 function parseQuery(value: string | string[] | undefined) {
@@ -36,8 +38,34 @@ function parseResume(value: string | string[] | undefined) {
   return trimmed
 }
 
-function isRemoteLocation(location: string) {
-  return /\bremote\b/i.test(location)
+function parseCursorStack(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === "string")) return []
+    return parsed.slice(-50)
+  } catch {
+    return []
+  }
+}
+
+function resumeTerms(titleRoles: string[][], skillTerms: SkillTerm[]) {
+  const terms: string[] = []
+  const seen = new Set<string>()
+  const add = (term: string) => {
+    if (!term || term.length > 32 || seen.has(term)) return
+    seen.add(term)
+    terms.push(term)
+  }
+  for (const skill of skillTerms) {
+    if (skill.fromRole) add(skill.term)
+  }
+  for (const role of titleRoles) {
+    for (const term of role) add(term)
+  }
+  for (const skill of skillTerms) add(skill.term)
+  return terms.slice(0, 8)
 }
 
 function listingLead(
@@ -121,34 +149,6 @@ function emptyListing(
   return remote ? "No remote roles were returned." : "No open roles were returned."
 }
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-}
-
-function titleTokenMatchers(query: string) {
-  return query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((token) => {
-      if (token.length <= 3) {
-        const pattern = new RegExp(`\\b${escapeRegExp(token)}\\b`, "i")
-        return (title: string, _lower: string) => pattern.test(title)
-      }
-      return (_title: string, lower: string) => lower.includes(token)
-    })
-}
-
-function countMatchedCategories<T extends string>(jobs: Array<{ url: string }>, byUrl: Map<string, T>) {
-  const counts = new Map<string, number>()
-  for (const job of jobs) {
-    const slug = byUrl.get(job.url)
-    if (!slug) continue
-    counts.set(slug, (counts.get(slug) ?? 0) + 1)
-  }
-  return counts
-}
-
 function formatUpdatedAt(value: string) {
   if (!value) return null
   const date = new Date(value)
@@ -170,6 +170,7 @@ export default async function DiscoverPage({
     remote?: string | string[]
     country?: string | string[]
     resume?: string | string[]
+    cursor?: string | string[]
   }>
 }) {
   const {
@@ -179,6 +180,7 @@ export default async function DiscoverPage({
     remote: remoteParam,
     country: countryParam,
     resume: resumeParam,
+    cursor: cursorParam,
   } = await searchParams
   const requestedCategory = Array.isArray(categoryParam) ? categoryParam[0] : categoryParam
   const category = requestedCategory && isJobCategorySlug(requestedCategory) ? requestedCategory : undefined
@@ -190,16 +192,10 @@ export default async function DiscoverPage({
   const countryParamSlug = country ? countrySlug(country) : undefined
   const requestedResume = parseResume(resumeParam)
   const unknownCategory = Boolean(requestedCategory) && !category
-  let jobs: Awaited<ReturnType<typeof fetchGreenhouseJobs>> = []
-  let loadError = false
+  const unsupportedCategory = Boolean(category) && category !== "software"
+  const cursorStack = parseCursorStack(cursorParam)
+  const page = parsePage(pageParam)
   const resumePromise = requestedResume ? loadMatchResume(requestedResume) : Promise.resolve(null)
-
-  try {
-    jobs = await fetchGreenhouseJobs()
-  } catch {
-    loadError = true
-  }
-
   const matchResume = await resumePromise
   const resumeMissing = matchResume?.status === "missing"
   const loadedResume = matchResume?.status === "ok" ? matchResume.resume : null
@@ -208,101 +204,43 @@ export default async function DiscoverPage({
     : { titleRoles: [] as string[][], skillTerms: [] as SkillTerm[] }
   const resumeHasNoTerms = Boolean(loadedResume) && titleRoles.length === 0 && skillTerms.length === 0
   const resumeLabel = loadedResume && !resumeHasNoTerms ? resumeMatchLabel(loadedResume) : undefined
-  const categories = await loadJobCategories()
-  const matchers = titleTokenMatchers(query)
-  const needsIndex = matchers.length > 0 || skillTerms.length > 0 || titleRoles.length > 0
-  const searchIndex = needsIndex ? await loadJobSearchIndex(jobs.length) : null
-  const descriptionPositions = searchIndex && matchers.length > 0 ? descriptionMatchPositions(query, searchIndex) : null
-  const descriptionSearchReady = matchers.length === 0 || descriptionPositions !== null
-  const skillsSearchReady = skillTerms.length === 0 || searchIndex !== null
-  const matchedInDescription = new Set<(typeof jobs)[number]>()
-  const queryPositions = new Set<number>()
-  if (matchers.length > 0) {
-    const titlePositions = new Set<number>()
-    for (let index = 0; index < jobs.length; index++) {
-      const job = jobs[index]
-      const lower = job.title.toLowerCase()
-      if (!matchers.every((matches) => matches(job.title, lower))) continue
-      queryPositions.add(index)
-      titlePositions.add(index)
-    }
-    if (descriptionPositions) {
-      for (const position of descriptionPositions) {
-        if (titlePositions.has(position) || !jobs[position]) continue
-        queryPositions.add(position)
-        matchedInDescription.add(jobs[position])
-      }
-    }
+  const terms = resumeLabel ? resumeTerms(titleRoles, skillTerms) : []
+  const searching = query.length > 0 || terms.length > 0
+  let loadError = false
+  let loaded = {
+    jobs: [] as Awaited<ReturnType<typeof loadDiscoverJobs>>["jobs"],
+    total: 0 as number | null,
+    isDone: true,
+    continueCursor: null as string | null,
+    capped: false,
+    companyCount: 0,
+    softwareCount: 0,
+    countryOptions: [] as Array<{ name: string; count: number }>,
   }
-  const resumeOrder = resumeLabel
-    ? resumeMatchPositions(titleRoles, skillTerms, jobs.map((job) => job.title), searchIndex)
-    : null
-  let matchedJobs: typeof jobs
-  if (resumeHasNoTerms) {
-    matchedJobs = []
-  } else if (resumeOrder) {
-    matchedJobs = []
-    for (const index of resumeOrder) {
-      if (matchers.length > 0 && !queryPositions.has(index)) continue
-      const job = jobs[index]
-      if (job) matchedJobs.push(job)
-    }
-  } else if (matchers.length === 0) {
-    matchedJobs = jobs
-  } else {
-    const titleHits: typeof jobs = []
-    const descriptionHits: typeof jobs = []
-    for (let index = 0; index < jobs.length; index++) {
-      if (!queryPositions.has(index)) continue
-      const job = jobs[index]
-      if (matchedInDescription.has(job)) descriptionHits.push(job)
-      else titleHits.push(job)
-    }
-    matchedJobs = titleHits.concat(descriptionHits)
-  }
-  const remoteFiltered = remote ? matchedJobs.filter((job) => isRemoteLocation(job.location)) : matchedJobs
-  const listedJobs = country
-    ? remoteFiltered.filter((job) => countriesInLocation(job.location).includes(country))
-    : remoteFiltered
-  const visibleJobs = category
-    ? listedJobs.filter((job) => categories.byUrl.get(job.url) === category)
-    : listedJobs
-  const matchedCounts =
-    matchers.length === 0 && !remote && !country && !resumeLabel && !resumeHasNoTerms
-      ? null
-      : countMatchedCategories(listedJobs, categories.byUrl)
-  const countryScope = category
-    ? remoteFiltered.filter((job) => categories.byUrl.get(job.url) === category)
-    : remoteFiltered
-  const countryCounts = new Map<string, number>()
-  for (const job of countryScope) {
-    for (const name of countriesInLocation(job.location)) {
-      countryCounts.set(name, (countryCounts.get(name) ?? 0) + 1)
-    }
-  }
-  const countryOptions = [...countryCounts.entries()]
-    .filter(([, count]) => count > 0)
-    .map(([name, count]) => ({
-      value: countrySlug(name),
-      label: `${name} (${count.toLocaleString()})`,
-      href: discoverHref(1, category, query, remote, countrySlug(name), requestedResume),
-    }))
-  if (country && countryParamSlug && !countryOptions.some((option) => option.value === countryParamSlug)) {
-    countryOptions.push({
-      value: countryParamSlug,
-      label: `${country} (0)`,
-      href: discoverHref(1, category, query, remote, countryParamSlug, requestedResume),
+
+  try {
+    loaded = await loadDiscoverJobs({
+      mode: unknownCategory || unsupportedCategory || resumeHasNoTerms ? "empty" : searching ? "search" : "browse",
+      cursor: cursorStack.at(-1) ?? null,
+      page,
+      remote,
+      country,
+      query,
+      terms,
     })
+  } catch {
+    loadError = true
   }
-  countryOptions.sort((a, b) => a.label.localeCompare(b.label))
-  const categoryLabel = JOB_CATEGORIES.find((item) => item.slug === category)?.label
-  const companyCount = new Set(visibleJobs.map((job) => job.companyName)).size
-  const pageCount = Math.max(1, Math.ceil(visibleJobs.length / PAGE_SIZE))
-  const page = parsePage(pageParam, visibleJobs.length === 0 ? 1 : pageCount)
-  const start = (page - 1) * PAGE_SIZE
-  const pageJobs = visibleJobs.slice(start, start + PAGE_SIZE)
-  const rangeStart = visibleJobs.length === 0 ? 0 : start + 1
-  const rangeEnd = start + pageJobs.length
+
+  const categoryLabel = category ? JOB_CATEGORIES.find((item) => item.slug === category)?.label : undefined
+  const jobs = loaded.jobs
+  const total = loaded.total
+  const start = jobs.length === 0 ? 0 : searching ? (page - 1) * PAGE_SIZE + 1 : cursorStack.length * PAGE_SIZE + 1
+  const rangeEnd = start === 0 ? 0 : start + jobs.length - 1
+  const pageCount = Math.max(1, Math.ceil((total ?? jobs.length) / PAGE_SIZE))
+  const nextStack =
+    !searching && loaded.continueCursor && !loaded.isDone ? [...cursorStack, loaded.continueCursor] : undefined
+  const previousStack = cursorStack.slice(0, -1)
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -328,7 +266,7 @@ export default async function DiscoverPage({
           Open roles
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {listingLead(remote, categoryLabel, query, companyCount, country, resumeLabel)}
+          {listingLead(remote, categoryLabel ?? "Software", query, loaded.companyCount, country, resumeLabel)}
         </p>
 
         <form method="get" action="/discover" className="mt-6 flex gap-2">
@@ -377,14 +315,18 @@ export default async function DiscoverPage({
             value={countryParamSlug ?? ""}
             options={[
               { value: "", label: "Any country", href: discoverHref(1, category, query, remote, undefined, requestedResume) },
-              ...countryOptions,
+              ...loaded.countryOptions.map((option) => ({
+                value: countryOptionSlug(option.name),
+                label: `${option.name} (${option.count.toLocaleString()})`,
+                href: discoverHref(1, category, query, remote, countryOptionSlug(option.name), requestedResume),
+              })),
             ]}
           />
         </div>
 
-        {(query && !descriptionSearchReady) || (skillTerms.length > 0 && !skillsSearchReady) ? (
+        {loaded.capped ? (
           <p className="mt-3 text-sm text-muted-foreground">
-            Descriptions are still indexing. These results match titles only.
+            Showing the closest matches. A broad search does not list every role.
           </p>
         ) : null}
         {resumeMissing ? (
@@ -403,9 +345,7 @@ export default async function DiscoverPage({
             All
           </Link>
           {JOB_CATEGORIES.map((item) => {
-            const count = matchedCounts
-              ? (matchedCounts.get(item.slug) ?? 0)
-              : (categories.counts.get(item.slug) ?? 0)
+            const count = item.slug === "software" ? loaded.softwareCount : 0
             const selected = item.slug === category
             return (
               <Link
@@ -426,22 +366,27 @@ export default async function DiscoverPage({
 
         {loadError ? (
           <p className="mt-8 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            Greenhouse jobs could not be loaded. Try again in a moment.
+            Software roles could not be loaded. Try again in a moment.
           </p>
         ) : unknownCategory ? (
           <p className="mt-8 text-sm text-muted-foreground">That category is not available.</p>
-        ) : visibleJobs.length === 0 ? (
+        ) : unsupportedCategory ? (
           <p className="mt-8 text-sm text-muted-foreground">
-            {emptyListing(remote, categoryLabel, query, country, resumeLabel, resumeHasNoTerms)}
+            Only Software roles are in the live catalog.
+          </p>
+        ) : jobs.length === 0 ? (
+          <p className="mt-8 text-sm text-muted-foreground">
+            {emptyListing(remote, categoryLabel ?? "Software", query, country, resumeLabel, resumeHasNoTerms)}
           </p>
         ) : (
           <>
             <div className="mt-6 flex items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              {rangeStart.toLocaleString()}–{rangeEnd.toLocaleString()} of {visibleJobs.length.toLocaleString()}
+              {start.toLocaleString()}–{rangeEnd.toLocaleString()}
+              {total != null ? ` of ${total.toLocaleString()}` : ""}
             </p>
             <div className="flex items-center gap-2">
-              {page > 1 ? (
+              {searching && page > 1 ? (
                 <Link
                   href={discoverHref(page - 1, category, query, remote, countryParamSlug, requestedResume)}
                   className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
@@ -449,9 +394,25 @@ export default async function DiscoverPage({
                   Previous
                 </Link>
               ) : null}
-              {page < pageCount ? (
+              {!searching && cursorStack.length > 0 ? (
+                <Link
+                  href={discoverHref(1, category, query, remote, countryParamSlug, requestedResume, previousStack)}
+                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
+                >
+                  Previous
+                </Link>
+              ) : null}
+              {searching && page < pageCount ? (
                 <Link
                   href={discoverHref(page + 1, category, query, remote, countryParamSlug, requestedResume)}
+                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
+                >
+                  Next
+                </Link>
+              ) : null}
+              {!searching && nextStack ? (
+                <Link
+                  href={discoverHref(1, category, query, remote, countryParamSlug, requestedResume, nextStack)}
                   className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
                 >
                   Next
@@ -460,13 +421,13 @@ export default async function DiscoverPage({
             </div>
             </div>
             <ol className="mt-4 divide-y divide-border rounded-xl border border-border bg-white">
-            {pageJobs.map((job, index) => {
+            {jobs.map((job, index) => {
               const updated = formatUpdatedAt(job.updatedAt)
               return (
                 <li key={`${job.boardToken}-${job.id}`} className="px-4 py-4 md:px-5">
                   <div className="flex items-start gap-3">
                     <span className="mt-0.5 w-14 shrink-0 text-right text-sm font-medium tabular-nums text-slate-400">
-                      {(start + index + 1).toLocaleString()}
+                      {(start + index).toLocaleString()}
                     </span>
                     <div className="min-w-0">
                       <a
@@ -481,7 +442,7 @@ export default async function DiscoverPage({
                         {job.companyName} · {job.location}
                         {updated ? ` · Updated ${updated}` : ""}
                       </p>
-                      {matchedInDescription.has(job) ? (
+                      {job.matchedInDescription ? (
                         <p className="mt-1 text-xs font-medium text-blue-700">Matched in description</p>
                       ) : null}
                     </div>
