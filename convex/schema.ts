@@ -121,4 +121,21 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"]), // Fast lookup by user ID
+
+  // Plain-text descriptions live in their own table so a timestamp check can
+  // read softwareJobs without loading the posting body.
+  softwareJobDescriptions: defineTable({
+    text: v.string(),
+  }),
+
+  softwareJobs: defineTable({
+    greenhouseId: v.number(),
+    boardToken: v.string(),
+    title: v.string(),
+    companyName: v.string(),
+    location: v.string(),
+    url: v.string(),
+    updatedAt: v.string(),
+    descriptionId: v.id("softwareJobDescriptions"),
+  }).index("by_url", ["url"]),
 });
