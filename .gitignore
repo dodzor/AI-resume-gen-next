@@ -18,7 +18,7 @@
 /out/
 
 # generated Greenhouse job cache
-/.cache/
+# /.cache/
 
 # production
 /build

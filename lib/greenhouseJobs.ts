@@ -2,7 +2,12 @@ import { promises as fs } from "fs"
 import path from "path"
 // Board tokens from the Last Round AI ATS company directory (CC-BY-4.0), August 2026.
 import boardTokens from "./greenhouseBoards.json"
-import { categorizeJobs, type JobCategoryRecord, type JobCategorySlug } from "./jobCategories"
+import {
+  CATEGORY_RULES_VERSION,
+  categorizeJobs,
+  type JobCategoryRecord,
+  type JobCategorySlug,
+} from "./jobCategories"
 import {
   buildSearchPostings,
   decodeSearchIndex,
@@ -201,7 +206,7 @@ async function writeJobCategories(jobs: GreenhouseJobListing[]) {
   const records = categorizeJobs(jobs)
   const tempPath = `${CATEGORIES_PATH}.tmp`
   await fs.mkdir(path.dirname(CATEGORIES_PATH), { recursive: true })
-  await fs.writeFile(tempPath, JSON.stringify(records))
+  await fs.writeFile(tempPath, JSON.stringify({ version: CATEGORY_RULES_VERSION, records }))
   await fs.rename(tempPath, CATEGORIES_PATH)
   categoryMemory = {
     stamp: (await fs.stat(CATEGORIES_PATH)).mtimeMs,
@@ -209,12 +214,33 @@ async function writeJobCategories(jobs: GreenhouseJobListing[]) {
   }
 }
 
+async function categoryFileVersion(): Promise<number> {
+  try {
+    const handle = await fs.open(CATEGORIES_PATH, "r")
+    try {
+      const buf = Buffer.alloc(32)
+      const { bytesRead } = await handle.read(buf, 0, 32, 0)
+      const head = buf.subarray(0, bytesRead).toString("utf8")
+      if (head.startsWith("[")) return 0
+      const match = /^\{"version":(\d+)/.exec(head)
+      return match ? Number(match[1]) : 0
+    } finally {
+      await handle.close()
+    }
+  } catch {
+    return 0
+  }
+}
+
 async function readJobCategories(): Promise<JobCategoryRecord[] | null> {
   try {
     const raw = await fs.readFile(CATEGORIES_PATH, "utf8")
-    const parsed = JSON.parse(raw) as JobCategoryRecord[]
-    if (!Array.isArray(parsed)) return null
-    return parsed
+    const parsed = JSON.parse(raw) as
+      | JobCategoryRecord[]
+      | { version?: number; records?: JobCategoryRecord[] }
+    if (!parsed || Array.isArray(parsed) || parsed.version !== CATEGORY_RULES_VERSION) return null
+    if (!Array.isArray(parsed.records)) return null
+    return parsed.records
   } catch {
     return null
   }
@@ -228,7 +254,9 @@ async function ensureJobCategories(jobs: GreenhouseJobListing[]) {
     categoryStamp = 0
   }
 
-  if (categoryStamp !== 0 && categoryStamp >= loadedStamp) return
+  if (categoryStamp !== 0 && categoryStamp >= loadedStamp && (await categoryFileVersion()) === CATEGORY_RULES_VERSION) {
+    return
+  }
   await writeJobCategories(jobs)
 }
 
