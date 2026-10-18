@@ -20,6 +20,7 @@ interface ResumeSwitcherProps {
   resumes: Resume[] | undefined
   currentResumeId: Id<'resumes'> | null
   onSelectResume: (resumeId: Id<'resumes'>) => void
+  onDeleteResume: (resumeId: Id<'resumes'>) => Promise<void>
   onCreateNew: () => void
   isLoading: boolean
 }
@@ -28,10 +29,12 @@ export default function ResumeSwitcher({
   resumes,
   currentResumeId,
   onSelectResume,
+  onDeleteResume,
   onCreateNew,
   isLoading
 }: ResumeSwitcherProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [deletingId, setDeletingId] = useState<Id<'resumes'> | null>(null)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const { canCreateResume, remaining, limits, usage, plan } = useUsageLimits()
   
@@ -57,6 +60,25 @@ export default function ResumeSwitcher({
       return
     }
     onCreateNew()
+  }
+
+  const handleDelete = async (resume: Resume) => {
+    const title = resume.jobTitle || 'Untitled Resume'
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) {
+      return
+    }
+
+    setDeletingId(resume._id)
+    try {
+      await onDeleteResume(resume._id)
+      if ((resumes?.length ?? 0) <= 1) {
+        setIsOpen(false)
+      }
+    } catch {
+      // Parent surfaces the error.
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const formatLimitText = () => {
@@ -127,24 +149,49 @@ export default function ResumeSwitcher({
               </div>
               {resumes.map((resume) => {
                 const isCurrent = resume._id === currentResumeId
+                const title = resume.jobTitle || 'Untitled Resume'
+                const isDeleting = deletingId === resume._id
                 return (
-                  <button
+                  <div
                     key={resume._id}
-                    onClick={() => {
-                      onSelectResume(resume._id)
-                      setIsOpen(false)
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
-                      isCurrent
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'hover:bg-gray-50 text-gray-700'
+                    className={`flex items-center rounded-md transition-colors ${
+                      isCurrent ? 'bg-blue-50' : 'hover:bg-gray-50'
                     }`}
                   >
-                    <div className="font-medium">{resume.jobTitle || 'Untitled Resume'}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {new Date(resume.updatedAt).toLocaleDateString()}
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelectResume(resume._id)
+                        setIsOpen(false)
+                      }}
+                      className={`min-w-0 flex-1 text-left px-3 py-2 ${
+                        isCurrent ? 'text-blue-700' : 'text-gray-700'
+                      }`}
+                    >
+                      <div className="font-medium truncate">{title}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {new Date(resume.updatedAt).toLocaleDateString()}
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Delete ${title}`}
+                      title="Delete resume"
+                      disabled={deletingId !== null}
+                      onClick={() => {
+                        void handleDelete(resume)
+                      }}
+                      className="mr-1 shrink-0 rounded-md p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    >
+                      {isDeleting ? (
+                        <span className="block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 )
               })}
             </div>

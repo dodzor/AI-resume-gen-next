@@ -137,6 +137,18 @@ export const deleteResume = mutation({
     }
 
     await ctx.db.delete(args.resumeId);
+
+    const usage = await ctx.db
+      .query("userUsage")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .unique();
+
+    if (usage && usage.resumesCreated > 0) {
+      await ctx.db.patch(usage._id, {
+        resumesCreated: usage.resumesCreated - 1,
+        updatedAt: Date.now(),
+      });
+    }
   },
 });
 

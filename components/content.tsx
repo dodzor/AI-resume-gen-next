@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { flushSync } from 'react-dom'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
@@ -102,6 +103,7 @@ export default function Content() {
       currentResumeId ? { resumeId: currentResumeId } : "skip" // Get a single resume when ID is set
     )
     const saveResume = useMutation(api.resumes.saveResume)
+    const deleteResume = useMutation(api.resumes.deleteResume)
     const [isSaving, setIsSaving] = useState(false)
     const [lastSaved, setLastSaved] = useState<Date | null>(null)
     const [hasStartedEditing, setHasStartedEditing] = useState(false)
@@ -117,6 +119,7 @@ export default function Content() {
     const isLoadingFromConvex = useRef(false)
     const lastLoadedResumeId = useRef<string | null>(null)
     const justCreatedResumeId = useRef<string | null>(null)
+    const skipAutoLoad = useRef(false)
     
     // Save function - called when user navigates steps
     const handleSave = useCallback(async () => {
@@ -230,6 +233,11 @@ export default function Content() {
         if (resumes === undefined) {
           // Still loading resumes
           debugLog('loadResume:waitingForResumes')
+          return
+        }
+
+        if (skipAutoLoad.current) {
+          debugLog('loadResume:skipped:userEditingNewResume')
           return
         }
         
@@ -482,25 +490,74 @@ export default function Content() {
       })
     }, [currentStep, maxStepReached, currentResumeId])
     
-    // Handler for creating new resume
-    const handleCreateNew = useCallback(() => {
-      console.log('Creating new resume')
+    const resetEditor = useCallback(() => {
       setFormData(getDefaultFormData())
       setGeneratedResume('')
       setCurrentResumeId(null)
       setLoadedResumeData(null)
       setCurrentStep(1)
       setMaxStepReached(1)
-      setShowPreview(false) // Hide preview when starting a new resume
+      setShowPreview(false)
       setResumeEntryPhase('choose')
       setImportMeta(null)
       setResumeImportText('')
       setResumeImportFileName('')
       lastLoadedResumeId.current = null
+      skipAutoLoad.current = true
       localStorage.removeItem(LAST_EDITED_RESUME_KEY)
       isLoadingFromConvex.current = false
       setIsLoadingResume(false)
     }, [])
+
+    // Handler for creating new resume
+    const handleCreateNew = useCallback(() => {
+      console.log('Creating new resume')
+      resetEditor()
+    }, [resetEditor])
+
+    const handleDeleteResume = useCallback(async (resumeId: Id<'resumes'>) => {
+      const remaining = (resumes ?? []).filter((resume) => resume._id !== resumeId)
+      const isCurrent = currentResumeId === resumeId
+      const previousLastEdited = localStorage.getItem(LAST_EDITED_RESUME_KEY)
+
+      if (isCurrent && remaining.length > 0) {
+        const nextId = remaining[0]._id
+        localStorage.setItem(LAST_EDITED_RESUME_KEY, nextId)
+        skipAutoLoad.current = false
+        isLoadingFromConvex.current = true
+        flushSync(() => {
+          setCurrentResumeId(nextId)
+        })
+      } else if (isCurrent) {
+        // Unsubscribe before the document is removed so getResume does not throw.
+        localStorage.removeItem(LAST_EDITED_RESUME_KEY)
+        lastLoadedResumeId.current = null
+        flushSync(() => {
+          setCurrentResumeId(null)
+        })
+      } else if (previousLastEdited === resumeId && currentResumeId) {
+        localStorage.setItem(LAST_EDITED_RESUME_KEY, currentResumeId)
+      }
+
+      try {
+        await deleteResume({ resumeId })
+        if (isCurrent && remaining.length === 0) {
+          resetEditor()
+        }
+      } catch (error: any) {
+        console.error('Failed to delete resume:', error)
+        if (isCurrent && currentResumeId) {
+          skipAutoLoad.current = false
+          localStorage.setItem(LAST_EDITED_RESUME_KEY, currentResumeId)
+          isLoadingFromConvex.current = true
+          setCurrentResumeId(currentResumeId)
+        } else if (previousLastEdited) {
+          localStorage.setItem(LAST_EDITED_RESUME_KEY, previousLastEdited)
+        }
+        alert(error?.message || 'Failed to delete resume. Please try again.')
+        throw error
+      }
+    }, [resumes, currentResumeId, deleteResume, resetEditor])
 
     const handleStartFreshFromGate = useCallback(() => {
       setImportMeta(null)
@@ -545,6 +602,7 @@ export default function Content() {
     
     // Handler for switching resumes
     const handleSelectResume = useCallback((resumeId: Id<'resumes'>) => {
+      skipAutoLoad.current = false
       setCurrentResumeId(resumeId)
       isLoadingFromConvex.current = true
       setIsLoadingResume(true)
@@ -611,6 +669,7 @@ export default function Content() {
                     resumes={resumes}
                     currentResumeId={currentResumeId}
                     onSelectResume={handleSelectResume}
+                    onDeleteResume={handleDeleteResume}
                     onCreateNew={handleCreateNew}
                     isLoading={isLoadingResume}
                   />
