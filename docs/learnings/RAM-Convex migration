@@ -1,0 +1,22 @@
+**Situation.** RoleMirror’s discover page fetched all 4,966 Greenhouse boards inside the Next.js server and kept every description in memory until the last board returned. That process peaked at 8.4 GB and still held about 2.5 GB after the fetch, for the job list and the search index. A Vercel function stops at 2 GB on Hobby and 4 GB on Pro, and it has no disk that keeps `.cache` for the next request. In production the instance was killed while the download was still running, and the browser only showed `Connection closed`.
+
+**Objective.** Run RoleMirror on Vercel, with the open-roles page able to list and search Software jobs without downloading the catalog during the request.
+
+**Action.** The catalog moved to Convex, starting with Software. A sync downloads each board list without the posting body, compares `updated_at` with the stored timestamp, and writes a description only when the job is new or changed. Listings and description text are separate documents, so a timestamp check never loads the body. `/discover` asks Convex for 20 listings at a time. Title and description search use Convex search indexes, and the description text stays in Convex. GitHub Actions runs that sync every six hours.
+
+**Result.** The first sync stored 32,583 Software roles. `/discover` renders one page from Convex, moves to the next page, and a search for “react” returns matches without pulling the catalog into the server. The page no longer depends on an 8 GB process, so it fits a Vercel function.
+
+**The search index** 
+The search index is a word-to-jobs lookup built from the posting text, so a search can find “react” without reading every description again.
+
+After the boards finished downloading, each description was split into words. Those words went into maps: a word such as `react` points at the job numbers whose text contains it. The same thing was done for acronyms. That structure was written to `.cache/greenhouse-job-search.bin`, about 200 MB on disk for roughly 155,000 words, and then decoded back into memory as `searchMemory`.
+
+The 2.5 GB that remained is that decoded lookup plus the job list of titles, companies, locations, and URLs. The raw description strings had already been discarded. The in-memory maps are much larger than the 200 MB file because each word and each job number is a JavaScript object, not a packed byte.
+
+**Vercel has no disk that keeps .cache for the next request**
+A request is one visit to the site, such as opening /discover. The next request is the visit after that: a refresh, the Next button, or someone else opening the page.
+
+On your Mac the Next.js process stays running. The first visit writes .cache and keeps the job list in memory. The following visit is handled by that same process, so it can read the cache it just wrote.
+
+On Vercel, the function that handled the first visit can disappear as soon as the response is sent. The following visit can run on a new instance. Anything written to .cache during the first visit is gone, because that disk belongs to the instance that just exited. The new instance has no job list and would start the Greenhouse download again.
+

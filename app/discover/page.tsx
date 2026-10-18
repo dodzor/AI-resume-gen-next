@@ -1,12 +1,12 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { CountrySelect } from "@/components/CountrySelect"
+import { DiscoverRequestSpinner } from "@/components/DiscoverRequestSpinner"
 import { DiscoverPagination } from "@/components/DiscoverPagination"
 import { RemoteCheckbox } from "@/components/RemoteCheckbox"
 import { ResumeMatchToggle } from "@/components/ResumeMatchToggle"
 import { discoverHref } from "@/lib/discoverHref"
 import { countryOptionSlug, loadDiscoverJobs } from "@/lib/loadDiscoverJobs"
-import { isJobCategorySlug, JOB_CATEGORIES } from "@/lib/jobCategories"
 import { countryFromParam, countrySlug } from "@/lib/jobCountries"
 import type { SkillTerm } from "@/lib/jobSearch"
 import { loadMatchResume } from "@/lib/loadMatchResume"
@@ -60,7 +60,6 @@ function resumeTerms(titleRoles: string[][], skillTerms: SkillTerm[]) {
 
 function listingLead(
   remote: boolean,
-  categoryLabel: string | undefined,
   query: string,
   companyCount: number,
   countryLabel?: string,
@@ -69,74 +68,42 @@ function listingLead(
   const companies = companyCount > 0 ? ` across ${companyCount.toLocaleString()} companies` : ""
   const where = countryLabel ? ` in ${countryLabel}` : ""
   const matchedTo = resumeLabel ? ` matched to ${resumeLabel}` : ""
+  const scope = `${remote ? "Remote " : ""}Software roles`
   if (query) {
-    const scope = categoryLabel
-      ? `${remote ? "Remote " : ""}${categoryLabel} roles`
-      : remote
-        ? "Remote roles"
-        : "Roles"
     return `${scope} matching "${query}"${matchedTo}${where}${companies}.`
   }
   if (resumeLabel) {
-    const scope = categoryLabel
-      ? `${remote ? "Remote " : ""}${categoryLabel} roles`
-      : remote
-        ? "Remote roles"
-        : "Roles"
     return `${scope} matched to ${resumeLabel}${where}${companies}.`
   }
-  if (categoryLabel) {
-    return `${remote ? "Remote " : ""}${categoryLabel} roles${where} from public Greenhouse job boards${companies}.`
-  }
-  if (remote) {
-    return `Remote postings${where} from public Greenhouse job boards${companies}.`
-  }
-  if (countryLabel) {
-    return `Open postings in ${countryLabel} from public Greenhouse job boards${companies}.`
-  }
-  return companyCount > 0
-    ? `Open postings from public Greenhouse job boards${companies}.`
-    : "Open postings from public Greenhouse job boards."
+  return `${scope}${where} from public Greenhouse job boards${companies}.`
 }
 
 function emptyListing(
   remote: boolean,
-  categoryLabel: string | undefined,
   query: string,
   countryLabel?: string,
   resumeLabel?: string,
   resumeHasNoTerms?: boolean,
 ) {
   const where = countryLabel ? ` in ${countryLabel}` : ""
+  const remoteWord = remote ? "remote " : ""
   if (resumeHasNoTerms) {
     return resumeLabel
       ? `${resumeLabel} has no roles or skills to match.`
       : "This resume has no roles or skills to match."
   }
   if (query) {
-    const remoteWord = remote ? "remote " : ""
-    return categoryLabel
-      ? `No ${remoteWord}${categoryLabel} roles match "${query}"${where}.`
-      : `No ${remoteWord}roles match "${query}"${where}.`
+    return `No ${remoteWord}Software roles match "${query}"${where}.`
   }
   if (resumeLabel) {
-    const remoteWord = remote ? "remote " : ""
-    return categoryLabel
-      ? `No ${remoteWord}${categoryLabel} roles match ${resumeLabel}${where}.`
-      : `No ${remoteWord}roles match ${resumeLabel}${where}.`
-  }
-  if (categoryLabel && countryLabel) {
-    return remote
-      ? `No remote ${categoryLabel} roles in ${countryLabel}.`
-      : `No open ${categoryLabel} roles in ${countryLabel}.`
-  }
-  if (categoryLabel) {
-    return remote ? `No remote roles in ${categoryLabel}.` : `No open roles in ${categoryLabel}.`
+    return `No ${remoteWord}Software roles match ${resumeLabel}${where}.`
   }
   if (countryLabel) {
-    return remote ? `No remote roles in ${countryLabel}.` : `No open roles in ${countryLabel}.`
+    return remote
+      ? `No remote Software roles in ${countryLabel}.`
+      : `No open Software roles in ${countryLabel}.`
   }
-  return remote ? "No remote roles were returned." : "No open roles were returned."
+  return remote ? "No remote roles in Software." : "No open roles in Software."
 }
 
 function formatUpdatedAt(value: string) {
@@ -155,7 +122,6 @@ export default async function DiscoverPage({
 }: {
   searchParams: Promise<{
     page?: string | string[]
-    category?: string | string[]
     q?: string | string[]
     remote?: string | string[]
     country?: string | string[]
@@ -164,14 +130,11 @@ export default async function DiscoverPage({
 }) {
   const {
     page: pageParam,
-    category: categoryParam,
     q: queryParam,
     remote: remoteParam,
     country: countryParam,
     resume: resumeParam,
   } = await searchParams
-  const requestedCategory = Array.isArray(categoryParam) ? categoryParam[0] : categoryParam
-  const category = requestedCategory && isJobCategorySlug(requestedCategory) ? requestedCategory : undefined
   const query = parseQuery(queryParam)
   const remoteValue = Array.isArray(remoteParam) ? remoteParam[0] : remoteParam
   const remote = remoteValue === "1"
@@ -179,8 +142,6 @@ export default async function DiscoverPage({
   const country = countryFromParam(requestedCountry)
   const countryParamSlug = country ? countrySlug(country) : undefined
   const requestedResume = parseResume(resumeParam)
-  const unknownCategory = Boolean(requestedCategory) && !category
-  const unsupportedCategory = Boolean(category) && category !== "software"
   const requestedPage = parsePage(pageParam)
   const resumePromise = requestedResume ? loadMatchResume(requestedResume) : Promise.resolve(null)
   const matchResume = await resumePromise
@@ -207,7 +168,7 @@ export default async function DiscoverPage({
 
   try {
     loaded = await loadDiscoverJobs({
-      mode: unknownCategory || unsupportedCategory || resumeHasNoTerms ? "empty" : searching ? "search" : "browse",
+      mode: resumeHasNoTerms ? "empty" : searching ? "search" : "browse",
       page: requestedPage,
       remote,
       country,
@@ -218,17 +179,16 @@ export default async function DiscoverPage({
     loadError = true
   }
 
-  const categoryLabel = category ? JOB_CATEGORIES.find((item) => item.slug === category)?.label : undefined
   const jobs = loaded.jobs
   const total = loaded.total
   const pageCount = total == null ? 1 : Math.max(1, Math.ceil(total / PAGE_SIZE))
   const page = Math.min(loaded.page, pageCount)
   if (!loadError && page !== requestedPage) {
-    redirect(discoverHref(page, category, query, remote, countryParamSlug, requestedResume))
+    redirect(discoverHref(page, undefined, query, remote, countryParamSlug, requestedResume))
   }
   const start = jobs.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const rangeEnd = start === 0 ? 0 : start + jobs.length - 1
-  const hrefFor = (target: number) => discoverHref(target, category, query, remote, countryParamSlug, requestedResume)
+  const hrefFor = (target: number) => discoverHref(target, undefined, query, remote, countryParamSlug, requestedResume)
   const resultsNoun = total === 1 ? "result" : "results"
   const resultsLabel =
     total == null
@@ -238,6 +198,7 @@ export default async function DiscoverPage({
         : `Showing ${start.toLocaleString()}–${rangeEnd.toLocaleString()} of ${total.toLocaleString()} ${resultsNoun}`
 
   return (
+    <DiscoverRequestSpinner>
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6">
@@ -261,11 +222,10 @@ export default async function DiscoverPage({
           Open roles
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {listingLead(remote, categoryLabel ?? "Software", query, loaded.companyCount, country, resumeLabel)}
+          {listingLead(remote, query, loaded.companyCount, country, resumeLabel)}
         </p>
 
         <form method="get" action="/discover" className="mt-6 flex gap-2">
-          {category ? <input type="hidden" name="category" value={category} /> : null}
           {remote ? <input type="hidden" name="remote" value="1" /> : null}
           {countryParamSlug ? <input type="hidden" name="country" value={countryParamSlug} /> : null}
           {requestedResume ? <input type="hidden" name="resume" value={requestedResume} /> : null}
@@ -289,7 +249,7 @@ export default async function DiscoverPage({
           </button>
           {query ? (
             <Link
-              href={discoverHref(1, category, undefined, remote, countryParamSlug, requestedResume)}
+              href={discoverHref(1, undefined, undefined, remote, countryParamSlug, requestedResume)}
               className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
             >
               Clear
@@ -298,10 +258,9 @@ export default async function DiscoverPage({
         </form>
 
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <RemoteCheckbox checked={remote} href={discoverHref(1, category, query, !remote, countryParamSlug, requestedResume)} />
+          <RemoteCheckbox checked={remote} href={discoverHref(1, undefined, query, !remote, countryParamSlug, requestedResume)} />
           <ResumeMatchToggle
             activeResumeId={requestedResume}
-            category={category}
             query={query}
             remote={remote}
             country={countryParamSlug}
@@ -309,11 +268,11 @@ export default async function DiscoverPage({
           <CountrySelect
             value={countryParamSlug ?? ""}
             options={[
-              { value: "", label: "Any country", href: discoverHref(1, category, query, remote, undefined, requestedResume) },
+              { value: "", label: "Any country", href: discoverHref(1, undefined, query, remote, undefined, requestedResume) },
               ...loaded.countryOptions.map((option) => ({
                 value: countryOptionSlug(option.name),
                 label: `${option.name} (${option.count.toLocaleString()})`,
-                href: discoverHref(1, category, query, remote, countryOptionSlug(option.name), requestedResume),
+                href: discoverHref(1, undefined, query, remote, countryOptionSlug(option.name), requestedResume),
               })),
             ]}
           />
@@ -328,46 +287,9 @@ export default async function DiscoverPage({
           <p className="mt-3 text-sm text-muted-foreground">That resume could not be loaded.</p>
         ) : null}
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            href={discoverHref(1, undefined, query, remote, countryParamSlug, requestedResume)}
-            className={`rounded-full border px-3 py-1 text-sm ${
-              category
-                ? "border-border text-foreground hover:bg-muted/60"
-                : "border-blue-600 bg-blue-600 text-white"
-            }`}
-          >
-            All
-          </Link>
-          {JOB_CATEGORIES.map((item) => {
-            const count = item.slug === "software" ? loaded.softwareCount : 0
-            const selected = item.slug === category
-            return (
-              <Link
-                key={item.slug}
-                href={discoverHref(1, item.slug, query, remote, countryParamSlug, requestedResume)}
-                className={`rounded-full border px-3 py-1 text-sm ${
-                  selected
-                    ? "border-blue-600 bg-blue-600 text-white"
-                    : "border-border text-foreground hover:bg-muted/60"
-                }`}
-              >
-                {item.label}
-                {count > 0 ? ` (${count.toLocaleString()})` : ""}
-              </Link>
-            )
-          })}
-        </div>
-
         {loadError ? (
           <p className="mt-8 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             Software roles could not be loaded. Try again in a moment.
-          </p>
-        ) : unknownCategory ? (
-          <p className="mt-8 text-sm text-muted-foreground">That category is not available.</p>
-        ) : unsupportedCategory ? (
-          <p className="mt-8 text-sm text-muted-foreground">
-            Only Software roles are in the live catalog.
           </p>
         ) : (
           <>
@@ -376,7 +298,7 @@ export default async function DiscoverPage({
             ) : null}
             {jobs.length === 0 ? (
               <p className="mt-8 text-sm text-muted-foreground">
-                {emptyListing(remote, categoryLabel ?? "Software", query, country, resumeLabel, resumeHasNoTerms)}
+                {emptyListing(remote, query, country, resumeLabel, resumeHasNoTerms)}
               </p>
             ) : (
               <>
@@ -419,5 +341,6 @@ export default async function DiscoverPage({
         )}
       </main>
     </div>
+    </DiscoverRequestSpinner>
   )
 }

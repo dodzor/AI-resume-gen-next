@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { SignInButton, useAuth } from "@clerk/nextjs"
 import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
+import { useBeginDiscoverRequest } from "@/components/DiscoverRequestSpinner"
 import { discoverHref } from "@/lib/discoverHref"
 import { LAST_EDITED_RESUME_KEY, resumeMatchLabel } from "@/lib/resumeMatch"
 
@@ -23,6 +24,7 @@ export function ResumeMatchToggle({
   country?: string
 }) {
   const router = useRouter()
+  const beginDiscoverRequest = useBeginDiscoverRequest()
   const { isLoaded, isSignedIn } = useAuth()
   const resumes = useQuery(api.resumes.getUserResumes, isLoaded && isSignedIn ? {} : "skip")
   const [storedId, setStoredId] = useState<string | null>(null)
@@ -71,7 +73,10 @@ export function ResumeMatchToggle({
       <input
         type="checkbox"
         checked={checked}
-        onChange={() => router.push(href)}
+        onChange={() => {
+          beginDiscoverRequest(href)
+          router.push(href)
+        }}
         className="h-4 w-4 accent-blue-600"
       />
       <span className="truncate">{resumeMatchLabel(selected)}</span>
