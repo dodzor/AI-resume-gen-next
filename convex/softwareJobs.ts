@@ -6,6 +6,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 const MAX_PAGE_SIZE = 200;
 const MAX_TEXT_BYTES = 800_000;
 const PAGE_SIZE = 20;
+const MAX_PAGE_SCAN = 4_000;
 const SEARCH_LIMIT = 64;
 const MAX_SEARCH_TERMS = 8;
 const MAX_TERM_BYTES = 32;
@@ -233,43 +234,115 @@ export const getSoftwareCatalog = query({
   },
 });
 
+export const scanSoftwareJobStats = query({
+  args: {
+    cursor: v.union(v.string(), v.null()),
+    limit: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const limit = Math.min(Math.max(Math.floor(args.limit), 1), 4_000);
+    const result = await ctx.db.query("softwareJobs").paginate({ numItems: limit, cursor: args.cursor });
+    let remote = 0;
+    const countries = new Map<string, { count: number; remoteCount: number }>();
+    for (const job of result.page) {
+      const isRemote = job.remote === true;
+      if (isRemote) remote += 1;
+      for (const name of job.countries ?? []) {
+        const current = countries.get(name) ?? { count: 0, remoteCount: 0 };
+        current.count += 1;
+        if (isRemote) current.remoteCount += 1;
+        countries.set(name, current);
+      }
+    }
+    return {
+      scanned: result.page.length,
+      remote,
+      countries: [...countries.entries()].map(([name, counts]) => ({ name, ...counts })),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
+  },
+});
+
+type ScannedPage<T> = {
+  page: T[];
+  isDone: boolean;
+  continueCursor: string;
+};
+
+async function readOffsetPage<T>(
+  load: (cursor: string | null, numItems: number) => Promise<ScannedPage<T>>,
+  present: (rows: T[]) => Promise<ReturnType<typeof listing>[]>,
+  cursor: string | null,
+  skip: number,
+  numItems: number,
+) {
+  const requestedSkip = Math.max(0, skip);
+  const pageSize = Math.max(0, numItems);
+  const budget = Math.min(Math.max(requestedSkip + pageSize, 1), MAX_PAGE_SCAN);
+  const result = await load(cursor, budget);
+  const scanned = result.page.length;
+  if (scanned < requestedSkip) {
+    return { page: [], isDone: result.isDone, continueCursor: result.continueCursor, skipped: scanned, reached: false };
+  }
+  const pageEnd = requestedSkip + pageSize;
+  if (pageEnd > budget && scanned >= budget && !result.isDone) {
+    return { page: [], isDone: false, continueCursor: result.continueCursor, skipped: scanned, reached: false };
+  }
+  return {
+    page: await present(result.page.slice(requestedSkip, pageEnd)),
+    isDone: result.isDone,
+    continueCursor: result.continueCursor,
+    skipped: requestedSkip,
+    reached: true,
+  };
+}
+
 export const listSoftwareJobsPage = query({
   args: {
     cursor: v.union(v.string(), v.null()),
+    skip: v.optional(v.number()),
     numItems: v.number(),
     remote: v.optional(v.boolean()),
     country: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const numItems = Math.min(Math.max(Math.floor(args.numItems), 1), PAGE_SIZE);
+    const numItems = Math.min(Math.max(Math.floor(args.numItems), 0), PAGE_SIZE);
+    const skip = Math.max(0, Math.floor(args.skip ?? 0));
     if (args.country) {
-      const countryPage = await ctx.db
-        .query("softwareJobCountries")
-        .withIndex("by_country_remote", (q) =>
-          args.remote ? q.eq("country", args.country!).eq("remote", true) : q.eq("country", args.country!),
-        )
-        .paginate({ numItems, cursor: args.cursor });
-      const page = [];
-      for (const link of countryPage.page) {
-        const job = await ctx.db.get(link.jobId);
-        if (job) page.push(listing(job));
-      }
-      return {
-        page,
-        isDone: countryPage.isDone,
-        continueCursor: countryPage.continueCursor,
-      };
+      const countryQuery = () =>
+        ctx.db
+          .query("softwareJobCountries")
+          .withIndex("by_country_remote", (q) =>
+            args.remote ? q.eq("country", args.country!).eq("remote", true) : q.eq("country", args.country!),
+          );
+      return await readOffsetPage(
+        (cursor, count) => countryQuery().paginate({ numItems: count, cursor }),
+        async (links) => {
+          const page = [];
+          for (const link of links) {
+            const job = await ctx.db.get(link.jobId);
+            if (job) page.push(listing(job));
+          }
+          return page;
+        },
+        args.cursor,
+        skip,
+        numItems,
+      );
     }
 
-    const jobs = args.remote
-      ? ctx.db.query("softwareJobs").withIndex("by_remote", (q) => q.eq("remote", true))
-      : ctx.db.query("softwareJobs");
-    const result = await jobs.paginate({ numItems, cursor: args.cursor });
-    return {
-      page: result.page.map((job) => listing(job)),
-      isDone: result.isDone,
-      continueCursor: result.continueCursor,
-    };
+    const jobsQuery = () =>
+      args.remote
+        ? ctx.db.query("softwareJobs").withIndex("by_remote", (q) => q.eq("remote", true))
+        : ctx.db.query("softwareJobs");
+    return await readOffsetPage(
+      (cursor, count) => jobsQuery().paginate({ numItems: count, cursor }),
+      async (jobs) => jobs.map((job) => listing(job)),
+      args.cursor,
+      skip,
+      numItems,
+    );
   },
 });
 

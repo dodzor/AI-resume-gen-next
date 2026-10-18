@@ -1,5 +1,7 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { CountrySelect } from "@/components/CountrySelect"
+import { DiscoverPagination } from "@/components/DiscoverPagination"
 import { RemoteCheckbox } from "@/components/RemoteCheckbox"
 import { ResumeMatchToggle } from "@/components/ResumeMatchToggle"
 import { discoverHref } from "@/lib/discoverHref"
@@ -36,18 +38,6 @@ function parseResume(value: string | string[] | undefined) {
   const trimmed = (raw ?? "").trim()
   if (!trimmed || trimmed.length > 128) return undefined
   return trimmed
-}
-
-function parseCursorStack(value: string | string[] | undefined) {
-  const raw = Array.isArray(value) ? value[0] : value
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === "string")) return []
-    return parsed.slice(-50)
-  } catch {
-    return []
-  }
 }
 
 function resumeTerms(titleRoles: string[][], skillTerms: SkillTerm[]) {
@@ -170,7 +160,6 @@ export default async function DiscoverPage({
     remote?: string | string[]
     country?: string | string[]
     resume?: string | string[]
-    cursor?: string | string[]
   }>
 }) {
   const {
@@ -180,7 +169,6 @@ export default async function DiscoverPage({
     remote: remoteParam,
     country: countryParam,
     resume: resumeParam,
-    cursor: cursorParam,
   } = await searchParams
   const requestedCategory = Array.isArray(categoryParam) ? categoryParam[0] : categoryParam
   const category = requestedCategory && isJobCategorySlug(requestedCategory) ? requestedCategory : undefined
@@ -193,8 +181,7 @@ export default async function DiscoverPage({
   const requestedResume = parseResume(resumeParam)
   const unknownCategory = Boolean(requestedCategory) && !category
   const unsupportedCategory = Boolean(category) && category !== "software"
-  const cursorStack = parseCursorStack(cursorParam)
-  const page = parsePage(pageParam)
+  const requestedPage = parsePage(pageParam)
   const resumePromise = requestedResume ? loadMatchResume(requestedResume) : Promise.resolve(null)
   const matchResume = await resumePromise
   const resumeMissing = matchResume?.status === "missing"
@@ -210,8 +197,8 @@ export default async function DiscoverPage({
   let loaded = {
     jobs: [] as Awaited<ReturnType<typeof loadDiscoverJobs>>["jobs"],
     total: 0 as number | null,
+    page: 1,
     isDone: true,
-    continueCursor: null as string | null,
     capped: false,
     companyCount: 0,
     softwareCount: 0,
@@ -221,8 +208,7 @@ export default async function DiscoverPage({
   try {
     loaded = await loadDiscoverJobs({
       mode: unknownCategory || unsupportedCategory || resumeHasNoTerms ? "empty" : searching ? "search" : "browse",
-      cursor: cursorStack.at(-1) ?? null,
-      page,
+      page: requestedPage,
       remote,
       country,
       query,
@@ -235,12 +221,21 @@ export default async function DiscoverPage({
   const categoryLabel = category ? JOB_CATEGORIES.find((item) => item.slug === category)?.label : undefined
   const jobs = loaded.jobs
   const total = loaded.total
-  const start = jobs.length === 0 ? 0 : searching ? (page - 1) * PAGE_SIZE + 1 : cursorStack.length * PAGE_SIZE + 1
+  const pageCount = total == null ? 1 : Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const page = Math.min(loaded.page, pageCount)
+  if (!loadError && page !== requestedPage) {
+    redirect(discoverHref(page, category, query, remote, countryParamSlug, requestedResume))
+  }
+  const start = jobs.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const rangeEnd = start === 0 ? 0 : start + jobs.length - 1
-  const pageCount = Math.max(1, Math.ceil((total ?? jobs.length) / PAGE_SIZE))
-  const nextStack =
-    !searching && loaded.continueCursor && !loaded.isDone ? [...cursorStack, loaded.continueCursor] : undefined
-  const previousStack = cursorStack.slice(0, -1)
+  const hrefFor = (target: number) => discoverHref(target, category, query, remote, countryParamSlug, requestedResume)
+  const resultsNoun = total === 1 ? "result" : "results"
+  const resultsLabel =
+    total == null
+      ? null
+      : jobs.length === 0
+        ? `${total.toLocaleString()} ${resultsNoun}`
+        : `Showing ${start.toLocaleString()}–${rangeEnd.toLocaleString()} of ${total.toLocaleString()} ${resultsNoun}`
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -374,83 +369,52 @@ export default async function DiscoverPage({
           <p className="mt-8 text-sm text-muted-foreground">
             Only Software roles are in the live catalog.
           </p>
-        ) : jobs.length === 0 ? (
-          <p className="mt-8 text-sm text-muted-foreground">
-            {emptyListing(remote, categoryLabel ?? "Software", query, country, resumeLabel, resumeHasNoTerms)}
-          </p>
         ) : (
           <>
-            <div className="mt-6 flex items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground">
-              {start.toLocaleString()}–{rangeEnd.toLocaleString()}
-              {total != null ? ` of ${total.toLocaleString()}` : ""}
-            </p>
-            <div className="flex items-center gap-2">
-              {searching && page > 1 ? (
-                <Link
-                  href={discoverHref(page - 1, category, query, remote, countryParamSlug, requestedResume)}
-                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
-                >
-                  Previous
-                </Link>
-              ) : null}
-              {!searching && cursorStack.length > 0 ? (
-                <Link
-                  href={discoverHref(1, category, query, remote, countryParamSlug, requestedResume, previousStack)}
-                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
-                >
-                  Previous
-                </Link>
-              ) : null}
-              {searching && page < pageCount ? (
-                <Link
-                  href={discoverHref(page + 1, category, query, remote, countryParamSlug, requestedResume)}
-                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
-                >
-                  Next
-                </Link>
-              ) : null}
-              {!searching && nextStack ? (
-                <Link
-                  href={discoverHref(1, category, query, remote, countryParamSlug, requestedResume, nextStack)}
-                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
-                >
-                  Next
-                </Link>
-              ) : null}
-            </div>
-            </div>
-            <ol className="mt-4 divide-y divide-border rounded-xl border border-border bg-white">
-            {jobs.map((job, index) => {
-              const updated = formatUpdatedAt(job.updatedAt)
-              return (
-                <li key={`${job.boardToken}-${job.id}`} className="px-4 py-4 md:px-5">
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5 w-14 shrink-0 text-right text-sm font-medium tabular-nums text-slate-400">
-                      {(start + index).toLocaleString()}
-                    </span>
-                    <div className="min-w-0">
-                      <a
-                        href={job.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-medium text-slate-900 hover:text-blue-700"
-                      >
-                        {job.title}
-                      </a>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {job.companyName} · {job.location}
-                        {updated ? ` · Updated ${updated}` : ""}
-                      </p>
-                      {job.matchedInDescription ? (
-                        <p className="mt-1 text-xs font-medium text-blue-700">Matched in description</p>
-                      ) : null}
-                    </div>
-                  </div>
-                </li>
-              )
-            })}
-            </ol>
+            {resultsLabel && !resumeHasNoTerms ? (
+              <p className="mt-6 text-sm text-muted-foreground">{resultsLabel}</p>
+            ) : null}
+            {jobs.length === 0 ? (
+              <p className="mt-8 text-sm text-muted-foreground">
+                {emptyListing(remote, categoryLabel ?? "Software", query, country, resumeLabel, resumeHasNoTerms)}
+              </p>
+            ) : (
+              <>
+                <DiscoverPagination className="mt-4" page={page} pageCount={pageCount} hrefFor={hrefFor} />
+                <ol className="mt-4 divide-y divide-border rounded-xl border border-border bg-white">
+                  {jobs.map((job, index) => {
+                    const updated = formatUpdatedAt(job.updatedAt)
+                    return (
+                      <li key={`${job.boardToken}-${job.id}`} className="px-4 py-4 md:px-5">
+                        <div className="flex items-start gap-3">
+                          <span className="mt-0.5 w-14 shrink-0 text-right text-sm font-medium tabular-nums text-slate-400">
+                            {(start + index).toLocaleString()}
+                          </span>
+                          <div className="min-w-0">
+                            <a
+                              href={job.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-medium text-slate-900 hover:text-blue-700"
+                            >
+                              {job.title}
+                            </a>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {job.companyName} · {job.location}
+                              {updated ? ` · Updated ${updated}` : ""}
+                            </p>
+                            {job.matchedInDescription ? (
+                              <p className="mt-1 text-xs font-medium text-blue-700">Matched in description</p>
+                            ) : null}
+                          </div>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ol>
+                <DiscoverPagination className="mt-6" page={page} pageCount={pageCount} hrefFor={hrefFor} />
+              </>
+            )}
           </>
         )}
       </main>
