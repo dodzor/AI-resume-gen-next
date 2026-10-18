@@ -14,6 +14,14 @@ type SoftwareCatalog = {
   updatedAt: number
 }
 
+type SoftwareScanPage = {
+  scanned: number
+  remote: number
+  countries: SoftwareCatalog["countries"]
+  isDone: boolean
+  continueCursor: string
+}
+
 let catalogBuild: Promise<SoftwareCatalog> | null = null
 
 export type DiscoverListing = {
@@ -72,7 +80,8 @@ async function buildCatalog(convex: ReturnType<typeof client>): Promise<Software
   let remoteTotal = 0
   const countryCounts = new Map<string, { count: number; remoteCount: number }>()
   for (let step = 0; step < 40; step++) {
-    const result = await convex.query(api.softwareJobs.scanSoftwareJobStats, {
+    // Annotation breaks a circular inference between this result and `cursor`.
+    const result: SoftwareScanPage = await convex.query(api.softwareJobs.scanSoftwareJobStats, {
       cursor,
       limit: CATALOG_SCAN,
     })

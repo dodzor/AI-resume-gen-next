@@ -1,24 +1,31 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono, DM_Sans } from 'next/font/google'
+import localFont from 'next/font/local'
 import './globals.css'
 import { ClerkProvider } from '@clerk/nextjs'
 import ConvexClientProvider from '@/components/ConvexClientProvider'
 import { Analytics } from '@vercel/analytics/react'
 
-const geistSans = Geist({
+// Self-hosted so production builds do not fetch Google Fonts.
+// next/font/google fails when Google returns extensionless /l/font?kit= URLs.
+const geistSans = localFont({
+  src: '../fonts/Geist-latin.woff2',
   variable: '--font-geist-sans',
-  subsets: ['latin'],
+  weight: '100 900',
+  display: 'swap',
 })
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: '../fonts/GeistMono-latin.woff2',
   variable: '--font-geist-mono',
-  subsets: ['latin'],
+  weight: '100 900',
+  display: 'swap',
 })
 
-  const dmSans = DM_Sans({
+const dmSans = localFont({
+  src: '../fonts/DMSans-latin.woff2',
   variable: '--font-dm-sans',
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: '100 1000',
+  display: 'swap',
 })
 
 export const metadata: Metadata = {
