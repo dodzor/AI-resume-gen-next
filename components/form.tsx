@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { TEMPLATES, TemplateId } from '../lib/templates'
+import { PRODUCT_RULE, exportBlockReason, resumePlainText } from '../lib/evidenceRules'
+import LineFlags from './LineFlags'
+import HostileReviewPanel from './HostileReviewPanel'
 
 import { generateFileName } from '../lib/pdfUtils'
 import { validatePDFContent } from '../lib/pdfErrorHandler'
@@ -31,6 +34,7 @@ interface FormProps {
   currentResumeId?: string | null
   importMeta?: { fileName: string; importedAt: number } | null
   onReimport?: () => void
+  masterRecord?: any
 }
 
 const STEPS = [
@@ -61,7 +65,8 @@ export default function Form({
   onSave,
   currentResumeId,
   importMeta,
-  onReimport
+  onReimport,
+  masterRecord
 }: FormProps) {
     const [internalCurrentStep, setInternalCurrentStep] = useState(1)
     const [internalShowPreview, setInternalShowPreview] = useState(true)
@@ -72,6 +77,7 @@ export default function Form({
     const [improvingExperienceIndex, setImprovingExperienceIndex] = useState<number | null>(null)    
     const [rewritingBullet, setRewritingBullet] = useState<{ experienceIndex: number; bulletIndex: number } | null>(null)
     const [isAnalyzingJobDescription, setIsAnalyzingJobDescription] = useState(false)
+    const [isTailoring, setIsTailoring] = useState(false)
     
     // Usage limits and upgrade modal state
     const { plan, canExport, isPro, isFree } = useUsageLimits()
@@ -100,6 +106,17 @@ export default function Form({
         tone: string | null;
         hasThemes: boolean;
         hasKeywords: boolean;
+        factsUsed?: string[];
+        isDuty?: boolean;
+        recommendation?: string;
+        verb?: string;
+        did?: string;
+        how?: string;
+        result?: string;
+        verbSet?: boolean;
+        didSet?: boolean;
+        howSet?: boolean;
+        resultSet?: boolean;
     }>>({})
     // Track info icon hover state: key = `${experienceIndex}-${bulletIndex}`
     const [showInfoTooltip, setShowInfoTooltip] = useState<Record<string, boolean>>({})
@@ -600,6 +617,7 @@ export default function Form({
             // Set the generated resume
             setGeneratedResume(data.resume)
             setIsFormCompleted(true) // Mark form as completed
+            if (blockExport(data.resume || '')) return
 
             // Immediately download as PDF
             const templateId: TemplateId = formData.template || 'professional-blue'
@@ -647,8 +665,63 @@ export default function Form({
     }
 
     // Copy resume content to clipboard (for free users)
+    const blockExport = (extra = '') => {
+        const reason = exportBlockReason(`${resumePlainText(formData)}\n${extra}`)
+        if (reason) {
+            alert(reason)
+            return true
+        }
+        return false
+    }
+
+    const handleTailorFromMaster = async () => {
+        if (!masterRecord) {
+            alert('Build the career record first. New applications copy confirmed facts from it.')
+            return
+        }
+        const jobDescriptions = [formData.job, ...(formData.targetJobs || [])].map((job: string) => job?.trim()).filter(Boolean)
+        if (jobDescriptions.length === 0) {
+            alert('Paste at least one job description.')
+            return
+        }
+        setIsTailoring(true)
+        try {
+            const response = await fetch('/api/tailor-resume', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ master: masterRecord, jobDescriptions }),
+            })
+            const data = await response.json()
+            if (!response.ok) {
+                if (data.upgradeRequired) {
+                    handleAPIError(data, 'ai_rewrite')
+                    return
+                }
+                throw new Error(data.message || data.error || 'Could not tailor the resume')
+            }
+            setFormData((prev: any) => ({
+                ...prev,
+                summary: data.summary ?? prev.summary,
+                skills: data.skills || prev.skills,
+                experiences: data.experiences?.length ? data.experiences : prev.experiences,
+                extractedRequirements: data.requirements || [],
+                gaps: data.gaps || [],
+                overlapPhrases: data.overlap || [],
+                template: prev.template || 'modern-minimal',
+            }))
+            if (data.resumeHtml) setGeneratedResume(data.resumeHtml)
+        } catch (error) {
+            if (!handleAPIError(error, 'ai_rewrite')) {
+                alert(error instanceof Error ? error.message : 'Could not tailor the resume')
+            }
+        } finally {
+            setIsTailoring(false)
+        }
+    }
+
     const handleCopyToClipboard = async () => {
         const previewContent = generateSimplePreview(formData, currentStep)
+        if (blockExport(previewContent)) return
         
         try {
             // Create a temporary div to extract text content
@@ -678,6 +751,7 @@ export default function Form({
         }
 
         const previewContent = generateSimplePreview(formData, currentStep)
+        if (blockExport(previewContent)) return
         
         // Validate content before proceeding
         const validation = validatePDFContent(previewContent)
@@ -1408,8 +1482,7 @@ export default function Form({
                 throw new Error(data.message || 'Failed to rewrite bullet')
             }
         
-            // Update the specific bullet point
-            handleBulletChange(experienceIndex, bulletIndex, data.rewrittenBullet)
+            // The recommendation stays beside the original until the user applies it.
             
             // If no keywords were pre-selected and the API returned incorporated keywords, auto-select them
             if (selected.length === 0 && data.incorporatedKeywords && Array.isArray(data.incorporatedKeywords) && data.incorporatedKeywords.length > 0) {
@@ -1422,18 +1495,25 @@ export default function Form({
             
             // Store rewrite reasoning if available
             const key = `${experienceIndex}-${bulletIndex}`
-            if (data.reasoning) {
+            if (data.reasoning || data.factsUsed) {
                 setRewriteReasoning((prev) => ({
                     ...prev,
-                    [key]: data.reasoning
+                    [key]: {
+                        ...(data.reasoning || { themes: [], keywords: [], tone: null, hasThemes: false, hasKeywords: false }),
+                        factsUsed: data.factsUsed || [],
+                        isDuty: data.isDuty === true,
+                        recommendation: data.rewrittenBullet || data.line || '',
+                        verb: data.verb || '',
+                        did: data.did || '',
+                        how: data.how || '',
+                        result: data.result || '',
+                        verbSet: data.verbSet === true,
+                        didSet: data.didSet === true,
+                        howSet: data.howSet === true,
+                        resultSet: data.resultSet === true,
+                    }
                 }))
             }
-            
-            // Show tooltip after successful rewrite
-            setShowRewriteTooltip((prev) => ({
-                ...prev,
-                [key]: true
-            }))
         } catch (error: any) {
             if (!handleAPIError(error, 'ai_rewrite')) {
                 // Only show alert if upgrade modal wasn't shown
@@ -1562,6 +1642,61 @@ export default function Form({
                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
                             />
                         </div>
+
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <p className="text-sm font-medium text-slate-800">More descriptions of the same role</p>
+                            <p className="mt-1 text-xs text-slate-500">Optional. Phrases that appear in every description are used for the headline and first bullets only when the career record supports them.</p>
+                            {(formData.targetJobs || ['']).map((job: string, index: number) => (
+                                <textarea
+                                    key={index}
+                                    value={job}
+                                    rows={4}
+                                    onChange={(event) => {
+                                        const next = [...(formData.targetJobs || [''])]
+                                        next[index] = event.target.value
+                                        setFormData((prev: any) => ({ ...prev, targetJobs: next }))
+                                    }}
+                                    placeholder={`Job description ${index + 2}`}
+                                    className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                                />
+                            ))}
+                            {(formData.targetJobs || []).length < 3 && (
+                                <button
+                                    type="button"
+                                    className="mt-2 text-sm font-medium text-blue-700"
+                                    onClick={() => setFormData((prev: any) => ({ ...prev, targetJobs: [...(prev.targetJobs || []), ''] }))}
+                                >
+                                    Add another description
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => void handleTailorFromMaster()}
+                                disabled={isTailoring}
+                                className="mt-3 rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                            >
+                                {isTailoring ? 'Tailoring…' : 'Tailor from career record'}
+                            </button>
+                            {(formData.extractedRequirements || []).length > 0 && (
+                                <div className="mt-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Requirements that decide the scan</p>
+                                    <ul className="mt-1 list-disc pl-5 text-sm text-slate-700">
+                                        {formData.extractedRequirements.map((item: string) => <li key={item}>{item}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+                            {(formData.gaps || []).length > 0 && (
+                                <div className="mt-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Gaps — interview prep, not text to add</p>
+                                    <ul className="mt-1 list-disc pl-5 text-sm text-amber-950">
+                                        {formData.gaps.map((item: string) => <li key={item}>{item}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+                            {(formData.overlapPhrases || []).length > 0 && (
+                                <p className="mt-3 text-xs text-slate-600">Shared across the descriptions: {formData.overlapPhrases.join(', ')}</p>
+                            )}
+                        </div>
                         
                         <UsageGatedButton
                             action="job_analysis"
@@ -1649,7 +1784,7 @@ export default function Form({
                                         >
                                             <h4 className="font-semibold text-sm text-gray-900 mb-3">Tone Adjustment</h4>
                                             <p className="text-xs text-gray-700 mb-4">
-                                                The tone adjusts the language, verbs, scope, and ownership level in your resume summary and bullet points to match the seniority level of the role you're applying for.
+                                                Tone names how senior the posting is. It does not add scope, title, or results you have not already stated.
                                             </p>
                                             
                                             <div className="space-y-4">
@@ -1809,7 +1944,7 @@ export default function Form({
                                                     <div>
                                                         <h5 className="font-semibold text-xs text-gray-900 mb-2">How to Use</h5>
                                                         <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
-                                                            <li>When rewriting bullet points, select relevant keywords to incorporate</li>
+                                                            <li>Select an employer word only when it truthfully names work you did. A missing word is a gap.</li>
                                                             <li>Keywords are automatically suggested based on the bullet point content</li>
                                                             <li>Only include keywords that naturally fit the context of your work</li>
                                                             <li>The number in parentheses is keyword weight (posting mentions + must-have + title bonuses)</li>
@@ -1828,8 +1963,9 @@ export default function Form({
                 return (
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-4">Choose a Resume Template</label>
+                        <p className="mb-4 text-sm text-slate-600">Use a single column and plain type. Graphic layouts are not part of this workflow.</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {TEMPLATES.map((template) => (
+                            {[...TEMPLATES].sort((a, b) => Number(b.scanLayout) - Number(a.scanLayout)).map((template) => (
                                 <button
                                     key={template.id}
                                     type="button"
@@ -1861,6 +1997,9 @@ export default function Form({
                                         <div>
                                             <h3 className="font-semibold text-gray-800">{template.name}</h3>
                                             <p className="text-sm text-gray-500 mt-1">{template.description}</p>
+                                            {!template.scanLayout && (
+                                                <p className="mt-1 text-xs font-medium text-amber-800">Not recommended. The 11-second scan uses one column and no graphics.</p>
+                                            )}
                                         </div>
                                         {formData.template === template.id && (
                                             <div className="flex-shrink-0 ml-3">
@@ -2037,7 +2176,7 @@ export default function Form({
                                                             <div key={bulletIndex} className="space-y-1">
                                                                 {showKeywordPreview && (
                                                                     <div className="space-y-2 text-xs">
-                                                                        <span className="text-gray-500 font-medium">Keywords to incorporate (from job analysis):</span>
+                                                                        <span className="text-gray-500 font-medium">Employer words — use only if you did this work:</span>
                                                                         {previewCategories.map((category, catIdx) => (
                                                                             <div key={catIdx}>
                                                                                 <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1">
@@ -2100,15 +2239,17 @@ export default function Form({
                                                                         )}
                                                                     </div>
                                                                 )}
-                                                                <div className="flex items-center gap-2" style={{ overflow: 'visible' }}>
+                                                                <div className="flex items-start gap-2">
                                                                     <textarea
-                                                                        cols={2}
+                                                                        rows={3}
                                                                         placeholder={`Bullet point ${bulletIndex + 1} (e.g., Built web applications using React and Node.js)`}
                                                                         value={bullet}
                                                                         onChange={(e) => handleBulletChange(index, bulletIndex, e.target.value)}
-                                                                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
+                                                                        className={`min-h-20 min-w-0 w-full flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ${
+                                                                            /\[X\]/i.test(bullet) ? 'border-amber-500 bg-amber-50' : 'border-gray-300'
+                                                                        }`}
                                                                     />
-                                                                    <div className="flex flex-col gap-1">
+                                                                    <div className="flex shrink-0 flex-col gap-1">
                                                                         <div className="flex items-center gap-1 relative" style={{ overflow: 'visible' }}>
                                                                             <UsageGatedButton
                                                                                 action="ai_rewrite"
@@ -2497,6 +2638,46 @@ export default function Form({
                                                                         )}
                                                                     </div>
                                                                 </div>
+                                                                <LineFlags text={bullet} />
+                                                                {rewriteReasoning[`${index}-${bulletIndex}`]?.recommendation ? (() => {
+                                                                    const reasoning = rewriteReasoning[`${index}-${bulletIndex}`]
+                                                                    if (!reasoning) return null
+                                                                    const openSlots = [
+                                                                        { label: 'Action verb', text: reasoning.verb, set: reasoning.verbSet },
+                                                                        { label: 'What you did', text: reasoning.did, set: reasoning.didSet },
+                                                                        { label: 'How', text: reasoning.how, set: reasoning.howSet },
+                                                                        { label: 'Result / impact', text: reasoning.result, set: reasoning.resultSet },
+                                                                    ].filter((slot) => !slot.set && slot.text?.trim())
+                                                                    if (openSlots.length === 0) return null
+                                                                    return (
+                                                                    <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                                                                        <p className="text-xs font-semibold text-blue-900">Recommendations for what this line does not already say</p>
+                                                                        <ul className="mt-2 space-y-1 text-sm text-slate-900">
+                                                                            {openSlots.map((slot) => (
+                                                                                <li key={slot.label}>
+                                                                                    <span className="font-medium text-slate-500">{slot.label}: </span>
+                                                                                    {/^\[X\]$/i.test((slot.text || '').trim()) ? '[X] — not in what you wrote' : slot.text}
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                        {reasoning.recommendation && reasoning.recommendation !== bullet ? (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleBulletChange(index, bulletIndex, reasoning.recommendation || '')}
+                                                                                className="mt-2 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                                                                            >
+                                                                                Use this line
+                                                                            </button>
+                                                                        ) : null}
+                                                                    </div>
+                                                                    )
+                                                                })() : null}
+                                                                {rewriteReasoning[`${index}-${bulletIndex}`]?.factsUsed?.length ? (
+                                                                    <p className="text-xs text-slate-600">
+                                                                        Facts used: {rewriteReasoning[`${index}-${bulletIndex}`].factsUsed!.join('; ')}
+                                                                        {rewriteReasoning[`${index}-${bulletIndex}`].isDuty ? ' · Source line is still a duty.' : ''}
+                                                                    </p>
+                                                                ) : null}
                                                             </div>
                                                         )
                                                     })}
@@ -3088,8 +3269,11 @@ export default function Form({
                                             rows={6}
                                             value={formData.summary || ''}
                                             onChange={handleInputChange}
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none"
+                                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 resize-none ${
+                                                /\[X\]/i.test(formData.summary || '') ? 'border-amber-500 bg-amber-50' : 'border-gray-300'
+                                            }`}
                                         />
+                                        <LineFlags text={formData.summary || ''} />
                                         
                                         {/* Summary Info Tooltip */}
                                         {showSummaryInfoTooltip && (
@@ -3104,7 +3288,7 @@ export default function Form({
                                             >
                                                 <h4 className="font-semibold text-sm text-gray-900 mb-3">How Summary is Generated</h4>
                                                 <p className="text-xs text-gray-700 mb-4">
-                                                    The summary is AI-generated based on your work experience, education, skills, and the target job description. It's tailored to match the seniority level and requirements of the role you're applying for.
+                                                    The summary states the 11-second claim in the employer&apos;s language, using only facts you already provided. A missing number stays [X].
                                                 </p>
                                                 
                                                 <div className="space-y-3">
@@ -3261,12 +3445,14 @@ export default function Form({
                 </div>
                 
                 <ProgressIndicator />
+                <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">{PRODUCT_RULE}</p>
         
                 <div className="space-y-6" style={{ overflow: 'visible' }}>
                     {/* Step Content */}
                     <div className="min-h-[300px]" style={{ overflow: 'visible' }}>
                         {renderStepContent()}
                     </div>
+                    <HostileReviewPanel formData={formData} currentStep={currentStep} setFormData={setFormData} />
 
                 {/* Navigation Buttons */}
                 <div className="flex justify-between items-center pt-6 border-t border-gray-200">

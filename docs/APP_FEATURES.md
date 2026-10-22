@@ -2,6 +2,24 @@
 
 This document lists the key features of the app, derived from `IMPLEMENTATION_ANALYSIS.md`.
 
+## The 11-second argument
+
+A resume is an 11-second argument: “I have already solved the problem you are hiring me to solve.” Recruiters scan the current role, previous company, dates, one or two bullets, and skills. The model is the interviewer, editor, strategist, and hostile reviewer. The user supplies every fact.
+
+Flow: career dump → 5–7 clarifying questions → confirmed master record → one tailored resume per job → hostile review → export the tailored resume only.
+
+- **Career record.** One per user (`kind: "master"`). Holds the raw dump, clarifying Q&A, and structured facts. It is never exported and does not count toward `resumesCreated`.
+- **Applications.** Tailored resumes (`kind: "tailored"`) keep the wizard, keywords, themes, seniority, and recommendations. “New application” copies evidence from the master. It does not start from a blank AI draft. Free remains 1 lifetime application; Pro remains 10.
+- **Never invent.** Summary, bullet, experience, structuring, and generate routes refuse to add metrics, tools, scope, or outcomes. Missing numbers stay `[X]` and block export. Stock phrases are rejected in the prompt and in a post-check.
+- **Duties become outcomes.** Rewrites use action verb → what they did → measurable outcome, and return the line, a duty flag, and the user facts used.
+- **One master, many jobs.** Tailoring extracts the ten requirements that decide the scan, reorders confirmed evidence, and lists unsupported requirements as gaps. Several descriptions of the same role contribute only the phrases they share, and only when the master supports them.
+- **Hostile reader.** A review annotates stop-reading, generic, AI voice, and credibility on the lines. The last three reviews are kept. The 11-second preview highlights only the scan lines and dims the rest.
+- **Layout.** Tailored resumes default to the single-column Modern Minimal template. Graphic layouts are not recommended.
+- **Scanner.** `/free-resume-scanner` still returns match, missing, and matched keywords, plus a human-scan verdict. It does not write replacement bullets.
+- **Discover.** Search is unchanged. “Use for an application” sends that posting’s description into the tailor step.
+
+Cover letters, interview practice, and negotiation are out of scope. The master keeps one thread of facts and Q&A so those can be added later.
+
 ---
 
 ## Job Description Analysis & Insights

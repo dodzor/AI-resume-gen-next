@@ -81,8 +81,34 @@ export default defineSchema({
     recommendations: v.optional(v.array(v.string())), // What the resume should show
     thematicSummary: v.optional(v.string()), // One sentence explaining what the job emphasizes
     
-    // Generated Resume (HTML string)
+    // Generated Resume (HTML string). Tailored resumes only; the master is never exported.
     generatedResume: v.optional(v.string()),
+
+    // master = private career record (does not count toward resumesCreated).
+    // tailored = one application, child of the master. Missing kind means tailored.
+    kind: v.optional(v.union(v.literal("master"), v.literal("tailored"))),
+    rawDump: v.optional(v.string()),
+    clarifyingQA: v.optional(v.array(v.object({
+      question: v.string(),
+      answer: v.optional(v.string()),
+      askedAt: v.number(),
+    }))),
+    confirmedFacts: v.optional(v.array(v.string())),
+    masterResumeId: v.optional(v.id("resumes")),
+    extractedRequirements: v.optional(v.array(v.string())),
+    gaps: v.optional(v.array(v.string())),
+    overlapPhrases: v.optional(v.array(v.string())),
+    targetJobs: v.optional(v.array(v.string())),
+    hostileReviews: v.optional(v.array(v.object({
+      createdAt: v.number(),
+      stopReading: v.string(),
+      verdict: v.string(),
+      annotations: v.array(v.object({
+        target: v.string(),
+        labels: v.array(v.string()),
+        note: v.string(),
+      })),
+    }))),
     
     // Metadata
     maxStepReached: v.optional(v.number()), // Last completed step (1-8)

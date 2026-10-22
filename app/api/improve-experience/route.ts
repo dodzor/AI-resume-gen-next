@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { requireAuth } from '@/lib/api-auth';
 import { checkUsageLimit, incrementUsageAfterAction } from '@/lib/api-usage';
+import {
+  EVIDENCE_RULES,
+  FIDELITY_TEMPERATURE,
+  bulletLines,
+  findBannedPhrases,
+  isDutyLine,
+  parseModelJson,
+  scrubInventedClaims,
+} from '@/lib/evidenceRules';
 
 // Lazy-initialize OpenAI client to avoid build-time errors
 function getOpenAIClient() {
@@ -47,69 +56,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const systemMessage = 'You are a professional resume writer specializing in transforming vague, task-based job descriptions into impactful, concrete bullet points that avoid buzzwords and clichés.';
+    const systemMessage = `You are the interviewer and editor. You do not invent experience. ${EVIDENCE_RULES}`;
     
     // Build themes instructions if available
     let themesInstructions = '';
     if (themes && Array.isArray(themes) && themes.length > 0 && recommendations && Array.isArray(recommendations) && recommendations.length > 0) {
-      themesInstructions = `\n\nIMPORTANT THEMES TO EMPHASIZE: The following themes and values are critical for this role:\n${themes.map((t: string) => `- ${t}`).join('\n')}\n\nThe bullet points should demonstrate these capabilities:\n${recommendations.map((r: string) => `- ${r}`).join('\n')}\n${thematicSummary ? `\nContext: ${thematicSummary}` : ''}\n\nWhen rewriting the bullet points, ensure they naturally incorporate and emphasize these themes and recommendations. Show concrete examples of how the work described aligns with what this role values. Prioritize bullet points that demonstrate these themes.`;
+      themesInstructions = `\n\nTHEMES (ordering signals only): Mention a theme only when the source already shows it.\n${themes.map((t: string) => `- ${t}`).join('\n')}\n${recommendations.map((r: string) => `- ${r}`).join('\n')}\n${thematicSummary ? `\nContext: ${thematicSummary}` : ''}`;
     }
     
-    const prompt = `Transform the following job description into impactful, concrete bullet points. Convert vague, task-based statements into bullets that show impact, results, or value, not just what the person was responsible for.
+    const sourceCount = Math.max(bulletLines(description).length, 1);
+    const prompt = `Turn this experience into outcome bullets. Keep the same number of bullets (${sourceCount}). Do not add a role, tool, metric, or outcome that is not in the source.
 
-Format: Action verb + what you did + how + result/impact
+Shape: strong action verb → what the person did → measurable outcome.
+If the number is missing, write [X].
 
-Current Description:
+Source:
 ${description}
 ${role ? `Role: ${role}` : ''}
 ${company ? `Company: ${company}` : ''}
-
-Requirements:
-- Transform each vague statement into a bullet point that shows impact, results, or value
-- Use the format: Action verb + what you did + how + result/impact
-- Focus on quantifiable results, improvements, or achievements when possible
-- Use strong action verbs (e.g., "Developed", "Implemented", "Led", "Optimized", "Increased", "Reduced", "Built", "Delivered", "Launched", "Automated", "Scaled")
-- If specific metrics aren't available, focus on the impact or value delivered
-- Maintain the same number of bullet points or consolidate if appropriate
-- Each bullet should be concise but impactful
-- Return the improved description as a plain text list with each bullet on a new line
-- Do not add any markdown formatting, numbering, or additional text
-- Do not include explanations or notes
-
-CRITICAL: Avoid ALL buzzwords and clichés. Never use these terms:
-
-Personality Buzzwords (show outcomes instead):
-- Dynamic, Passionate, Motivated, Hard-working, Dedicated, Results-driven, Detail-oriented, Fast learner, Self-starter, Proactive, Go-getter, Enthusiastic, Driven, Accomplished
-
-Skill & Ability Clichés (state what you did and at what level):
-- Adept at, Skilled in, Expertise in, Knowledgeable in, Familiar with, Proficient in, Experienced in (without context), Strong understanding of, proven track record
-
-"Problem Solving" & Thinking Clichés (describe the problem solved and result):
-- Problem solver, Critical thinker, Strategic thinker, Analytical mindset, Think outside the box, Innovative thinker
-
-Team & Collaboration Clichés (mention who you worked with and what changed):
-- Team player, Works well independently or in a team, Excellent communicator, Cross-functional collaboration, Stakeholder management
-
-Leadership & Management Clichés (show scale: number of people, decisions, outcomes):
-- Natural leader, People person, Hands-on manager, Visionary, Thought leader, Change agent
-
-Tech-Specific Buzzwords (explain how it was optimized or scaled):
-- Cutting-edge technology, Scalable solutions, Best practices, Robust architecture, High-performance systems, Optimized workflows
-
-Marketing / Business Buzzwords (use plain language + metrics):
-- Synergy, Value-added, Leveraged, Disruptive, End-to-end, Customer-centric, Go-to-market, KPI-driven
-
-Soft Skills Without Proof (tie them to a concrete situation):
-- Multitasker, Time management, Adaptable, Resilient, Stress-resistant
-
-Phrases Recruiters Ignore (use better verbs instead):
-- Responsible for, In charge of, Tasked with, Assisted with (without outcome), Worked on
-
-Instead of buzzwords, use concrete language that shows what was accomplished, who was involved, what changed, and measurable outcomes.
-
 ${themesInstructions}
 
-Return ONLY the improved bullet points, one per line, without any prefixes, numbering, or formatting.`;
+Return JSON only:
+{"lines":[{"line":"rewritten bullet","isDuty":false,"factsUsed":["quote from the source"]}]}`;
 
     console.log('Improving experience description for:', role || 'Unknown role');
 
@@ -126,8 +94,9 @@ Return ONLY the improved bullet points, one per line, without any prefixes, numb
           content: prompt
         }
       ],
-      temperature: 0.7,
-      max_tokens: 500
+      temperature: FIDELITY_TEMPERATURE,
+      response_format: { type: 'json_object' },
+      max_tokens: 800
     });
 
     if (!completion.choices[0]?.message?.content) {
@@ -142,17 +111,30 @@ Return ONLY the improved bullet points, one per line, without any prefixes, numb
     }
 
     // Get the content and clean it up
-    let improvedDescription = completion.choices[0].message.content.trim();
-    
-    // Remove any markdown formatting, bullets, numbering, or quotes
-    improvedDescription = improvedDescription.replace(/^["']|["']$/g, '');
-    improvedDescription = improvedDescription.replace(/^```[\w]*\n?|\n?```$/g, '');
-    // Remove markdown bullets and numbering
-    improvedDescription = improvedDescription.replace(/^[-*•]\s+/gm, '');
-    improvedDescription = improvedDescription.replace(/^\d+\.\s+/gm, '');
-    // Remove any leading/trailing whitespace from each line
-    improvedDescription = improvedDescription.split('\n').map(line => line.trim()).filter(line => line.length > 0).join('\n');
-    improvedDescription = improvedDescription.trim();
+    const source = [description, role, company].filter(Boolean).join('\n');
+    let parsed: { lines?: Array<{ line?: string; isDuty?: boolean; factsUsed?: unknown }> } = {};
+    try {
+      parsed = parseModelJson(completion.choices[0].message.content.trim());
+    } catch {
+      parsed = { lines: bulletLines(completion.choices[0].message.content).map((line) => ({ line })) };
+    }
+    const sourceBulletCount = bulletLines(description).length || 1;
+    const lines = (parsed.lines || [])
+      .slice(0, sourceBulletCount)
+      .map((item) => {
+        const line = scrubInventedClaims(String(item.line || '').trim(), source);
+        const factsUsed = Array.isArray(item.factsUsed)
+          ? item.factsUsed.filter((fact): fact is string => typeof fact === 'string' && source.toLowerCase().includes(fact.toLowerCase().slice(0, Math.min(fact.length, 40))))
+          : [];
+        return {
+          line,
+          isDuty: isDutyLine(description) || item.isDuty === true || isDutyLine(line),
+          factsUsed,
+          bannedPhrases: findBannedPhrases(line),
+        };
+      })
+      .filter((item) => item.line);
+    const improvedDescription = lines.map((item) => item.line).join('\n');
 
     console.log('Experience description improved successfully');
 
@@ -161,7 +143,8 @@ Return ONLY the improved bullet points, one per line, without any prefixes, numb
 
     return NextResponse.json({
       success: true,
-      improvedDescription: improvedDescription
+      improvedDescription: improvedDescription,
+      lines
     });
 
   } catch (error: any) {

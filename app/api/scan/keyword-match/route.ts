@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractKeywords, scanResumeAgainstKeywords } from '@/lib/resumeScanner';
+import { reviewHumanScan } from '@/lib/humanScan';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +33,8 @@ export async function POST(request: NextRequest) {
     const result = scanResumeAgainstKeywords(resumeText, keywords);
     return NextResponse.json({
       ...result,
-      keywordCount: keywords.length
+      keywordCount: keywords.length,
+      humanScan: reviewHumanScan(resumeText)
     });
   } catch (error) {
     console.error('Keyword scan failed:', error);

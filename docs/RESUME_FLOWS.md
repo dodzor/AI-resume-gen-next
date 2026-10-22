@@ -1,6 +1,21 @@
 # Resume Management Flows Documentation
 
-This document describes the key flows in the AI Resume Generator application, including auto-save, resume loading, and resume switching functionality.
+This document describes the key flows in the AI Resume Generator application, including the 11-second argument workflow, auto-save, resume loading, and resume switching.
+
+## Master, then tailored resumes
+
+1. **Dump.** The career record opens on a free-text dump. No template and no bullet format.
+2. **Interview.** `/api/interview-master` reads the dump and asks 5–7 questions. It does not draft.
+3. **Answers.** Each question and answer is saved on the master. The user can ask again.
+4. **Structure.** `/api/structure-master` updates the master from the dump and answered questions only. Unanswered questions are ignored. Missing numbers stay `[X]`.
+5. **Pick a job.** The user pastes a description in the wizard, or chooses “Use for an application” on `/discover`, which opens `/?tailorUrl=…` with that posting’s text.
+6. **Tailor.** “New application” copies confirmed evidence from the master into a tailored resume and counts it against the plan limit. `/api/tailor-resume` reorders that evidence into the employer’s language, returns gaps, and does not add facts. Two to four descriptions of the same role contribute their shared phrases only where the master supports them.
+7. **Hostile review.** `/api/hostile-review` annotates the tailored resume and does not rewrite it. The user fixes lines and can review again. The last three reviews are stored. The 11-second preview updates as they edit.
+8. **Export.** PDF and copy run only for a tailored resume, and only when no `[X]` or stock phrase remains. The master has no export.
+
+Creating or deleting the master does not change `resumesCreated`. Tailored resumes still do.
+
+The wizard (Target Job, Template, Personal Info, Experience, Education, Skills, Portfolio, Summary) still edits a tailored resume. Keyword extraction, seniority, themes, and recommendations still come from job analysis. They order confirmed facts. They do not authorize new ones.
 
 ## Table of Contents
 

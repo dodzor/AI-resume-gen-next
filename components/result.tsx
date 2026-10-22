@@ -9,6 +9,8 @@ import { useUsageLimits } from '@/hooks/useUsageLimits'
 import UpgradeModal from './UpgradeModal'
 import type { ActionType } from '@/lib/plan-limits'
 import '../styles/resume-display.css'
+import ElevenSecondPreview from './ElevenSecondPreview'
+import { exportBlockReason, resumePlainText } from '@/lib/evidenceRules'
 
 interface ResultProps {
     formData: any
@@ -51,6 +53,11 @@ export default function Result({ formData, generatedResume, currentStep, showPre
             
             // Get plain text content
             const textContent = tempDiv.textContent || tempDiv.innerText || ''
+            const blocked = exportBlockReason(textContent)
+            if (blocked) {
+                alert(blocked)
+                return
+            }
             
             // Copy to clipboard
             await navigator.clipboard.writeText(textContent)
@@ -71,6 +78,12 @@ export default function Result({ formData, generatedResume, currentStep, showPre
         }
 
         // Validate content before proceeding
+        const blocked = exportBlockReason(`${resumePlainText(formData)}\n${generatedResume || ''}`)
+        if (blocked) {
+            alert(blocked)
+            return
+        }
+
         const validation = validatePDFContent(generatedResume)
         if (!validation.isValid) {
             alert(validation.error)
@@ -173,6 +186,17 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                     </div>
                 {/* )} */}
                 
+                {formData.kind !== 'master' && (
+                    <ElevenSecondPreview
+                      formData={formData}
+                      annotations={formData.hostileReviews?.[formData.hostileReviews.length - 1]?.annotations || []}
+                    />
+                )}
+                {exportBlockReason(resumePlainText(formData)) && (
+                    <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                      Not ready to export. {exportBlockReason(resumePlainText(formData))}
+                    </p>
+                )}
                 <div className={`flex-1 bg-gray-50 rounded-lg p-4 sm:p-6 border-2 border-dashed border-gray-300 overflow-y-auto min-h-[300px] lg:min-h-0 custom-scrollbar ${showForm === false ? 'lg:max-w-[800px] lg:mx-auto' : ''}`}>
                     {previewContent ? (
                         <div className={finalDisplayClassName} dangerouslySetInnerHTML={{ __html: previewContent }} />

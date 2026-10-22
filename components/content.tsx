@@ -8,6 +8,7 @@ import { Id } from '@/convex/_generated/dataModel'
 import Result from './result'
 import Form from './form'
 import ResumeSwitcher from './ResumeSwitcher'
+import MasterCareerPanel from './MasterCareerPanel'
 import ResumeEntryGate from './ResumeEntryGate'
 import { UserButton } from '@clerk/nextjs'
 import { useUsageLimits } from '@/hooks/useUsageLimits'
@@ -30,7 +31,22 @@ const getDefaultFormData = () => ({
   portfolioProjects: [] as { name: string; toolsSkills: string; outcome: string }[],
   portfolioLink: '',
   job: '',
-  template: 'professional-blue' as const,
+  template: 'modern-minimal' as const,
+  kind: 'tailored' as 'master' | 'tailored',
+  rawDump: '',
+  clarifyingQA: [] as { question: string; answer?: string; askedAt: number }[],
+  confirmedFacts: [] as string[],
+  masterResumeId: undefined as Id<'resumes'> | undefined,
+  extractedRequirements: [] as string[],
+  gaps: [] as string[],
+  overlapPhrases: [] as string[],
+  targetJobs: [] as string[],
+  hostileReviews: [] as {
+    createdAt: number
+    stopReading: string
+    verdict: string
+    annotations: { target: string; labels: string[]; note: string }[]
+  }[],
   jobTitle: '',
   tone: '',
   summary: '',
@@ -104,6 +120,13 @@ export default function Content() {
     )
     const saveResume = useMutation(api.resumes.saveResume)
     const deleteResume = useMutation(api.resumes.deleteResume)
+    const ensureMaster = useMutation(api.resumes.ensureMaster)
+    const createApplicationFromMaster = useMutation(api.resumes.createApplicationFromMaster)
+    const [tailorUrl, setTailorUrl] = useState<string | null>(null)
+    const discoveredJob = useQuery(
+      api.softwareJobs.getSoftwareJobByUrl,
+      tailorUrl ? { url: tailorUrl } : 'skip'
+    )
     const [isSaving, setIsSaving] = useState(false)
     const [lastSaved, setLastSaved] = useState<Date | null>(null)
     const [hasStartedEditing, setHasStartedEditing] = useState(false)
@@ -120,9 +143,24 @@ export default function Content() {
     const lastLoadedResumeId = useRef<string | null>(null)
     const justCreatedResumeId = useRef<string | null>(null)
     const skipAutoLoad = useRef(false)
+    const formDataRef = useRef(formData)
+    formDataRef.current = formData
+    const currentResumeIdRef = useRef(currentResumeId)
+    currentResumeIdRef.current = currentResumeId
+    // Bumped when the user opens another record, so an in-flight autosave
+    // cannot write the previous id back over that choice.
+    const navigationEpoch = useRef(0)
+
+    useEffect(() => {
+      const url = new URLSearchParams(window.location.search).get('tailorUrl')
+      if (url) setTailorUrl(url)
+    }, [])
     
     // Save function - called when user navigates steps
-    const handleSave = useCallback(async () => {
+    const handleSave = useCallback(async (override?: Record<string, unknown>) => {
+      const formData = { ...formDataRef.current, ...override }
+      const savedForId = currentResumeIdRef.current
+      const epoch = navigationEpoch.current
       // Don't save if still loading from Convex
       if (isLoadingFromConvex.current) {
         debugLog('handleSave:skipped:isLoadingFromConvex', {
@@ -168,17 +206,32 @@ export default function Content() {
           thematicSummary: formData.thematicSummary || undefined,
           generatedResume: generatedResume || undefined,
           maxStepReached: maxStepReached || undefined,
+          kind: formData.kind === 'master' ? 'master' : 'tailored',
+          rawDump: formData.rawDump || undefined,
+          clarifyingQA: formData.clarifyingQA?.length ? formData.clarifyingQA : undefined,
+          confirmedFacts: formData.confirmedFacts?.length ? formData.confirmedFacts : undefined,
+          masterResumeId: formData.masterResumeId,
+          extractedRequirements: formData.extractedRequirements?.length ? formData.extractedRequirements : undefined,
+          gaps: formData.gaps?.length ? formData.gaps : undefined,
+          overlapPhrases: formData.overlapPhrases?.length ? formData.overlapPhrases : undefined,
+          targetJobs: formData.targetJobs?.length ? formData.targetJobs : undefined,
+          hostileReviews: formData.hostileReviews?.length ? formData.hostileReviews.slice(-3) : undefined,
         })
         
-        setCurrentResumeId(resumeId)
-        setLastSaved(new Date())
-        setHasStartedEditing(true)
+        const switchedAway = navigationEpoch.current !== epoch || (currentResumeIdRef.current !== savedForId && currentResumeIdRef.current !== resumeId)
         debugLog('handleSave:success', {
-          previousResumeId: currentResumeId,
+          previousResumeId: savedForId,
           savedResumeId: resumeId,
           currentStep,
           maxStepReached,
+          switchedAway,
         })
+        // A click on Career record blurs the field and starts this save.
+        // If that click already opened another record, keep the user's selection.
+        if (switchedAway) return
+        setCurrentResumeId(resumeId)
+        setLastSaved(new Date())
+        setHasStartedEditing(true)
         
         // Hide preview when creating a new resume
         if (!currentResumeId && resumeId) {
@@ -238,6 +291,14 @@ export default function Content() {
 
         if (skipAutoLoad.current) {
           debugLog('loadResume:skipped:userEditingNewResume')
+          return
+        }
+
+        // A record is already open. List refreshes after a save, and a brand-new
+        // career record is not in the list for a moment. Picking again would
+        // replace the editor or undo the click that opened it.
+        if (currentResumeId) {
+          debugLog('loadResume:skipped:alreadyOpen', { currentResumeId })
           return
         }
         
@@ -308,13 +369,22 @@ export default function Content() {
       }
       
       loadResume()
-    }, [resumes])
+    }, [resumes, currentResumeId])
     
     // Load resume data when currentResumeId or getResume result changes
     useEffect(() => {
       if (currentResumeId && getResume) {
+        // The query can still be the previous record for a render after the id changes.
+        if (getResume._id !== currentResumeId) return
         // Check if we're actually switching to a different resume
         const isSwitchingResume = lastLoadedResumeId.current !== currentResumeId
+        if (!isSwitchingResume) {
+          // The open document echoed our own save. Replacing form state here
+          // drops focus in the field the user just moved to.
+          isLoadingFromConvex.current = false
+          setIsLoadingResume(false)
+          return
+        }
         debugLog('hydrateResume:start', {
           currentResumeId,
           lastLoadedResumeId: lastLoadedResumeId.current,
@@ -347,7 +417,7 @@ export default function Content() {
           portfolioLink: getResume.portfolioLink || '',
           job: getResume.job || '',
           jobTitle: getResume.jobTitle || '',
-          template: (getResume.template || 'professional-blue') as 'professional-blue',
+          template: (getResume.template || 'modern-minimal') as 'modern-minimal',
           tone: getResume.tone || '',
           summary: getResume.summary || '',
           keywords: getResume.keywords || [],
@@ -392,7 +462,17 @@ export default function Content() {
           keywordsWithCounts: getResume.keywordsWithCounts ?? [],
           themes: getResume.themes || [],
           recommendations: getResume.recommendations || [],
-          thematicSummary: getResume.thematicSummary || ''
+          thematicSummary: getResume.thematicSummary || '',
+          kind: (getResume.kind === 'master' ? 'master' : 'tailored') as 'master' | 'tailored',
+          rawDump: getResume.rawDump || '',
+          clarifyingQA: getResume.clarifyingQA || [],
+          confirmedFacts: getResume.confirmedFacts || [],
+          masterResumeId: getResume.masterResumeId,
+          extractedRequirements: getResume.extractedRequirements || [],
+          gaps: getResume.gaps || [],
+          overlapPhrases: getResume.overlapPhrases || [],
+          targetJobs: getResume.targetJobs || [],
+          hostileReviews: getResume.hostileReviews || [],
         }
         
         setFormData(mappedFormData)
@@ -509,12 +589,6 @@ export default function Content() {
       setIsLoadingResume(false)
     }, [])
 
-    // Handler for creating new resume
-    const handleCreateNew = useCallback(() => {
-      console.log('Creating new resume')
-      resetEditor()
-    }, [resetEditor])
-
     const handleDeleteResume = useCallback(async (resumeId: Id<'resumes'>) => {
       const remaining = (resumes ?? []).filter((resume) => resume._id !== resumeId)
       const isCurrent = currentResumeId === resumeId
@@ -559,10 +633,55 @@ export default function Content() {
       }
     }, [resumes, currentResumeId, deleteResume, resetEditor])
 
+    const handleOpenMaster = useCallback(async () => {
+      const epoch = ++navigationEpoch.current
+      try {
+        const masterId = await ensureMaster({})
+        if (navigationEpoch.current !== epoch) return
+        skipAutoLoad.current = false
+        isLoadingFromConvex.current = true
+        currentResumeIdRef.current = masterId
+        setCurrentResumeId(masterId)
+        setResumeEntryPhase('done')
+      } catch (error: any) {
+        alert(error?.message || 'Could not open the career record.')
+      }
+    }, [ensureMaster])
+
+    const handleCreateApplication = useCallback(async (job?: string, jobTitle?: string) => {
+      const epoch = ++navigationEpoch.current
+      const master = (resumes ?? []).find((resume) => resume.kind === 'master')
+      if (!master) {
+        await handleOpenMaster()
+        return
+      }
+      try {
+        const resumeId = await createApplicationFromMaster({
+          masterResumeId: master._id,
+          job,
+          jobTitle,
+        })
+        if (navigationEpoch.current !== epoch) return
+        skipAutoLoad.current = false
+        isLoadingFromConvex.current = true
+        currentResumeIdRef.current = resumeId
+        setCurrentResumeId(resumeId)
+        setResumeEntryPhase('done')
+        setCurrentStep(1)
+      } catch (error: any) {
+        if (error?.upgradeRequired || error?.code === 'USAGE_LIMIT_EXCEEDED') {
+          setUpgradeModalAction('create_resume')
+          setShowUpgradeModal(true)
+          return
+        }
+        alert(error?.message || 'Could not create the application.')
+      }
+    }, [resumes, createApplicationFromMaster, handleOpenMaster])
+
     const handleStartFreshFromGate = useCallback(() => {
       setImportMeta(null)
-      setResumeEntryPhase('done')
-    }, [])
+      void handleOpenMaster()
+    }, [handleOpenMaster])
 
     const handlePdfParsed = useCallback((text: string, fileName: string) => {
       setResumeImportText(text)
@@ -576,11 +695,16 @@ export default function Content() {
 
     const handleFinishImport = useCallback(
       (data: ResumeImportPayload, mode: ResumeMergeMode) => {
-        setFormData((prev) => mergeImportedResume(prev as Record<string, unknown>, data, mode) as typeof prev)
+        const hasMaster = (resumes ?? []).some((resume) => resume.kind === 'master')
+        setFormData((prev) => {
+          const merged = mergeImportedResume(prev as Record<string, unknown>, data, mode) as typeof prev
+          if (hasMaster) return merged
+          return { ...merged, kind: 'master' as const, rawDump: resumeImportText || prev.rawDump }
+        })
         setImportMeta({ fileName: resumeImportFileName || 'resume.pdf', importedAt: Date.now() })
         setResumeEntryPhase('done')
       },
-      [resumeImportFileName]
+      [resumeImportFileName, resumeImportText, resumes]
     )
 
     const handleImportUpgradeRequired = useCallback(() => {
@@ -602,10 +726,11 @@ export default function Content() {
     
     // Handler for switching resumes
     const handleSelectResume = useCallback((resumeId: Id<'resumes'>) => {
+      navigationEpoch.current += 1
       skipAutoLoad.current = false
-      setCurrentResumeId(resumeId)
       isLoadingFromConvex.current = true
-      setIsLoadingResume(true)
+      currentResumeIdRef.current = resumeId
+      setCurrentResumeId(resumeId)
     }, [])
     
     // Get current resume data for switcher
@@ -627,6 +752,7 @@ export default function Content() {
     
     // Show resume switcher if resumes exist or if we're not in initial loading
     const showResumeSwitcher = (resumes && resumes.length > 0) || (!isLoadingResume && resumes !== undefined)
+    const masterRecord = resumes?.find((resume) => resume.kind === 'master')
 
     const showResumeEntryGate =
       resumeEntryPhase === 'choose' ||
@@ -670,7 +796,8 @@ export default function Content() {
                     currentResumeId={currentResumeId}
                     onSelectResume={handleSelectResume}
                     onDeleteResume={handleDeleteResume}
-                    onCreateNew={handleCreateNew}
+                    onOpenMaster={() => { void handleOpenMaster() }}
+                    onCreateApplication={() => { void handleCreateApplication() }}
                     isLoading={isLoadingResume}
                   />
                 )}
@@ -705,6 +832,19 @@ export default function Content() {
           </header>
 
           <div className="px-4 pt-8 sm:px-6 pb-6">
+            {discoveredJob && (
+              <div className="mx-auto mb-4 max-w-5xl rounded-lg border border-blue-200 bg-white px-4 py-3 text-sm text-slate-800">
+                <p className="font-medium">Use this discovered role: {discoveredJob.title} at {discoveredJob.companyName}</p>
+                <p className="mt-1 text-slate-600">The description is copied into a new application. It does not invent experience.</p>
+                <button
+                  type="button"
+                  onClick={() => { void handleCreateApplication(discoveredJob.text, discoveredJob.title) }}
+                  className="mt-2 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white"
+                >
+                  New application with this job
+                </button>
+              </div>
+            )}
             {showResumeEntryGate && resumeEntryPhase !== null ? (
               <ResumeEntryGate
                 phase={resumeEntryPhase}
@@ -722,6 +862,12 @@ export default function Content() {
                 <div className="animate-spin text-4xl mb-4">⏳</div>
                 <p className="text-gray-600">Loading resume...</p>
               </div>
+            ) : formData.kind === 'master' ? (
+              <MasterCareerPanel
+                formData={formData}
+                setFormData={setFormData}
+                onSave={handleSave}
+              />
             ) : isFormCompleted ? (
               // Full-width layout when form is completed
               <div className="max-w-5xl mx-auto space-y-6">
@@ -742,6 +888,7 @@ export default function Content() {
                         currentResumeId={currentResumeId}
                         importMeta={importMeta}
                         onReimport={handleReimport}
+                        masterRecord={masterRecord}
                       />
                     )}
                 <Result 
@@ -778,6 +925,7 @@ export default function Content() {
                         currentResumeId={currentResumeId}
                         importMeta={importMeta}
                         onReimport={handleReimport}
+                        masterRecord={masterRecord}
                       />
                     </div>
                   </div>

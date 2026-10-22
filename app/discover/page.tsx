@@ -328,6 +328,12 @@ export default async function DiscoverPage({
                             {job.matchedInDescription ? (
                               <p className="mt-1 text-xs font-medium text-blue-700">Matched in description</p>
                             ) : null}
+                            <Link
+                              href={`/?tailorUrl=${encodeURIComponent(job.url)}`}
+                              className="mt-2 inline-block text-xs font-medium text-blue-700 hover:text-blue-900"
+                            >
+                              Use for an application
+                            </Link>
                           </div>
                         </div>
                       </li>

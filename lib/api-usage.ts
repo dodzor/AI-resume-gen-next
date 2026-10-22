@@ -9,8 +9,10 @@
 
 import { NextResponse } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { api } from '@/convex/_generated/api';
-import type { ActionType } from '@/lib/plan-limits';
+import type { ActionType, PlanTier } from '@/lib/plan-limits';
+import { planTierFromLabel } from '@/lib/plan-tier';
 
 /**
  * Result type for successful usage check
@@ -46,6 +48,42 @@ function getConvexClient(): ConvexHttpClient {
   return new ConvexHttpClient(convexUrl);
 }
 
+const ENTITLED_ITEM_STATUSES = new Set(['active', 'past_due']);
+
+/**
+ * Read the signed-in user's Clerk Billing plan.
+ * Convex can still say "free" when a webhook stored the display name "Pro"
+ * as a miss, or when a later user.updated event cleared the plan.
+ */
+async function clerkPaidPlan(userId: string): Promise<Exclude<PlanTier, 'free'> | null> {
+  try {
+    const session = await auth();
+    if (session.userId === userId && typeof session.has === 'function') {
+      if (session.has({ plan: 'user:enterprise' })) return 'enterprise';
+      if (session.has({ plan: 'user:pro' })) return 'pro';
+    }
+  } catch (error) {
+    console.error('Clerk session plan check failed:', error);
+  }
+
+  try {
+    const client = await clerkClient();
+    const subscription = await client.billing.getUserBillingSubscription(userId);
+    let paid: 'pro' | 'enterprise' | null = null;
+    for (const item of subscription.subscriptionItems ?? []) {
+      if (!ENTITLED_ITEM_STATUSES.has(item.status)) continue;
+      const tier = planTierFromLabel(item.plan?.slug) ?? planTierFromLabel(item.plan?.name);
+      if (tier === 'enterprise') return 'enterprise';
+      if (tier === 'free' || item.plan?.isDefault) continue;
+      if (tier === 'pro' || item.plan) paid = 'pro';
+    }
+    return paid;
+  } catch (error) {
+    console.error('Clerk billing lookup failed:', error);
+    return null;
+  }
+}
+
 /**
  * Check if user can perform a specific action based on their usage limits
  * 
@@ -79,6 +117,20 @@ export async function checkUsageLimit(
     const result = await client.query(api.usage.canPerformActionServer, { userId, action });
     
     if (!result.allowed) {
+      const paidPlan = await clerkPaidPlan(userId);
+      if (paidPlan) {
+        try {
+          await client.mutation(api.usage.updateUserPlan, {
+            userId,
+            plan: paidPlan,
+            resetCounters: false,
+          });
+        } catch (syncError) {
+          console.error('Failed to sync Clerk plan into Convex:', syncError);
+        }
+        return { allowed: true };
+      }
+
       // Build error response with upgrade prompt
       const statusCode = result.upgradeRequired ? 403 : 403; // 403 Forbidden
       

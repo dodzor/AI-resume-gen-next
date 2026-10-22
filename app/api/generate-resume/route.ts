@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createResumePrompt } from '../../../lib/resumeTemplate';
+import { EVIDENCE_RULES, FIDELITY_TEMPERATURE, scrubInventedClaims } from '@/lib/evidenceRules';
 import { requireAuth } from '@/lib/api-auth';
 import { checkUsageLimit, incrementUsageAfterAction } from '@/lib/api-usage';
 
@@ -69,14 +70,14 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: "system",
-          content: "You are a professional resume writer. Create a well-formatted, professional resume using ONLY the HTML structure and classes provided in the prompt. Do not add any additional CSS classes, inline styles, or complex formatting that might cause issues with PDF generation."
+          content: `You assemble confirmed facts into a one-column resume. You do not invent bullets to fill the template. ${EVIDENCE_RULES}`
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      temperature: 1,
+      temperature: FIDELITY_TEMPERATURE,
       max_tokens: 1500
     });
 
@@ -110,6 +111,8 @@ export async function POST(request: NextRequest) {
     content = content.replace(/\n\s*This resume is structured/i, '');
 
     content = content.trim();
+    const factSource = [experience, education, skills, portfolio, name].filter(Boolean).join('\n');
+    content = scrubInventedClaims(content, factSource);
 
     console.log('Resume generated successfully for:', name);
 

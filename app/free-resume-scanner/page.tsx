@@ -14,6 +14,12 @@ interface ScanResponse {
   missingMustHaveKeywords: Array<{ keyword: string; count: number; score: number }>;
   insights: string[];
   keywordCount: number;
+  humanScan?: {
+    claim: string;
+    stopReading: string;
+    dutyLines: string[];
+    generatedPhrases: string[];
+  };
 }
 
 export default function FreeResumeScannerPage() {
@@ -207,6 +213,28 @@ export default function FreeResumeScannerPage() {
               </div>
             </div>
 
+
+            {scanResult.humanScan && (
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">11-second read</p>
+                <p className="mt-2 text-sm text-slate-800">{scanResult.humanScan.claim}</p>
+                <p className="mt-2 text-sm font-medium text-rose-800">{scanResult.humanScan.stopReading}</p>
+                {scanResult.humanScan.dutyLines.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-slate-500">Duties, not outcomes</p>
+                    <ul className="mt-1 list-disc pl-5 text-sm text-slate-700">
+                      {scanResult.humanScan.dutyLines.map((line) => <li key={line}>{line}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {scanResult.humanScan.generatedPhrases.length > 0 && (
+                  <p className="mt-3 text-sm text-slate-700">
+                    Sounds generated: {scanResult.humanScan.generatedPhrases.join(', ')}
+                  </p>
+                )}
+                <p className="mt-3 text-xs text-slate-500">This scan does not write replacement bullets.</p>
+              </div>
+            )}
 
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Insights</p>

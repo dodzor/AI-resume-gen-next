@@ -10,6 +10,8 @@ export interface ResumeTemplate {
   name: string;
   description: string;
   preview: string; // CSS class for preview styling
+  /** Single-column plain layout used by the 11-second workflow. */
+  scanLayout: boolean;
 }
 
 export const TEMPLATES: ResumeTemplate[] = [
@@ -17,27 +19,33 @@ export const TEMPLATES: ResumeTemplate[] = [
     id: 'professional-blue',
     name: 'Professional Blue',
     description: 'Classic professional style with blue accents and centered header',
-    preview: 'template-professional-blue'
+    preview: 'template-professional-blue',
+    scanLayout: true
   },
   {
     id: 'modern-minimal',
     name: 'Modern Minimal',
-    description: 'Clean, minimalist design with elegant typography and subtle borders',
-    preview: 'template-modern-minimal'
+    description: 'One column, plain type. Default for a tailored resume.',
+    preview: 'template-modern-minimal',
+    scanLayout: true
   },
   {
     id: 'creative-designer',
     name: 'Creative Designer',
-    description: 'Vibrant yet intentional design for UI/UX, Graphic & Product designers',
-    preview: 'template-creative-designer'
+    description: 'Graphic layout. Not used for the 11-second scan.',
+    preview: 'template-creative-designer',
+    scanLayout: false
   },
   {
     id: 'developer',
     name: 'Developer',
-    description: 'Clean, structured, ATS-friendly — optimized for engineers and developers',
-    preview: 'template-developer'
+    description: 'Single column, plain type, no skill bars or icons',
+    preview: 'template-developer',
+    scanLayout: true
   }
 ];
+
+export const SCAN_TEMPLATE_ID: TemplateId = 'modern-minimal';
 
 /**
  * Get PDF stylesheet for a specific template

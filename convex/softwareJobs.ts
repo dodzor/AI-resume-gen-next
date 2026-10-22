@@ -462,3 +462,24 @@ export const searchSoftwareJobs = query({
     };
   },
 });
+
+// Read one public Greenhouse posting so a discovered role can be tailored.
+// Does not change search or the sync.
+export const getSoftwareJobByUrl = query({
+  args: { url: v.string() },
+  handler: async (ctx, args) => {
+    const job = await ctx.db
+      .query("softwareJobs")
+      .withIndex("by_url", (q) => q.eq("url", args.url))
+      .unique();
+    if (!job) return null;
+    const description = await ctx.db.get(job.descriptionId);
+    return {
+      title: job.title,
+      companyName: job.companyName,
+      location: job.location,
+      url: job.url,
+      text: description?.text ?? "",
+    };
+  },
+});

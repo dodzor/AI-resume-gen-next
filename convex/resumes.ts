@@ -64,6 +64,29 @@ export const saveResume = mutation({
     thematicSummary: v.optional(v.string()),
     generatedResume: v.optional(v.string()),
     maxStepReached: v.optional(v.number()),
+    kind: v.optional(v.union(v.literal("master"), v.literal("tailored"))),
+    rawDump: v.optional(v.string()),
+    clarifyingQA: v.optional(v.array(v.object({
+      question: v.string(),
+      answer: v.optional(v.string()),
+      askedAt: v.number(),
+    }))),
+    confirmedFacts: v.optional(v.array(v.string())),
+    masterResumeId: v.optional(v.id("resumes")),
+    extractedRequirements: v.optional(v.array(v.string())),
+    gaps: v.optional(v.array(v.string())),
+    overlapPhrases: v.optional(v.array(v.string())),
+    targetJobs: v.optional(v.array(v.string())),
+    hostileReviews: v.optional(v.array(v.object({
+      createdAt: v.number(),
+      stopReading: v.string(),
+      verdict: v.string(),
+      annotations: v.array(v.object({
+        target: v.string(),
+        labels: v.array(v.string()),
+        note: v.string(),
+      })),
+    }))),
   },
   handler: async (ctx, args) => {
     // Get authenticated user
@@ -75,18 +98,52 @@ export const saveResume = mutation({
     const userId = identity.subject; // Clerk user ID
 
     const now = Date.now();
+    const reviews = args.hostileReviews && args.hostileReviews.length > 3
+      ? args.hostileReviews.slice(-3)
+      : args.hostileReviews;
+    const fields = { ...args, hostileReviews: reviews };
 
     // If resumeId provided, update existing resume
     if (args.resumeId) {
-      await ctx.db.patch(args.resumeId, {
-        ...args,
+      const existing = await ctx.db.get(args.resumeId);
+      if (!existing || existing.userId !== userId) {
+        throw new Error("Resume not found or unauthorized");
+      }
+      await ctx.db.patch(args.resumeId, withoutEmpty({
+        ...fields,
         userId,
         updatedAt: now,
-      });
+      }));
       return args.resumeId;
     }
 
-    // Otherwise, create new resume - check usage limit first
+    // The career record is not an application and does not use the resume quota.
+    if (args.kind === "master") {
+      const owned = await ctx.db
+        .query("resumes")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+      const existingMaster = owned.find((resume) => resume.kind === "master");
+      if (existingMaster) {
+        await ctx.db.patch(existingMaster._id, withoutEmpty({
+          ...fields,
+          kind: "master" as const,
+          userId,
+          updatedAt: now,
+        }));
+        return existingMaster._id;
+      }
+
+      return await ctx.db.insert("resumes", withoutEmpty({
+        ...fields,
+        kind: "master" as const,
+        userId,
+        createdAt: now,
+        updatedAt: now,
+      }));
+    }
+
+    // Otherwise, create new tailored resume - check usage limit first
     // Check if user can create a new resume
     const canCreate = await ctx.runQuery(api.usage.canPerformAction, {
       action: "create_resume",
@@ -101,12 +158,13 @@ export const saveResume = mutation({
     }
 
     // Create new resume
-    const resumeId = await ctx.db.insert("resumes", {
-      ...args,
+    const resumeId = await ctx.db.insert("resumes", withoutEmpty({
+      ...fields,
+      kind: "tailored" as const,
       userId,
       createdAt: now,
       updatedAt: now,
-    });
+    }));
 
     // Increment usage counter after successful creation
     try {
@@ -143,12 +201,131 @@ export const deleteResume = mutation({
       .withIndex("by_user", (q) => q.eq("userId", identity.subject))
       .unique();
 
-    if (usage && usage.resumesCreated > 0) {
+    if (resume.kind !== "master" && usage && usage.resumesCreated > 0) {
       await ctx.db.patch(usage._id, {
         resumesCreated: usage.resumesCreated - 1,
         updatedAt: Date.now(),
       });
     }
+  },
+});
+
+function withoutEmpty<T extends Record<string, unknown>>(value: T): T {
+  const copy = { ...value };
+  for (const key of Object.keys(copy)) {
+    if (copy[key] === undefined) delete copy[key];
+  }
+  return copy;
+}
+
+// One career record per user. Never increments resumesCreated.
+export const ensureMaster = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const userId = identity.subject;
+    const owned = await ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const existing = owned.find((resume) => resume.kind === "master");
+    if (existing) return existing._id;
+
+    const seed = owned[0];
+    const dumpLines: string[] = [];
+    if (seed) {
+      for (const exp of seed.experiences) {
+        dumpLines.push(`${exp.role} at ${exp.company} (${exp.dates})`);
+        if (exp.description) dumpLines.push(exp.description);
+      }
+      if (seed.skills) dumpLines.push(`Skills: ${seed.skills}`);
+      if (seed.summary) dumpLines.push(seed.summary);
+    }
+
+    const now = Date.now();
+    return await ctx.db.insert("resumes", withoutEmpty({
+      userId,
+      kind: "master" as const,
+      name: seed?.name || "",
+      email: seed?.email || "",
+      phone: seed?.phone,
+      location: seed?.location,
+      experiences: seed?.experiences || [],
+      educationEntries: seed?.educationEntries || [],
+      certifications: seed?.certifications || [],
+      skills: seed?.skills || "",
+      portfolioProjects: seed?.portfolioProjects || [],
+      portfolioLink: seed?.portfolioLink,
+      summary: seed?.summary,
+      template: "modern-minimal",
+      rawDump: dumpLines.filter(Boolean).join("\n\n"),
+      clarifyingQA: [],
+      confirmedFacts: [],
+      createdAt: now,
+      updatedAt: now,
+    }));
+  },
+});
+
+// Copies confirmed master evidence into a new application. Counts toward the quota.
+export const createApplicationFromMaster = mutation({
+  args: {
+    masterResumeId: v.id("resumes"),
+    job: v.optional(v.string()),
+    jobTitle: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const userId = identity.subject;
+
+    const master = await ctx.db.get(args.masterResumeId);
+    if (!master || master.userId !== userId || master.kind !== "master") {
+      throw new Error("Career record not found");
+    }
+
+    const canCreate = await ctx.runQuery(api.usage.canPerformAction, {
+      action: "create_resume",
+    });
+    if (!canCreate.allowed) {
+      const error: any = new Error(canCreate.reason || "Resume limit reached");
+      error.upgradeRequired = canCreate.upgradeRequired || false;
+      error.code = "USAGE_LIMIT_EXCEEDED";
+      throw error;
+    }
+
+    const now = Date.now();
+    const resumeId = await ctx.db.insert("resumes", withoutEmpty({
+      userId,
+      kind: "tailored" as const,
+      masterResumeId: master._id,
+      name: master.name,
+      email: master.email,
+      phone: master.phone,
+      location: master.location,
+      experiences: master.experiences,
+      educationEntries: master.educationEntries,
+      certifications: master.certifications,
+      skills: master.skills,
+      portfolioProjects: master.portfolioProjects,
+      portfolioLink: master.portfolioLink,
+      summary: master.summary,
+      job: args.job,
+      jobTitle: args.jobTitle,
+      template: "modern-minimal",
+      confirmedFacts: master.confirmedFacts,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    try {
+      await ctx.runMutation(api.usage.incrementUsage, { action: "create_resume" });
+    } catch (error) {
+      console.error("Failed to increment usage counter:", error);
+    }
+
+    return resumeId;
   },
 });
 

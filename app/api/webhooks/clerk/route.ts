@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
 import type { PlanTier } from '@/lib/plan-limits';
+import { planTierFromLabel } from '@/lib/plan-tier';
 
 // Clerk webhook event types
 type WebhookEvent = {
@@ -45,112 +46,67 @@ const getConvexClient = () => {
   return new ConvexHttpClient(convexUrl);
 };
 
+function subscriptionItems(data: any): any[] {
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.subscription_items)) return data.subscription_items;
+  if (Array.isArray(data?.subscriptionItems)) return data.subscriptionItems;
+  if (data?.plan) return [data];
+  return [];
+}
+
+function tierFromSubscriptionItem(item: any): PlanTier | null {
+  const status = item?.status as string | undefined;
+  if (status && status !== 'active' && status !== 'past_due') return null;
+  const plan = item?.plan;
+  const labeled =
+    planTierFromLabel(plan?.slug) ??
+    planTierFromLabel(plan?.name) ??
+    planTierFromLabel(item?.plan_slug);
+  if (labeled === 'enterprise' || labeled === 'pro') return labeled;
+  if (labeled === 'free' || plan?.is_default === true || plan?.isDefault === true) return 'free';
+  if (plan?.slug || plan?.name) return 'pro';
+  return null;
+}
+
 /**
- * Extract plan tier from Clerk user metadata
- * 
- * Checks user.publicMetadata.plan or user.publicMetadata.subscriptionTier
- * Falls back to "free" if not found
+ * Plan written into Convex for this event.
+ * Returns null when the event does not say which plan the user is on,
+ * so profile updates cannot wipe a paid plan back to free.
  */
-function extractPlanTier(event: WebhookEvent): PlanTier {
+function extractPlanTier(event: WebhookEvent): PlanTier | null {
   console.log(`[extractPlanTier] Extracting plan tier from event type: ${event.type}`);
-  
-  // Handle user events
+
   if (event.type === 'user.created' || event.type === 'user.updated') {
     const user = event.data;
-    console.log(`[extractPlanTier] User data:`, JSON.stringify(user, null, 2));
-    
-    if (user?.publicMetadata?.plan) {
-      const plan = user.publicMetadata.plan as string;
-      console.log(`[extractPlanTier] Found plan in publicMetadata.plan: ${plan}`);
-      if (plan === 'pro' || plan === 'enterprise') {
-        return plan as PlanTier;
-      }
-    }
-    if (user?.publicMetadata?.subscriptionTier) {
-      const tier = user.publicMetadata.subscriptionTier as string;
-      console.log(`[extractPlanTier] Found tier in publicMetadata.subscriptionTier: ${tier}`);
-      if (tier === 'pro' || tier === 'enterprise') {
-        return tier as PlanTier;
-      }
-    }
-    // Check private metadata as fallback
-    if (user?.privateMetadata?.plan) {
-      const plan = user.privateMetadata.plan as string;
-      console.log(`[extractPlanTier] Found plan in privateMetadata.plan: ${plan}`);
-      if (plan === 'pro' || plan === 'enterprise') {
-        return plan as PlanTier;
-      }
-    }
+    return (
+      planTierFromLabel(user?.publicMetadata?.plan) ??
+      planTierFromLabel(user?.publicMetadata?.subscriptionTier) ??
+      planTierFromLabel(user?.privateMetadata?.plan)
+    );
   }
 
-  // Handle subscription events
-  if (
-    event.type === 'subscription.created' ||
-    event.type === 'subscription.updated' ||
-    event.type === 'subscriptionItem.updated'
-  ) {
+  if (event.type.startsWith('subscription')) {
     const subscription = event.data;
-    console.log(`[extractPlanTier] Subscription data:`, JSON.stringify(subscription, null, 2));
-    
-    // Clerk Commerce subscription structure:
-    // - subscription.items[] contains subscription items
-    // - Each item has: plan.name, plan.slug, status
-    // - Find the active item and extract its plan
-    
-    // For subscription.updated/created events, check items array
-    if (subscription?.items && Array.isArray(subscription.items)) {
-      console.log(`[extractPlanTier] Found ${subscription.items.length} subscription items`);
-      
-      // Find the active subscription item
-      const activeItem = subscription.items.find((item: any) => item.status === 'active');
-      
-      if (activeItem) {
-        const planName = activeItem.plan?.name || activeItem.plan?.slug;
-        console.log(`[extractPlanTier] Found active item with plan: ${planName}`);
-        
-        if (planName === 'pro' || planName === 'enterprise') {
-          console.log(`[extractPlanTier] ✅ Extracted plan tier: ${planName}`);
-          return planName as PlanTier;
-        } else if (planName === 'free') {
-          console.log(`[extractPlanTier] Active plan is 'free'`);
-          return 'free';
-        }
-      } else {
-        console.log(`[extractPlanTier] No active subscription item found`);
-      }
+    let found: PlanTier | null = null;
+    for (const item of subscriptionItems(subscription)) {
+      const tier = tierFromSubscriptionItem(item);
+      if (tier === 'enterprise') return 'enterprise';
+      if (tier === 'pro') found = 'pro';
+      else if (tier === 'free' && !found) found = 'free';
     }
-    
-    // For subscriptionItem.updated events, check the item directly
-    if (event.type === 'subscriptionItem.updated' && subscription?.plan) {
-      const planName = subscription.plan?.name || subscription.plan?.slug;
-      console.log(`[extractPlanTier] subscriptionItem.updated - plan: ${planName}, status: ${subscription.status}`);
-      
-      // Only use this item if it's active
-      if (subscription.status === 'active') {
-        if (planName === 'pro' || planName === 'enterprise') {
-          console.log(`[extractPlanTier] ✅ Extracted plan tier from subscriptionItem: ${planName}`);
-          return planName as PlanTier;
-        } else if (planName === 'free') {
-          return 'free';
-        }
-      } else {
-        console.log(`[extractPlanTier] subscriptionItem is not active (status: ${subscription.status}), checking subscription...`);
-        // If the item is not active, we need to check the parent subscription
-        // This will be handled by subscription.updated event
-      }
+    if (found) {
+      console.log(`[extractPlanTier] Extracted plan tier: ${found}`);
+      return found;
     }
-    
-    // Fallback: Check subscription status
-    // If subscription status is not active, user should be on free plan
-    if (subscription?.status && subscription.status !== 'active') {
-      console.log(`[extractPlanTier] Subscription status is '${subscription.status}', defaulting to 'free'`);
+    const status = subscription?.status as string | undefined;
+    if (status && status !== 'active' && status !== 'past_due') {
+      console.log(`[extractPlanTier] Subscription status is '${status}', using free`);
       return 'free';
     }
   }
 
-  // Default to free tier
-  console.log(`[extractPlanTier] No plan found, defaulting to 'free'`);
-  return 'free';
+  console.log(`[extractPlanTier] No plan found on this event`);
+  return null;
 }
 
 /**
@@ -187,7 +143,7 @@ async function handleUserCreated(event: WebhookEvent, convex: ConvexHttpClient) 
     return;
   }
 
-  const plan = extractPlanTier(event);
+  const plan = extractPlanTier(event) ?? 'free';
   console.log(`user.created: Initializing user ${userId} with plan ${plan}`);
 
   try {
@@ -215,6 +171,10 @@ async function handleUserUpdated(event: WebhookEvent, convex: ConvexHttpClient) 
   }
 
   const plan = extractPlanTier(event);
+  if (!plan) {
+    console.log(`user.updated: No plan metadata for ${userId}; leaving Convex plan unchanged`);
+    return;
+  }
   console.log(`user.updated: Updating user ${userId} to plan ${plan}`);
 
   try {
@@ -251,6 +211,10 @@ async function handleSubscriptionCreated(
   }
 
   const plan = extractPlanTier(event);
+  if (!plan) {
+    console.log(`[handleSubscriptionCreated] No plan on event for ${userId}; leaving Convex plan unchanged`);
+    return;
+  }
   console.log(`[handleSubscriptionCreated] Extracted plan: ${plan}`);
   console.log(`[handleSubscriptionCreated] Updating user ${userId} to plan ${plan}`);
 
@@ -288,6 +252,10 @@ async function handleSubscriptionUpdated(
   }
 
   const plan = extractPlanTier(event);
+  if (!plan) {
+    console.log(`[handleSubscriptionUpdated] No plan on event for ${userId}; leaving Convex plan unchanged`);
+    return;
+  }
   console.log(`[handleSubscriptionUpdated] Extracted plan: ${plan}`);
   console.log(`[handleSubscriptionUpdated] Updating user ${userId} to plan ${plan}`);
 
@@ -430,10 +398,11 @@ export async function POST(request: NextRequest) {
         await handleSubscriptionDeleted(event, convex);
         break;
 
+      case 'subscriptionItem.created':
       case 'subscriptionItem.updated':
-        console.log(`[${requestId}] Routing to handleSubscriptionUpdated (from subscriptionItem.updated)`);
-        // subscriptionItem.updated events also need to update the plan
-        // We'll use the same handler but extractPlanTier will handle the different structure
+      case 'subscriptionItem.active':
+      case 'subscriptionItem.pastDue':
+        console.log(`[${requestId}] Routing ${event.type} to handleSubscriptionUpdated`);
         await handleSubscriptionUpdated(event, convex);
         break;
 

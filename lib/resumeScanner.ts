@@ -338,19 +338,19 @@ function buildInsights(
   const insights: string[] = [];
 
   if (score < 40) {
-    insights.push('Your resume does not yet align well with this role. Focus on adding role-specific language from the job post.');
+    insights.push('Keyword overlap is one signal. A missing word is a gap or a wording mismatch, not a reason to insert it.');
   } else if (score < 70) {
-    insights.push('Your resume shows partial alignment. Tightening your bullet language around high-value keywords should improve match quality.');
+    insights.push('Partial overlap. Use an employer word only where the resume already describes that work.');
   } else {
-    insights.push('Your resume is already strongly aligned with this role. Keep refining impact metrics and role-specific outcomes.');
+    insights.push('Keyword overlap is strong. The human scan still checks whether the opening lines are outcomes you can defend.');
   }
 
   if (missingMustHaveKeywords.length > 0) {
     const topMissingMustHave = missingMustHaveKeywords.slice(0, 3).map((item) => item.keyword).join(', ');
-    insights.push(`Critical gap: you are missing core hiring-signal keywords like ${topMissingMustHave}. Prioritize these first.`);
+    insights.push(`Gap, not a prompt to insert: ${topMissingMustHave}. Use one only if it truthfully names work already on the resume.`);
   } else if (missingKeywords.length > 0) {
     const topMissing = missingKeywords.slice(0, 3).map((item) => item.keyword).join(', ');
-    insights.push(`Most important missing terms: ${topMissing}. Add these naturally in your summary, experience, or skills sections.`);
+    insights.push(`Missing terms: ${topMissing}. Treat each as a gap or a wording mismatch.`);
   }
 
   if (topKeywordCount > 0) {

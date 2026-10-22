@@ -75,9 +75,7 @@ REQUIRED STRUCTURE:
       <div class="job-entry">
         <h3 class="job-title">[Job Title], [Company] ([Years])</h3>
         <ul class="simple-list">
-          <li>[Achievement or responsibility 1]</li>
-          <li>[Achievement or responsibility 2]</li>
-          <li>[Achievement or responsibility 3]</li>
+          <li>[Confirmed outcome, or [X] where the number is missing]</li>
         </ul>
       </div>
       <!-- Repeat for each job -->
@@ -108,14 +106,21 @@ ${portfolioSection}
 </div>
 
 IMPORTANT RULES:
+Never invent metrics, responsibilities, achievements, scope, tools, or experience. If a number or fact would strengthen a line and the user has not provided it, insert [X] and ask for the real value. Leave [X] visible until the user replaces it.
+Do not invent bullets to fill the template. If a role has one confirmed bullet, output one bullet. If a section has no confirmed facts, leave it empty.
+One column, plain type, no icons, skill bars, or graphics.
+Each bullet is a strong action verb, what the person did, and the measurable outcome. If the outcome number is missing, write [X]. Do not imply impact the source does not state.
+Use the employer's words only when they truthfully name work already in the source. A missing keyword stays missing.
+Never use: leveraged synergies, dynamic self-starter, results-oriented professional, spearheaded transformational initiatives, results-driven, self-starter, proven track record, team player, synergy.
+
 1. Use ONLY the classes specified above (resume-container, resume-header, name, contact-info, resume-section, section-title, section-content, job-entry, job-title, simple-list, skills-list, education-entry, degree-title, school-info${portfolioClasses})
 2. Do NOT add any inline styles or additional CSS classes
 3. Do NOT use complex HTML elements (tables, divs with complex nesting, etc.)
 4. Keep the structure simple and flat
 5. Use semantic HTML tags (h1, h2, h3, p, ul, li, strong, a)
 6. In contact-info: separate items with " | " (pipe with spaces). IMPORTANT: Wrap email in <a href="mailto:email"> and wrap portfolio link in <a href="url">. Only include items that are provided.
-7. For Work Experience: ALWAYS format job descriptions as bullet points using <ul class="simple-list"> with <li> items. Each bullet point should be a separate achievement or responsibility. Do NOT use <p> tags for job descriptions.
-${formData.portfolio?.trim() ? '8. Include the Portfolio/Projects section between Work Experience and Skills' : '8. Do NOT include a Portfolio section if no portfolio data is provided'}
+7. For Work Experience: format confirmed facts as bullet points using <ul class="simple-list"> with <li> items. Do NOT use <p> tags for job descriptions. Do not add a bullet the source does not contain.
+${formData.portfolio?.trim() ? '8. Include the Portfolio/Projects section between Work Experience and Skills, using only the projects provided' : '8. Do NOT include a Portfolio section if no portfolio data is provided'}
 
 Generate a resume for:
 - Name: ${formData.name}
