@@ -4,12 +4,10 @@ import { requireAuth } from '@/lib/api-auth';
 import { checkUsageLimit, incrementUsageAfterAction } from '@/lib/api-usage';
 import { keywordMatchesTextLoose } from '@/lib/keywordQuality';
 import {
-  EVIDENCE_RULES,
-  FIDELITY_TEMPERATURE,
+  BANNED_PHRASES,
   findBannedPhrases,
   isDutyLine,
   parseModelJson,
-  scrubInventedClaims,
 } from '@/lib/evidenceRules';
 
 // Lazy-initialize OpenAI client to avoid build-time errors
@@ -68,18 +66,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const systemMessage = `You are the interviewer and editor. You do not invent experience. ${EVIDENCE_RULES}`;
+    const systemMessage = 'You are a professional resume writer. You turn a rough bullet into one concrete line: action verb, what they did, how, and the result.';
     
     // Build themes instructions if available
     let themesInstructions = '';
     if (themes && Array.isArray(themes) && themes.length > 0 && recommendations && Array.isArray(recommendations) && recommendations.length > 0) {
-      themesInstructions = `\n\nTHEMES (ordering signals only): Put a theme first only when the source already shows it. Do not add work to cover a theme.\n${themes.map((t: string) => `- ${t}`).join('\n')}\nWhat the resume should show, if the source supports it:\n${recommendations.map((r: string) => `- ${r}`).join('\n')}\n${thematicSummary ? `\nContext: ${thematicSummary}` : ''}`;
+      themesInstructions = `\n\nShape the line toward these themes when they fit the work:\n${themes.map((t: string) => `- ${t}`).join('\n')}\n${recommendations.map((r: string) => `- ${r}`).join('\n')}\n${thematicSummary ? `\nContext: ${thematicSummary}` : ''}`;
     }
     
     // Build seniority adjustment instructions based on tone
     let seniorityInstructions = '';
     if (tone) {
-      seniorityInstructions = `SENIORITY SIGNAL: The posting reads as "${tone}". Use that only to choose which confirmed facts to emphasize. Do not change the candidate's title, headcount, budget, or scope.`;
+      seniorityInstructions = `Write at a ${tone} level. Match the verb and scope to that level.`;
     }
     
     const contextInfo = allBullets && allBullets.length > 0 
@@ -88,21 +86,17 @@ export async function POST(request: NextRequest) {
 
     // Prepare keywords information
     const keywordsInfo = keywords && Array.isArray(keywords) && keywords.length > 0
-      ? `\n\nEmployer words the user has selected. Use one only if this bullet already describes that work:\n${keywords.map((k: string) => `- ${k}`).join('\n')}`
+      ? `\n\nWork these job words into the line when they fit. Do not force a word that has nothing to do with the bullet:\n${keywords.map((k: string) => `- ${k}`).join('\n')}`
       : '';
 
-    const prompt = `Read this one bullet. Do not write a resume. Do not add a metric, tool, method, scope, or outcome the source does not contain.
+    const prompt = `Read this one bullet. Return two different texts.
 
-Split it into four slots, in this order:
-1. verb — the action verb
-2. did — what they did
-3. how — how they did it
-4. result — the result or impact
+"message" is a short note to the candidate. Start with "The bullet states that". Say what the source already says. Then name how and result when they are missing, and mark each missing part as [X]. Do not include a rewritten bullet in the message.
 
-For each slot set "already" to true when the source bullet already states that part, and copy the source wording. Do not recommend a different wording for a part that is already there.
-Set "already" to false only when the source bullet does not state that part. Then put a recommendation in "text" only if another provided fact supports it. Otherwise "text" is [X].
+"line" is one example resume bullet, a finished sentence: action verb, what they did, how, and the result. This example is shown separately and is the only text pasted into the bullet.
+Example line: Implemented AWS deployment strategies for cloud infrastructure, enhancing the reliability and scalability of applications to support secure and efficient operations.
 
-The line keeps every part that is already set, and adds only the parts that are not.
+Also split the source into verb, did, how, and result. Set "already" to true only when the source already states that part, and copy the source wording. When the source does not state it, "text" is [X] and "already" is false.
 
 Source bullet:
 ${bullet}
@@ -111,8 +105,9 @@ ${company ? `Company: ${company}` : ''}${contextInfo}${keywordsInfo}
 
 ${themesInstructions}${seniorityInstructions ? '\n\n' + seniorityInstructions : ''}
 
+Never use these stock phrases: ${BANNED_PHRASES.join(', ')}.
 Return JSON only:
-{"line":"","verb":{"text":"","already":true},"did":{"text":"","already":true},"how":{"text":"","already":false},"result":{"text":"","already":false},"isDuty":false,"factsUsed":["short quotes from the source"],"missing":["slot names whose text is [X]"]}`;
+{"message":"","line":"","verb":{"text":"","already":true},"did":{"text":"","already":true},"how":{"text":"","already":false},"result":{"text":"","already":false},"isDuty":false,"factsUsed":["short quotes from the source"],"missing":["how","result"]}`;
 
     console.log('Rewriting bullet point for:', role || 'Unknown role');
 
@@ -129,9 +124,9 @@ Return JSON only:
           content: prompt
         }
       ],
-      temperature: FIDELITY_TEMPERATURE,
+      temperature: 0.7,
       response_format: { type: 'json_object' },
-      max_tokens: 400
+      max_tokens: 600
     });
 
     if (!completion.choices[0]?.message?.content) {
@@ -148,6 +143,7 @@ Return JSON only:
     // Get the content and clean it up
     const raw = completion.choices[0].message.content.trim();
     let parsed: {
+      message?: string
       line?: string
       verb?: string | { text?: string; already?: boolean }
       did?: string | { text?: string; already?: boolean }
@@ -163,7 +159,13 @@ Return JSON only:
       parsed = { line: raw };
     }
     const source = [bullet, role, company, ...(Array.isArray(keywords) ? keywords : [])].filter(Boolean).join('\n');
-    const cleanPart = (value: unknown) => scrubInventedClaims(String(value || '').replace(/^[-*•]\s+/, '').trim(), source);
+    const stripWrap = (value: unknown) => String(value || '')
+      .replace(/^["']|["']$/g, '')
+      .replace(/^```[\w]*\n?|\n?```$/g, '')
+      .replace(/^[-*•]\s+/gm, '')
+      .trim();
+    const cleanRewrite = (value: unknown) => stripWrap(value).replace(/^\d+\.\s+/gm, '').replace(/\s+/g, ' ').trim();
+    const cleanPart = (value: unknown) => cleanRewrite(value);
     const readSlot = (value: string | { text?: string; already?: boolean } | undefined) => {
       if (typeof value === 'string') return { text: cleanPart(value), already: false };
       return { text: cleanPart(value?.text), already: value?.already === true };
@@ -184,7 +186,8 @@ Return JSON only:
     const didSet = alreadySet(did, didSlot.already);
     const howSet = alreadySet(how, howSlot.already);
     const resultSet = alreadySet(result, resultSlot.already);
-    const rewrittenBullet = cleanPart(parsed.line) || [verb, did, how, result].filter((part) => part.length > 0 && !/^\[X\]$/i.test(part)).join(' ');
+    const note = stripWrap(parsed.message);
+    const rewrittenBullet = cleanRewrite(parsed.line);
     const factsUsed = Array.isArray(parsed.factsUsed)
       ? parsed.factsUsed.filter((fact): fact is string => typeof fact === 'string' && fact.trim().length > 0 && source.toLowerCase().includes(fact.toLowerCase().slice(0, Math.min(fact.length, 40))))
       : [];
@@ -224,7 +227,8 @@ Return JSON only:
 
     return NextResponse.json({
       success: true,
-      rewrittenBullet: rewrittenBullet,
+      rewrittenBullet,
+      message: note,
       line: rewrittenBullet,
       verb,
       did,
