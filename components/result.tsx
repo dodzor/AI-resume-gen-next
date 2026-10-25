@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { generateFileName } from '../lib/pdfUtils'
 import { validatePDFContent } from '../lib/pdfErrorHandler'
 import { getDisplayClassName, TemplateId } from '../lib/templates'
@@ -9,8 +9,38 @@ import { useUsageLimits } from '@/hooks/useUsageLimits'
 import UpgradeModal from './UpgradeModal'
 import type { ActionType } from '@/lib/plan-limits'
 import '../styles/resume-display.css'
-import ElevenSecondPreview from './ElevenSecondPreview'
-import { exportBlockReason, resumePlainText } from '@/lib/evidenceRules'
+import { exportBlockReason, resumePlainText, type HostileAnnotation } from '@/lib/evidenceRules'
+
+const NO_ANNOTATIONS: HostileAnnotation[] = []
+
+function hostileLabels(text: string, annotations: HostileAnnotation[]): string[] {
+    const lower = text.toLowerCase()
+    const labels = annotations.flatMap((note) => {
+        if (!note.target) return []
+        return lower.includes(note.target.toLowerCase().slice(0, 48)) ? note.labels : []
+    })
+    return [...new Set(labels)]
+}
+
+function withHostileBadges(html: string, annotations: HostileAnnotation[]): string {
+    if (annotations.length === 0 || typeof DOMParser === 'undefined') return html
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    doc.querySelectorAll<HTMLElement>('[data-line]').forEach((node) => {
+        const labels = hostileLabels(node.textContent || '', annotations)
+        if (labels.length === 0) return
+        const wrap = doc.createElement('span')
+        wrap.setAttribute('data-annotation-badge', 'true')
+        wrap.setAttribute('class', 'ml-2 inline-flex flex-wrap gap-1 align-middle')
+        for (const label of labels) {
+            const badge = doc.createElement('span')
+            badge.setAttribute('class', 'rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-800')
+            badge.textContent = label
+            wrap.appendChild(badge)
+        }
+        node.appendChild(wrap)
+    })
+    return doc.body.innerHTML
+}
 
 interface ResultProps {
     formData: any
@@ -24,6 +54,8 @@ interface ResultProps {
 export default function Result({ formData, generatedResume, currentStep, showPreview = true, showForm, setShowForm }: ResultProps) {
     const [isDownloading, setIsDownloading] = useState(false)
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+    const [showScan, setShowScan] = useState(false)
+    const [badgesReady, setBadgesReady] = useState(false)
     const { canExport, isFree, plan } = useUsageLimits()
     
     // Get the template from formData, default to 'professional-blue'
@@ -43,6 +75,13 @@ export default function Result({ formData, generatedResume, currentStep, showPre
     // Use template class if template is selected, even for preview
     const shouldUseTemplateClass = !isPreview || (isPreview && formData.template)
     const finalDisplayClassName = shouldUseTemplateClass ? displayClassName : ''
+    const showScanControl = formData.kind !== 'master'
+    const annotations: HostileAnnotation[] = formData.hostileReviews?.[formData.hostileReviews.length - 1]?.annotations ?? NO_ANNOTATIONS
+    const displayHtml = badgesReady ? withHostileBadges(previewContent, annotations) : previewContent
+
+    useEffect(() => {
+        setBadgesReady(true)
+    }, [])
 
     // Copy resume content to clipboard (for free users)
     const handleCopyToClipboard = async () => {
@@ -153,7 +192,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
         <>
             <div className={`bg-white rounded-xl shadow-lg p-4 sm:p-6 lg:p-8 h-full flex flex-col ${showForm === false ? 'lg:max-w-[800px] lg:mx-auto' : ''}`}>
                 {/* {isPreview && ( */}
-                    <div className="mb-4 flex items-center justify-between flex-shrink-0">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
                         <h2 className="text-lg sm:text-xl font-semibold text-gray-800 flex items-center">
                             <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -161,6 +200,22 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                             </svg>
                             Live Preview
                         </h2>
+                        <div className="flex flex-wrap items-center gap-2">
+                        {showScanControl && (
+                          <button
+                            type="button"
+                            aria-pressed={showScan}
+                            data-testid="eleven-second-scan-toggle"
+                            onClick={() => setShowScan((on) => !on)}
+                            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition duration-200 ${
+                              showScan
+                                ? 'bg-slate-900 text-white'
+                                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {showScan ? 'Hide 11-second scan' : 'Show 11-second scan'}
+                          </button>
+                        )}
                         {setShowForm && (
                           <button
                             onClick={() => setShowForm(!showForm)}
@@ -180,26 +235,30 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                             <span>{showForm ? 'Hide Form' : 'Show Form'}</span>
                           </button>
                         )}
+                        </div>
                         {/* <span className="text-xs text-gray-500 bg-blue-50 px-3 py-1 rounded-full">
                             {isPreview ? (formData.template ? 'Template Preview' : 'Simple Format') : 'Final Resume'}
                         </span> */}
                     </div>
                 {/* )} */}
                 
-                {formData.kind !== 'master' && (
-                    <ElevenSecondPreview
-                      formData={formData}
-                      annotations={formData.hostileReviews?.[formData.hostileReviews.length - 1]?.annotations || []}
-                    />
+                {showScan && (
+                    <p className="mb-3 text-xs text-slate-500 flex-shrink-0">
+                      Bright lines are what a recruiter reads: current role, previous company, dates, the first two bullets, and skills.
+                    </p>
                 )}
                 {exportBlockReason(resumePlainText(formData)) && (
                     <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
                       Not ready to export. {exportBlockReason(resumePlainText(formData))}
                     </p>
                 )}
-                <div className={`flex-1 bg-gray-50 rounded-lg p-4 sm:p-6 border-2 border-dashed border-gray-300 overflow-y-auto min-h-[300px] lg:min-h-0 custom-scrollbar ${showForm === false ? 'lg:max-w-[800px] lg:mx-auto' : ''}`}>
+                <div
+                    data-testid="eleven-second-preview"
+                    data-scan-active={showScan ? 'true' : 'false'}
+                    className={`flex-1 bg-gray-50 rounded-lg p-4 sm:p-6 border-2 border-dashed border-gray-300 overflow-y-auto min-h-[300px] lg:min-h-0 custom-scrollbar ${showForm === false ? 'lg:max-w-[800px] lg:mx-auto' : ''} ${showScan ? 'scan-active' : ''}`}
+                >
                     {previewContent ? (
-                        <div className={finalDisplayClassName} dangerouslySetInnerHTML={{ __html: previewContent }} />
+                        <div className={finalDisplayClassName} dangerouslySetInnerHTML={{ __html: displayHtml }} />
                     ) : (
                         <div className="flex items-center justify-center h-full min-h-[300px]">
                             <div className="text-center text-gray-500">

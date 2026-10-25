@@ -45,7 +45,7 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
   
   // Header
   if (formData.name || contactItems.length > 0) {
-    html += `<header class="resume-header ${headerClass}">`;
+    html += `<header class="resume-header ${headerClass} scan-dim">`;
     if (formData.name) {
       html += `<h1 class="name ${titleClass}">${escapeHtml(formData.name)}</h1>`;
     }
@@ -59,12 +59,12 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
   const shouldShowSummary = formData.summary || (currentStep ? currentStep >= 7 : true);
   if (formData.job && shouldShowSummary) {
     html += `<section class="resume-section ${sectionClass}">`;
-    html += `<h2 class="section-title ${titleClass}">Summary</h2>`;
+    html += `<h2 class="section-title ${titleClass} scan-dim">Summary</h2>`;
     html += `<div class="section-content ${contentClass}">`;
     if (formData.summary) {
-      html += `<p>${escapeHtml(formData.summary)}</p>`;
+      html += `<p data-line><span class="scan-dim">${escapeHtml(formData.summary)}</span></p>`;
     } else {
-      html += `<p>Professional summary will be generated based on your experience and target job.</p>`;
+      html += `<p data-line><span class="scan-dim">Professional summary will be generated based on your experience and target job.</span></p>`;
     }
     html += `</div></section>`;
   }
@@ -75,26 +75,18 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
     
     if (validExperiences.length > 0) {
       html += `<section class="resume-section ${sectionClass}">`;
-      html += `<h2 class="section-title ${titleClass}">Work Experience</h2>`;
+      html += `<h2 class="section-title ${titleClass} scan-dim">Work Experience</h2>`;
       html += `<div class="section-content ${contentClass}">`;
       
-      validExperiences.forEach((exp: any) => {
-        const parts = []
-        if (exp.role && exp.company) {
-          parts.push(`${escapeHtml(exp.role)} at ${escapeHtml(exp.company)}`)
-        } else if (exp.role) {
-          parts.push(escapeHtml(exp.role))
-        } else if (exp.company) {
-          parts.push(escapeHtml(exp.company))
-        }
-        if (exp.dates) {
-          parts.push(`(${escapeHtml(exp.dates)})`)
-        }
-        const header = parts.length > 0 ? parts.join(' ') : 'Experience'
+      validExperiences.forEach((exp: any, index: number) => {
+        const place = index === 0 ? 'current' : index === 1 ? 'previous' : 'later'
         html += `<div class="job-entry">`;
-        html += `<h3 class="job-title">${header}</h3>`;
+        html += experienceHeading(exp, place);
         if (exp.description) {
-          html += formatTextContent(exp.description);
+          html += formatTextContent(exp.description, {
+            brightCount: place === 'current' ? 2 : 0,
+            dimRemainder: place !== 'current',
+          });
         }
         html += `</div>`;
       });
@@ -103,9 +95,9 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
     }
   } else if (formData.experience) {
     html += `<section class="resume-section ${sectionClass}">`;
-    html += `<h2 class="section-title ${titleClass}">Work Experience</h2>`;
+    html += `<h2 class="section-title ${titleClass} scan-dim">Work Experience</h2>`;
     html += `<div class="section-content ${contentClass}">`;
-    html += formatTextContent(formData.experience);
+    html += formatTextContent(formData.experience, { dimRemainder: true });
     html += `</div></section>`;
   }
 
@@ -115,7 +107,7 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
     
     if (validProjects.length > 0) {
       html += `<section class="resume-section ${sectionClass}">`;
-      html += `<h2 class="section-title ${titleClass}">Portfolio / Projects</h2>`;
+      html += `<h2 class="section-title ${titleClass} scan-dim">Portfolio / Projects</h2>`;
       html += `<div class="section-content ${contentClass}">`;
       
       validProjects.forEach((project: any) => {
@@ -131,7 +123,7 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
           if (project.outcome) {
             parts.push(`→ ${escapeHtml(project.outcome)}`)
           }
-          html += `<p>${parts.join('<br>')}</p>`;
+          html += `<p data-line><span class="scan-dim">${parts.join('<br>')}</span></p>`;
         }
       });
       
@@ -139,23 +131,23 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
     }
   } else if (formData.portfolio) {
     html += `<section class="resume-section ${sectionClass}">`;
-    html += `<h2 class="section-title ${titleClass}">Portfolio / Projects</h2>`;
+    html += `<h2 class="section-title ${titleClass} scan-dim">Portfolio / Projects</h2>`;
     html += `<div class="section-content ${contentClass}">`;
-    html += formatTextContent(formData.portfolio);
+    html += formatTextContent(formData.portfolio, { dimRemainder: true });
     html += `</div></section>`;
   }
 
   // Skills
   if (formData.skills) {
     html += `<section class="resume-section ${sectionClass}">`;
-    html += `<h2 class="section-title ${titleClass}">Skills</h2>`;
-    html += `<div class="section-content ${contentClass}">`;
+    html += `<h2 class="section-title ${titleClass} scan-dim">Skills</h2>`;
+    html += `<div class="section-content ${contentClass}" data-scan="skills">`;
     // Format skills as a list
     const skillsList = formData.skills.split(',').map((s: string) => s.trim()).filter(Boolean);
     if (skillsList.length > 0) {
-      html += `<ul class="skills-list">`;
+      html += `<ul class="skills-list" data-line>`;
       skillsList.forEach((skill: string) => {
-        html += `<li>${escapeHtml(skill)}</li>`;
+        html += `<li>${escapeHtml(skill)}</li> `;
       });
       html += `</ul>`;
     } else {
@@ -170,25 +162,25 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
     
     if (validEntries.length > 0) {
       html += `<section class="resume-section ${sectionClass}">`;
-      html += `<h2 class="section-title ${titleClass}">Education</h2>`;
+      html += `<h2 class="section-title ${titleClass} scan-dim">Education</h2>`;
       html += `<div class="section-content ${contentClass}">`;
       
       validEntries.forEach((entry: any) => {
         html += `<div class="education-entry">`;
         if (entry.degree) {
-          html += `<h3 class="degree-title">${escapeHtml(entry.degree)}</h3>`;
+          html += `<h3 class="degree-title" data-line><span class="scan-dim">${escapeHtml(entry.degree)}</span></h3>`;
         }
         if (entry.school || entry.dates) {
           const schoolParts = []
           if (entry.school) schoolParts.push(escapeHtml(entry.school))
           if (entry.dates) schoolParts.push(escapeHtml(entry.dates))
-          html += `<p class="school-info">${schoolParts.join(' — ')}</p>`;
+          html += `<p class="school-info" data-line><span class="scan-dim">${schoolParts.join(' — ')}</span></p>`;
         }
         if (entry.gpa) {
-          html += `<p>GPA: ${escapeHtml(entry.gpa)}</p>`;
+          html += `<p data-line><span class="scan-dim">GPA: ${escapeHtml(entry.gpa)}</span></p>`;
         }
         if (entry.coursework) {
-          html += `<p>Relevant Coursework: ${escapeHtml(entry.coursework)}</p>`;
+          html += `<p data-line><span class="scan-dim">Relevant Coursework: ${escapeHtml(entry.coursework)}</span></p>`;
         }
         html += `</div>`;
       });
@@ -197,9 +189,9 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
     }
   } else if (formData.education) {
     html += `<section class="resume-section ${sectionClass}">`;
-    html += `<h2 class="section-title ${titleClass}">Education</h2>`;
+    html += `<h2 class="section-title ${titleClass} scan-dim">Education</h2>`;
     html += `<div class="section-content ${contentClass}">`;
-    html += formatTextContent(formData.education);
+    html += formatTextContent(formData.education, { dimRemainder: true });
     html += `</div></section>`;
   }
 
@@ -209,14 +201,14 @@ export function generateSimplePreview(formData: any, currentStep?: number): stri
     
     if (validCerts.length > 0) {
       html += `<section class="resume-section ${sectionClass}">`;
-      html += `<h2 class="section-title ${titleClass}">Certifications</h2>`;
+      html += `<h2 class="section-title ${titleClass} scan-dim">Certifications</h2>`;
       html += `<div class="section-content ${contentClass}">`;
       
       validCerts.forEach((cert: any) => {
         if (cert.name && cert.dates) {
-          html += `<p>${escapeHtml(cert.name)} (${escapeHtml(cert.dates)})</p>`;
+          html += `<p data-line><span class="scan-dim">${escapeHtml(cert.name)} (${escapeHtml(cert.dates)})</span></p>`;
         } else if (cert.name) {
-          html += `<p>${escapeHtml(cert.name)}</p>`;
+          html += `<p data-line><span class="scan-dim">${escapeHtml(cert.name)}</span></p>`;
         }
       });
       
@@ -245,44 +237,93 @@ function escapeHtml(text: string): string {
   }
 }
 
-function formatTextContent(text: string): string {
+type ExperienceHeading = { role?: string; company?: string; dates?: string }
+type ExperiencePlace = 'current' | 'previous' | 'later'
+
+function experienceHeading(exp: ExperienceHeading, place: ExperiencePlace): string {
+  const role = exp.role?.trim() || ''
+  const company = exp.company?.trim() || ''
+  const dates = exp.dates?.trim() || ''
+
+  if (place === 'later') {
+    const parts: string[] = []
+    if (role && company) parts.push(`${escapeHtml(role)} at ${escapeHtml(company)}`)
+    else if (role) parts.push(escapeHtml(role))
+    else if (company) parts.push(escapeHtml(company))
+    if (dates) parts.push(`(${escapeHtml(dates)})`)
+    const header = parts.join(' ') || 'Experience'
+    return `<h3 class="job-title" data-line><span class="scan-dim">${header}</span></h3>`
+  }
+
+  const bits: string[] = []
+  if (role) {
+    bits.push(place === 'current'
+      ? `<span data-scan="role" data-line>${escapeHtml(role)}</span>`
+      : `<span data-line><span class="scan-dim">${escapeHtml(role)}</span></span>`)
+  }
+  if (company) {
+    if (role) bits.push(place === 'previous' ? '<span class="scan-dim"> at </span>' : ' at ')
+    const scan = place === 'previous' ? 'previous-company' : 'company'
+    bits.push(`<span data-scan="${scan}" data-line>${escapeHtml(company)}</span>`)
+  }
+  if (dates) {
+    const spacer = bits.length ? ' ' : ''
+    bits.push(`${spacer}<span data-scan="dates" data-line>(${escapeHtml(dates)})</span>`)
+  }
+  const header = bits.join('')
+  if (!header) return `<h3 class="job-title" data-line><span class="scan-dim">Experience</span></h3>`
+  return `<h3 class="job-title">${header}</h3>`
+}
+
+function formatTextContent(text: string, options?: { brightCount?: number; dimRemainder?: boolean }): string {
   if (!text) return '';
-  
-  // Convert newlines to <br> and preserve bullet points
-  let formatted = escapeHtml(text);
-  formatted = formatted.replace(/\n/g, '<br>');
-  
-  // Convert bullet points (• or -) to proper list items if they appear at line start
-  const lines = formatted.split('<br>');
-  let inList = false;
-  let result = '';
-  
-  lines.forEach((line, index) => {
-    const trimmed = line.trim();
+
+  const brightCount = options?.brightCount ?? 0
+  const dimRemainder = options?.dimRemainder ?? false
+  const formatted = escapeHtml(text).replace(/\n/g, '<br>')
+  const lines = formatted.split('<br>')
+  let inList = false
+  let result = ''
+  let usedBright = 0
+
+  const markup = (content: string) => {
+    const isBright = usedBright < brightCount
+    usedBright += 1
+    const dim = !isBright && (dimRemainder || brightCount > 0)
+    const attrs = ['data-line']
+    if (isBright) attrs.push('data-scan="bullet"')
+    const inner = dim ? `<span class="scan-dim">${content}</span>` : content
+    return `<li ${attrs.join(' ')}>${inner}</li>`
+  }
+
+  lines.forEach((line) => {
+    const trimmed = line.trim()
     if (trimmed.startsWith('•') || trimmed.startsWith('-')) {
       if (!inList) {
-        result += '<ul class="simple-list">';
-        inList = true;
+        result += '<ul class="simple-list">'
+        inList = true
       }
-      const content = trimmed.substring(1).trim();
-      result += `<li>${content}</li>`;
-    } else {
-      if (inList) {
-        result += '</ul>';
-        inList = false;
-      }
-      if (trimmed) {
-        result += `<p>• ${line}</p>`;
-      } else {
-        // Empty lines should be formatted as <p> tags inside div.job-entry
-        result += '<p></p>';
-      }
+      const content = trimmed.substring(1).trim()
+      result += content ? markup(content) : '<li></li>'
+      return
     }
-  });
-  
-  if (inList) {
-    result += '</ul>';
-  }
-  
-  return result || formatted;
+    if (inList) {
+      result += '</ul>'
+      inList = false
+    }
+    if (trimmed) {
+      const isBright = usedBright < brightCount
+      usedBright += 1
+      const dim = !isBright && (dimRemainder || brightCount > 0)
+      const attrs = ['data-line']
+      if (isBright) attrs.push('data-scan="bullet"')
+      const inner = dim ? `<span class="scan-dim">• ${line}</span>` : `• ${line}`
+      result += `<p ${attrs.join(' ')}>${inner}</p>`
+    } else {
+      result += '<p></p>'
+    }
+  })
+
+  if (inList) result += '</ul>'
+  return result || formatted
 }

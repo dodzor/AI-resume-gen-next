@@ -11,7 +11,6 @@
   max-width: 800px;
   margin: 0 auto;
   padding: 40px;
-  height: 100%;
 }
 
 .resume-display-professional-blue .resume-header {
@@ -145,7 +144,6 @@
   max-width: 800px;
   margin: 0 auto;
   padding: 50px 40px;
-  height: 100%;
 }
 
 .resume-display-modern-minimal .resume-header {
@@ -374,7 +372,6 @@
   max-width: 800px;
   margin: 0 auto;
   padding: 48px 44px;
-  height: 100%;
 }
 
 .resume-display-creative-designer .resume-header {
@@ -591,7 +588,6 @@
   margin: 0 auto;
   padding: 36px 40px;
   font-size: 13px;
-  height: 100%;
 }
 
 .resume-display-developer .resume-header {
@@ -876,4 +872,13 @@
   border-radius: 4px;
   font-size: 13px;
   color: #374151;
+}
+
+/* 11-second scan. Dimmed lines stay in the page; only the recruiter's first pass stays full strength. */
+.scan-dim {
+  transition: opacity 150ms ease;
+}
+
+.scan-active .scan-dim {
+  opacity: 0.38;
 }
