@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { SignInButton, SignedIn, SignedOut } from '@clerk/nextjs';
+import { features } from '@/config/features';
 
 interface ScanResponse {
   matchScore: number;
@@ -214,7 +215,7 @@ export default function FreeResumeScannerPage() {
             </div>
 
 
-            {scanResult.humanScan && (
+            {features.elevenSecondScan && scanResult.humanScan && (
               <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">11-second read</p>
                 <p className="mt-2 text-sm text-slate-800">{scanResult.humanScan.claim}</p>

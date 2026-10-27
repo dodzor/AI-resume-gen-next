@@ -10,6 +10,7 @@ import UpgradeModal from './UpgradeModal'
 import type { ActionType } from '@/lib/plan-limits'
 import '../styles/resume-display.css'
 import { exportBlockReason, resumePlainText, type HostileAnnotation } from '@/lib/evidenceRules'
+import { features } from '@/config/features'
 
 const NO_ANNOTATIONS: HostileAnnotation[] = []
 
@@ -75,8 +76,10 @@ export default function Result({ formData, generatedResume, currentStep, showPre
     // Use template class if template is selected, even for preview
     const shouldUseTemplateClass = !isPreview || (isPreview && formData.template)
     const finalDisplayClassName = shouldUseTemplateClass ? displayClassName : ''
-    const showScanControl = formData.kind !== 'master'
-    const annotations: HostileAnnotation[] = formData.hostileReviews?.[formData.hostileReviews.length - 1]?.annotations ?? NO_ANNOTATIONS
+    const showScanControl = features.elevenSecondScan && formData.kind !== 'master'
+    const annotations: HostileAnnotation[] = features.hostileReview
+      ? (formData.hostileReviews?.[formData.hostileReviews.length - 1]?.annotations ?? NO_ANNOTATIONS)
+      : NO_ANNOTATIONS
     const displayHtml = badgesReady ? withHostileBadges(previewContent, annotations) : previewContent
 
     useEffect(() => {
@@ -92,7 +95,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
             
             // Get plain text content
             const textContent = tempDiv.textContent || tempDiv.innerText || ''
-            const blocked = exportBlockReason(textContent)
+            const blocked = features.exportGuard ? exportBlockReason(textContent) : null
             if (blocked) {
                 alert(blocked)
                 return
@@ -117,7 +120,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
         }
 
         // Validate content before proceeding
-        const blocked = exportBlockReason(`${resumePlainText(formData)}\n${generatedResume || ''}`)
+        const blocked = features.exportGuard ? exportBlockReason(`${resumePlainText(formData)}\n${generatedResume || ''}`) : null
         if (blocked) {
             alert(blocked)
             return
@@ -247,7 +250,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                       Bright lines are what a recruiter reads: current role, previous company, dates, the first two bullets, and skills.
                     </p>
                 )}
-                {exportBlockReason(resumePlainText(formData)) && (
+                {features.exportGuard && exportBlockReason(resumePlainText(formData)) && (
                     <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
                       Not ready to export. {exportBlockReason(resumePlainText(formData))}
                     </p>

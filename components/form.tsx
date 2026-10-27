@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { TEMPLATES, TemplateId } from '../lib/templates'
 import { PRODUCT_RULE, exportBlockReason, resumePlainText } from '../lib/evidenceRules'
+import { features } from '@/config/features'
 import LineFlags from './LineFlags'
 import HostileReviewPanel from './HostileReviewPanel'
 
@@ -667,7 +668,7 @@ export default function Form({
 
     // Copy resume content to clipboard (for free users)
     const blockExport = (extra = '') => {
-        const reason = exportBlockReason(`${resumePlainText(formData)}\n${extra}`)
+        const reason = features.exportGuard ? exportBlockReason(`${resumePlainText(formData)}\n${extra}`) : null
         if (reason) {
             alert(reason)
             return true
@@ -1483,9 +1484,6 @@ export default function Form({
                 throw new Error(data.message || 'Failed to rewrite bullet')
             }
         
-            // The recommendation stays beside the original until the user applies it.
-            
-            // If no keywords were pre-selected and the API returned incorporated keywords, auto-select them
             if (selected.length === 0 && data.incorporatedKeywords && Array.isArray(data.incorporatedKeywords) && data.incorporatedKeywords.length > 0) {
                 const key = `${experienceIndex}-${bulletIndex}`
                 setSelectedKeywords((prev) => ({
@@ -1493,6 +1491,14 @@ export default function Form({
                     [key]: data.incorporatedKeywords
                 }))
             }
+
+            const example = String(data.line || data.rewrittenBullet || '').trim()
+            if (!features.fixReview) {
+                if (example) handleBulletChange(experienceIndex, bulletIndex, example)
+                return
+            }
+
+            // The recommendation stays beside the original until the user applies it.
             
             // Store rewrite reasoning if available
             const key = `${experienceIndex}-${bulletIndex}`
@@ -1645,6 +1651,7 @@ export default function Form({
                             />
                         </div>
 
+                        {features.moreRoleDescriptions && (
                         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                             <p className="text-sm font-medium text-slate-800">More descriptions of the same role</p>
                             <p className="mt-1 text-xs text-slate-500">Optional. Phrases that appear in every description are used for the headline and first bullets only when the career record supports them.</p>
@@ -1699,6 +1706,7 @@ export default function Form({
                                 <p className="mt-3 text-xs text-slate-600">Shared across the descriptions: {formData.overlapPhrases.join(', ')}</p>
                             )}
                         </div>
+                        )}
                         
                         <UsageGatedButton
                             action="job_analysis"
@@ -1999,7 +2007,7 @@ export default function Form({
                                         <div>
                                             <h3 className="font-semibold text-gray-800">{template.name}</h3>
                                             <p className="text-sm text-gray-500 mt-1">{template.description}</p>
-                                            {!template.scanLayout && (
+                                            {features.elevenSecondScan && !template.scanLayout && (
                                                 <p className="mt-1 text-xs font-medium text-amber-800">Not recommended. The 11-second scan uses one column and no graphics.</p>
                                             )}
                                         </div>
@@ -2640,8 +2648,8 @@ export default function Form({
                                                                         )}
                                                                     </div>
                                                                 </div>
-                                                                <LineFlags text={bullet} />
-                                                                {rewriteReasoning[`${index}-${bulletIndex}`]?.recommendation || rewriteReasoning[`${index}-${bulletIndex}`]?.note ? (() => {
+                                                                {features.fixReview && <LineFlags text={bullet} />}
+                                                                {features.fixReview && (rewriteReasoning[`${index}-${bulletIndex}`]?.recommendation || rewriteReasoning[`${index}-${bulletIndex}`]?.note) ? (() => {
                                                                     const reasoning = rewriteReasoning[`${index}-${bulletIndex}`]
                                                                     if (!reasoning?.recommendation && !reasoning?.note) return null
                                                                     const openSlots = [
@@ -2681,7 +2689,7 @@ export default function Form({
                                                                     </div>
                                                                     )
                                                                 })() : null}
-                                                                {rewriteReasoning[`${index}-${bulletIndex}`]?.factsUsed?.length ? (
+                                                                {features.fixReview && rewriteReasoning[`${index}-${bulletIndex}`]?.factsUsed?.length ? (
                                                                     <p className="text-xs text-slate-600">
                                                                         Facts used: {rewriteReasoning[`${index}-${bulletIndex}`].factsUsed!.join('; ')}
                                                                         {rewriteReasoning[`${index}-${bulletIndex}`].isDuty ? ' · Source line is still a duty.' : ''}
@@ -3454,14 +3462,18 @@ export default function Form({
                 </div>
                 
                 <ProgressIndicator />
+                {features.productRule && (
                 <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">{PRODUCT_RULE}</p>
+                )}
         
                 <div className="space-y-6" style={{ overflow: 'visible' }}>
                     {/* Step Content */}
                     <div className="min-h-[300px]" style={{ overflow: 'visible' }}>
                         {renderStepContent()}
                     </div>
+                    {features.hostileReview && (
                     <HostileReviewPanel formData={formData} currentStep={currentStep} setFormData={setFormData} />
+                    )}
 
                 {/* Navigation Buttons */}
                 <div className="flex justify-between items-center pt-6 border-t border-gray-200">

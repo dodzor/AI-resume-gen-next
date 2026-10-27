@@ -17,6 +17,7 @@ import { mergeImportedResume } from '@/lib/mergeResumeImport'
 import type { ResumeImportPayload } from '@/lib/resumeImportSchema'
 import type { ResumeMergeMode } from '@/lib/mergeResumeImport'
 import type { ActionType } from '@/lib/plan-limits'
+import { features } from '@/config/features'
 
 // Default empty form data
 const getDefaultFormData = () => ({
@@ -317,17 +318,21 @@ export default function Content() {
           
           let resumeToLoad: Id<'resumes'> | null = null
           
+          const selectable = features.careerRecord
+            ? resumes
+            : resumes.filter((resume) => resume.kind !== 'master')
+
           if (lastEditedId) {
             // Check if resume still exists
-            const resumeExists = resumes.some(r => r._id === lastEditedId)
+            const resumeExists = selectable.some(r => r._id === lastEditedId)
             if (resumeExists) {
               resumeToLoad = lastEditedId
             }
           }
           
           // 2. If no resume from localStorage, use most recent
-          if (!resumeToLoad && resumes.length > 0) {
-            resumeToLoad = resumes[0]._id
+          if (!resumeToLoad && selectable.length > 0) {
+            resumeToLoad = selectable[0]._id
           }
           
           // 3. Load the resume
@@ -652,6 +657,11 @@ export default function Content() {
       const epoch = ++navigationEpoch.current
       const master = (resumes ?? []).find((resume) => resume.kind === 'master')
       if (!master) {
+        if (!features.careerRecord) {
+          resetEditor()
+          setResumeEntryPhase('done')
+          return
+        }
         await handleOpenMaster()
         return
       }
@@ -676,12 +686,17 @@ export default function Content() {
         }
         alert(error?.message || 'Could not create the application.')
       }
-    }, [resumes, createApplicationFromMaster, handleOpenMaster])
+    }, [resumes, createApplicationFromMaster, handleOpenMaster, resetEditor])
 
     const handleStartFreshFromGate = useCallback(() => {
       setImportMeta(null)
+      if (!features.careerRecord) {
+        resetEditor()
+        setResumeEntryPhase('done')
+        return
+      }
       void handleOpenMaster()
-    }, [handleOpenMaster])
+    }, [handleOpenMaster, resetEditor])
 
     const handlePdfParsed = useCallback((text: string, fileName: string) => {
       setResumeImportText(text)
@@ -862,7 +877,7 @@ export default function Content() {
                 <div className="animate-spin text-4xl mb-4">⏳</div>
                 <p className="text-gray-600">Loading resume...</p>
               </div>
-            ) : formData.kind === 'master' ? (
+            ) : features.careerRecord && formData.kind === 'master' ? (
               <MasterCareerPanel
                 formData={formData}
                 setFormData={setFormData}

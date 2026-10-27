@@ -6,6 +6,7 @@ import { Id } from '@/convex/_generated/dataModel'
 import { useUsageLimits } from '@/hooks/useUsageLimits'
 import { isUnlimited } from '@/lib/plan-limits'
 import UpgradeModal from './UpgradeModal'
+import { features } from '@/config/features'
 
 interface Resume {
   _id: Id<'resumes'>
@@ -57,13 +58,14 @@ export default function ResumeSwitcher({
   }
 
   const currentResume = resumes?.find(r => r._id === currentResumeId)
-  const currentLabel = currentResume?.kind === 'master'
+  const currentLabel = features.careerRecord && currentResume?.kind === 'master'
     ? 'Career record'
     : (currentResume?.jobTitle || 'New application')
 
   const handleCreateApplication = () => {
     if (!master) {
-      onOpenMaster()
+      if (features.careerRecord) onOpenMaster()
+      else onCreateApplication()
       return
     }
     if (isLimitReached) {
@@ -154,6 +156,7 @@ export default function ResumeSwitcher({
               Switch
             </button>
           )}
+          {features.careerRecord && (
           <button
             type="button"
             onClick={onOpenMaster}
@@ -161,6 +164,7 @@ export default function ResumeSwitcher({
           >
             Career record
           </button>
+          )}
           <button
             type="button"
             onClick={handleCreateApplication}
@@ -169,7 +173,7 @@ export default function ResumeSwitcher({
                 ? 'bg-gray-200 text-gray-500'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}
-            title={isLimitReached && master ? 'Application limit reached.' : 'Copy evidence from the career record'}
+            title={isLimitReached && master ? 'Application limit reached.' : features.careerRecord ? 'Copy evidence from the career record' : 'Start a new application'}
           >
             New application
           </button>
@@ -187,7 +191,7 @@ export default function ResumeSwitcher({
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
           <div className="absolute top-full left-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-96 overflow-y-auto">
             <div className="p-2">
-              {master && (
+              {features.careerRecord && master && (
                 <>
                   <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Career record</div>
                   {renderRow(master)}
@@ -195,7 +199,7 @@ export default function ResumeSwitcher({
               )}
               <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Applications</div>
               {applications.length === 0 && (
-                <p className="px-3 py-2 text-xs text-gray-500">No applications yet. New application copies the career record.</p>
+                <p className="px-3 py-2 text-xs text-gray-500">{features.careerRecord ? 'No applications yet. New application copies the career record.' : 'No applications yet.'}</p>
               )}
               {applications.map(renderRow)}
             </div>
