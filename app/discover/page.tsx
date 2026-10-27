@@ -11,6 +11,7 @@ import { countryFromParam, countrySlug } from "@/lib/jobCountries"
 import type { SkillTerm } from "@/lib/jobSearch"
 import { loadMatchResume } from "@/lib/loadMatchResume"
 import { resumeMatchLabel, resumeSearchTerms } from "@/lib/resumeMatch"
+import { SiteHeader } from "@/components/SiteHeader"
 
 const PAGE_SIZE = 20
 
@@ -200,19 +201,7 @@ export default async function DiscoverPage({
   return (
     <DiscoverRequestSpinner>
     <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <img src="/logo.jpg" alt="RoleMirror" className="h-12 w-12 object-contain" />
-          </Link>
-          <Link
-            href="/"
-            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
-          >
-            Back home
-          </Link>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main className="mx-auto max-w-3xl px-4 py-10 md:px-6">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">

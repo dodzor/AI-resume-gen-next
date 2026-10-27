@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { legal, legalContactReady } from '@/config/legal'
+import { SiteHeader } from '@/components/SiteHeader'
 
 export function LegalPage({
   title,
@@ -10,6 +11,8 @@ export function LegalPage({
   children: ReactNode
 }) {
   return (
+    <>
+    <SiteHeader />
     <main className="mx-auto max-w-3xl px-4 py-12 text-sm leading-relaxed text-slate-700">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
         {legal.productName}
@@ -26,6 +29,7 @@ export function LegalPage({
       )}
       <div className="mt-8 space-y-8">{children}</div>
     </main>
+    </>
   )
 }
 
