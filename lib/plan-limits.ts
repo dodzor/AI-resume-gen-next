@@ -1,19 +1,39 @@
 /**
- * Plan Limits Configuration
- * 
- * This file defines the subscription tier limits and provides helper functions
- * to check if actions are allowed based on plan tier.
- * 
- * Based on TIER_PLAN_DESIGN.md:
- * - Free: Limited usage to let users experience the product
- * - Pro: Unlimited usage for power users
- * - Enterprise: Future tier with advanced features
+ * Plan limits.
+ *
+ * Free is one tailored resume, with PDF. The public scanner does not use these limits.
+ * Search is a 30-day pass for 8 applications. Pro is the same access, billed monthly.
+ * Enterprise stays in the data model and is not shown on the pricing page.
  */
+
+/** Length of the one-time search pass. */
+export const SEARCH_PERIOD_MS = 30 * 24 * 60 * 60 * 1000
+
+export const OFFER = {
+  freeApplications: 1,
+  paidApplications: 8,
+  searchDays: 30,
+  searchPrice: '$19',
+  monthlyPrice: '$12',
+} as const
 
 /**
  * Subscription plan tiers
  */
-export type PlanTier = 'free' | 'pro' | 'enterprise';
+export type PlanTier = 'free' | 'search' | 'pro' | 'enterprise';
+
+export function planDisplayName(plan: PlanTier): string {
+  switch (plan) {
+    case 'search':
+      return 'This search'
+    case 'pro':
+      return 'Still looking'
+    case 'enterprise':
+      return 'Enterprise'
+    default:
+      return 'Free'
+  }
+}
 
 /**
  * Action types that can be limited
@@ -34,16 +54,20 @@ export type ActionType =
 export interface PlanLimits {
   plan: PlanTier;
   
-  // Monthly limits (reset each billing period)
+  // Monthly limits (reset each billing period). -1 is unlimited.
   monthly: {
-    jobAnalyses: number;      // -1 for unlimited
-    aiRewrites: number;       // -1 for unlimited (includes bullet, experience, summary)
-    exports: number;          // -1 for unlimited
+    jobAnalyses: number;
+    aiRewrites: number;
+    exports: number;
   };
-  
-  // Lifetime limits (never reset)
-  lifetime: {
-    resumes: number;          // -1 for unlimited
+
+  /**
+   * Tailored applications.
+   * Free is a lifetime cap. Search and Pro reset each period.
+   */
+  applications: {
+    limit: number;
+    resetsEachPeriod: boolean;
   };
   
   // Feature flags
@@ -58,56 +82,68 @@ export interface PlanLimits {
 /**
  * Plan limits configuration for each tier
  */
+const paidAccess = {
+  monthly: {
+    jobAnalyses: -1,
+    aiRewrites: -1,
+    exports: -1,
+  },
+  applications: {
+    limit: OFFER.paidApplications,
+    resetsEachPeriod: true,
+  },
+  features: {
+    pdfExport: true,
+    advancedAnalytics: false,
+    versionHistory: true,
+    multipleResumes: true,
+  },
+} as const
+
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
   free: {
     plan: 'free',
     monthly: {
-      jobAnalyses: 3,         // 3 job description analyses per month
-      aiRewrites: 3,          // 3 AI rewrites total (bullet + experience + summary combined)
-      exports: 0,             // No PDF exports (basic text export only)
+      jobAnalyses: -1,
+      aiRewrites: -1,
+      exports: -1,
     },
-    lifetime: {
-      resumes: 1,             // 1 resume total
+    applications: {
+      limit: OFFER.freeApplications,
+      resetsEachPeriod: false,
     },
     features: {
-      pdfExport: false,       // No PDF export
+      pdfExport: true,
       advancedAnalytics: false,
       versionHistory: false,
       multipleResumes: false,
     },
   },
-  
+
+  search: {
+    plan: 'search',
+    ...paidAccess,
+  },
+
   pro: {
     plan: 'pro',
-    monthly: {
-      jobAnalyses: -1,         // Unlimited job analyses
-      aiRewrites: -1,        // Unlimited AI rewrites
-      exports: -1,           // Unlimited PDF exports
-    },
-    lifetime: {
-      resumes: 10,           // 10 resumes total
-    },
-    features: {
-      pdfExport: true,       // PDF export available
-      advancedAnalytics: false, // Not yet implemented
-      versionHistory: true,  // Resume version history
-      multipleResumes: true,  // Can create multiple resumes
-    },
+    ...paidAccess,
   },
-  
+
   enterprise: {
     plan: 'enterprise',
     monthly: {
-      jobAnalyses: -1,       // Unlimited
-      aiRewrites: -1,       // Unlimited
-      exports: -1,           // Unlimited
+      jobAnalyses: -1,
+      aiRewrites: -1,
+      exports: -1,
     },
-    lifetime: {
-      resumes: -1,           // Unlimited resumes
+    applications: {
+      limit: -1,
+      resetsEachPeriod: true,
     },
     features: {
       pdfExport: true,
-      advancedAnalytics: true, // Job fit score, advanced suggestions
+      advancedAnalytics: true,
       versionHistory: true,
       multipleResumes: true,
     },
@@ -184,7 +220,7 @@ export function getActionLimit(tier: PlanTier, action: ActionType): number {
       return limits.monthly.aiRewrites;
     
     case 'create_resume':
-      return limits.lifetime.resumes;
+      return limits.applications.limit;
     
     case 'export':
       return limits.monthly.exports;
@@ -248,4 +284,14 @@ export function getRemainingQuota(usage: number, limit: number): number {
     return -1; // Unlimited
   }
   return Math.max(0, limit - usage);
+}
+
+export function limitReachedMessage(plan: PlanTier, action: ActionType, limit: number): string {
+  if (action === 'create_resume' && plan === 'free') {
+    return `The free plan includes one tailored resume. This search is ${OFFER.searchPrice} for ${OFFER.paidApplications} applications over ${OFFER.searchDays} days.`
+  }
+  if (action === 'create_resume') {
+    return `You've used all ${limit} applications for this period.`
+  }
+  return `You've reached the limit for this period (${limit}).`
 }

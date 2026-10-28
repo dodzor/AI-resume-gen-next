@@ -57,7 +57,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
     const [showScan, setShowScan] = useState(false)
     const [badgesReady, setBadgesReady] = useState(false)
-    const { canExport, isFree, plan } = useUsageLimits()
+    const { canExport, plan, isLoading: usageLoading } = useUsageLimits()
     
     // Get the template from formData, default to 'professional-blue'
     const templateId: TemplateId = formData.template || 'professional-blue'
@@ -113,8 +113,8 @@ export default function Result({ formData, generatedResume, currentStep, showPre
     }
 
     const handleDownloadPDF = async () => {
-        // Check if user can export PDF (Pro feature)
-        if (!canExport || isFree) {
+        if (usageLoading) return
+        if (!canExport) {
             setShowUpgradeModal(true)
             return
         }

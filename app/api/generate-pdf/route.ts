@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generatePDFWithPuppeteer } from '../../../lib/pdfServerUtils';
 import { TemplateId } from '../../../lib/templates';
 import { requireAuth } from '@/lib/api-auth';
-import { checkUsageLimit, incrementUsageAfterAction } from '@/lib/api-usage';
+import { checkUsageLimit, getConvexClient, incrementUsageAfterAction } from '@/lib/api-usage';
+import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,12 +22,41 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { content, templateId, fileName } = body;
+    const { content, templateId, fileName, resumeId, job } = body;
 
     // Validate required fields
     if (!content) {
       return NextResponse.json(
         { error: 'Missing required field: content' },
+        { status: 400 }
+      );
+    }
+
+    const convex = getConvexClient();
+    const jobText = typeof job === 'string' ? job : '';
+    const jobCheck = await convex.query(api.resumes.freePdfJobAllowed, {
+      userId,
+      resumeId: typeof resumeId === 'string' ? resumeId as Id<'resumes'> : undefined,
+      job: jobText,
+    });
+    if (!jobCheck.allowed) {
+      if (jobCheck.upgradeRequired) {
+        return NextResponse.json(
+          {
+            error: 'Usage limit exceeded',
+            code: 'PDF_JOB_LOCKED',
+            message: jobCheck.reason,
+            details: {
+              upgradeRequired: true,
+              action: 'create_resume',
+              exportedJob: jobCheck.exportedJob,
+            },
+          },
+          { status: 403 }
+        );
+      }
+      return NextResponse.json(
+        { error: 'PDF blocked', message: jobCheck.reason || 'This PDF cannot be downloaded.' },
         { status: 400 }
       );
     }
@@ -48,8 +79,20 @@ export async function POST(request: NextRequest) {
       fileName: fileName || 'Resume.pdf',
     });
 
+    if (typeof resumeId === 'string') {
+      try {
+        await convex.mutation(api.resumes.recordExportedJob, {
+          userId,
+          resumeId: resumeId as Id<'resumes'>,
+          job: jobText,
+        });
+      } catch (recordError) {
+        console.error('Failed to record exported job:', recordError);
+      }
+    }
+
     // 4. Increment usage AFTER successful operation
-    await incrementUsageAfterAction(userId, 'export');
+    await incrementUsageAfterAction(userId, 'export', convex);
 
     // Return PDF as response
     // Convert Buffer to Uint8Array for NextResponse compatibility

@@ -1,95 +1,80 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
+import {
+  PLAN_LIMITS,
+  SEARCH_PERIOD_MS,
+  getActionLimit,
+  hasFeature,
+  isUnlimited,
+  limitReachedMessage,
+  type ActionType,
+  type PlanTier,
+} from "../lib/plan-limits";
+import { applicationResumes } from "../lib/applicationResumes";
 
-/**
- * Plan tiers - must match lib/plan-limits.ts
- */
-type PlanTier = "free" | "pro" | "enterprise";
+const planTierValidator = v.union(
+  v.literal("free"),
+  v.literal("search"),
+  v.literal("pro"),
+  v.literal("enterprise")
+);
 
-/**
- * Action types that can be limited
- */
-type ActionType = "job_analysis" | "ai_rewrite" | "create_resume" | "export";
+type UsageSnapshot = {
+  _id: Id<"userUsage">;
+  subscriptionStartDate: number;
+  periodStart: number;
+  periodEnd: number;
+  plan: PlanTier;
+  jobAnalysesUsed: number;
+  aiRewritesUsed: number;
+  exportsUsed: number;
+  resumesCreated: number;
+  applicationsUsed?: number;
+};
 
-/**
- * Plan limits configuration - must match lib/plan-limits.ts
- * For unlimited features, use -1
- */
-const PLAN_LIMITS = {
-  free: {
-    monthly: {
-      jobAnalyses: 3,
-      aiRewrites: 3,
-      exports: 0,
-    },
-    lifetime: {
-      resumes: 1,
-    },
-    features: {
-      pdfExport: false,
-    },
-  },
-  pro: {
-    monthly: {
-      jobAnalyses: -1, // Unlimited
-      aiRewrites: -1, // Unlimited
-      exports: -1, // Unlimited
-    },
-    lifetime: {
-      resumes: 10,
-    },
-    features: {
-      pdfExport: true,
-    },
-  },
-  enterprise: {
-    monthly: {
-      jobAnalyses: -1, // Unlimited
-      aiRewrites: -1, // Unlimited
-      exports: -1, // Unlimited
-    },
-    lifetime: {
-      resumes: -1, // Unlimited
-    },
-    features: {
-      pdfExport: true,
-    },
-  },
-} as const;
-
-/**
- * Helper: Check if limit is unlimited (-1)
- */
-function isUnlimited(limit: number): boolean {
-  return limit === -1;
+function effectivePlan(usage: { plan: PlanTier; periodEnd: number }, now: number): PlanTier {
+  if (usage.plan === "search" && now >= usage.periodEnd) return "free";
+  return usage.plan;
 }
 
-/**
- * Helper: Get action limit for a plan tier
- */
-function getActionLimit(tier: PlanTier, action: ActionType): number {
-  const limits = PLAN_LIMITS[tier];
-  
-  switch (action) {
-    case "job_analysis":
-      return limits.monthly.jobAnalyses;
-    case "ai_rewrite":
-      return limits.monthly.aiRewrites;
-    case "create_resume":
-      return limits.lifetime.resumes;
-    case "export":
-      return limits.monthly.exports;
-    default:
-      return 0;
+function applicationsUsedNow(
+  usage: { resumesCreated: number; applicationsUsed?: number; periodEnd: number },
+  plan: PlanTier,
+  now: number
+): number {
+  if (!PLAN_LIMITS[plan].applications.resetsEachPeriod) return usage.resumesCreated;
+  if (now >= usage.periodEnd) return 0;
+  return usage.applicationsUsed ?? 0;
+}
+
+function periodForPlan(plan: PlanTier, now: number, subscriptionStartDate: number) {
+  if (plan === "search") return { start: now, end: now + SEARCH_PERIOD_MS };
+  return calculateBillingPeriod(now, subscriptionStartDate);
+}
+
+function applicationIncrement(
+  usage: { resumesCreated: number; applicationsUsed?: number; plan: PlanTier; periodEnd: number },
+  now: number
+): { resumesCreated: number; applicationsUsed?: number } {
+  const plan = effectivePlan(usage, now);
+  const next: { resumesCreated: number; applicationsUsed?: number } = {
+    resumesCreated: usage.resumesCreated + 1,
+  };
+  if (PLAN_LIMITS[plan].applications.resetsEachPeriod) {
+    next.applicationsUsed = (usage.applicationsUsed ?? 0) + 1;
   }
+  return next;
 }
 
-/**
- * Helper: Check if feature is available
- */
-function hasFeature(tier: PlanTier, feature: "pdfExport"): boolean {
-  return PLAN_LIMITS[tier].features[feature];
+function limitsFor(plan: PlanTier) {
+  const limits = PLAN_LIMITS[plan];
+  return {
+    jobAnalyses: limits.monthly.jobAnalyses,
+    aiRewrites: limits.monthly.aiRewrites,
+    exports: limits.monthly.exports,
+    resumes: limits.applications.limit,
+  };
 }
 
 /**
@@ -165,7 +150,7 @@ function calculateBillingPeriod(
 async function getUserUsageRecord(
   ctx: any,
   userId: string
-): Promise<{ _id: Id<"userUsage">; subscriptionStartDate: number; periodStart: number; periodEnd: number; plan: PlanTier; jobAnalysesUsed: number; aiRewritesUsed: number; exportsUsed: number; resumesCreated: number } | null> {
+): Promise<UsageSnapshot | null> {
   const existing = await ctx.db
     .query("userUsage")
     .withIndex("by_user", (q: any) => q.eq("userId", userId))
@@ -192,9 +177,7 @@ async function getOrCreateUserUsage(
   
   if (existing) {
     // Check if billing period has expired
-    if (now >= existing.periodEnd) {
-      // Reset monthly counters for new billing period
-      // Use user's subscription start date to calculate next period
+    if (now >= existing.periodEnd && existing.plan !== "search") {
       const newPeriod = calculateBillingPeriod(now, existing.subscriptionStartDate);
       await ctx.db.patch(existing._id, {
         periodStart: newPeriod.start,
@@ -202,6 +185,7 @@ async function getOrCreateUserUsage(
         jobAnalysesUsed: 0,
         aiRewritesUsed: 0,
         exportsUsed: 0,
+        applicationsUsed: 0,
         updatedAt: now,
       });
     }
@@ -223,6 +207,7 @@ async function getOrCreateUserUsage(
     aiRewritesUsed: 0,
     exportsUsed: 0,
     resumesCreated: 0,
+    applicationsUsed: 0,
     createdAt: now,
     updatedAt: now,
   });
@@ -263,12 +248,7 @@ export const getUserUsage = query({
           exports: 0,
           resumes: 0,
         },
-        limits: {
-          jobAnalyses: PLAN_LIMITS[defaultPlan].monthly.jobAnalyses,
-          aiRewrites: PLAN_LIMITS[defaultPlan].monthly.aiRewrites,
-          exports: PLAN_LIMITS[defaultPlan].monthly.exports,
-          resumes: PLAN_LIMITS[defaultPlan].lifetime.resumes,
-        },
+        limits: limitsFor(defaultPlan),
         periodInfo: {
           start: period.start,
           end: period.end,
@@ -295,20 +275,16 @@ export const getUserUsage = query({
       };
     }
 
+    const plan = effectivePlan(usage, now);
     return {
-      plan: displayUsage.plan,
+      plan,
       usage: {
         jobAnalyses: displayUsage.jobAnalysesUsed,
         aiRewrites: displayUsage.aiRewritesUsed,
         exports: displayUsage.exportsUsed,
-        resumes: displayUsage.resumesCreated,
+        resumes: applicationsUsedNow(usage, plan, now),
       },
-      limits: {
-        jobAnalyses: PLAN_LIMITS[displayUsage.plan].monthly.jobAnalyses,
-        aiRewrites: PLAN_LIMITS[displayUsage.plan].monthly.aiRewrites,
-        exports: PLAN_LIMITS[displayUsage.plan].monthly.exports,
-        resumes: PLAN_LIMITS[displayUsage.plan].lifetime.resumes,
-      },
+      limits: limitsFor(plan),
       periodInfo: {
         start: displayPeriod.start,
         end: displayPeriod.end,
@@ -358,7 +334,7 @@ export const canPerformAction = query({
         if (!hasFeature(defaultPlan, "pdfExport")) {
           return {
             allowed: false,
-            reason: "PDF export is not available in your plan. Upgrade to Pro for PDF export.",
+            reason: "PDF export is not available on this plan.",
             remaining: 0,
             upgradeRequired: true,
           };
@@ -382,7 +358,8 @@ export const canPerformAction = query({
       };
     }
 
-    const plan = usage.plan;
+    const now = Date.now();
+    const plan = effectivePlan(usage, now);
     const limit = getActionLimit(plan, action);
 
     // Check feature availability for export
@@ -390,7 +367,7 @@ export const canPerformAction = query({
       if (!hasFeature(plan, "pdfExport")) {
         return {
           allowed: false,
-          reason: "PDF export is not available in your plan. Upgrade to Pro for PDF export.",
+          reason: "PDF export is not available on this plan.",
           remaining: 0,
           upgradeRequired: true,
         };
@@ -407,7 +384,7 @@ export const canPerformAction = query({
         currentUsage = usage.aiRewritesUsed;
         break;
       case "create_resume":
-        currentUsage = usage.resumesCreated;
+        currentUsage = applicationsUsedNow(usage, plan, now);
         break;
       case "export":
         currentUsage = usage.exportsUsed;
@@ -432,16 +409,9 @@ export const canPerformAction = query({
 
     // Check if limit reached
     if (currentUsage >= limit) {
-      const actionNames: Record<ActionType, string> = {
-        job_analysis: "job analyses",
-        ai_rewrite: "AI rewrites",
-        create_resume: "resumes",
-        export: "PDF exports",
-      };
-
       return {
         allowed: false,
-        reason: `You've used all your free ${actionNames[action]} (${limit}/${limit}). Upgrade to Pro for unlimited access.`,
+        reason: limitReachedMessage(plan, action, limit),
         remaining: 0,
         upgradeRequired: true,
       };
@@ -521,7 +491,7 @@ export const incrementUsage = mutation({
           update.aiRewritesUsed = updatedUsage.aiRewritesUsed + 1;
           break;
         case "create_resume":
-          update.resumesCreated = updatedUsage.resumesCreated + 1;
+          Object.assign(update, applicationIncrement(updatedUsage, now));
           break;
         case "export":
           update.exportsUsed = updatedUsage.exportsUsed + 1;
@@ -545,7 +515,7 @@ export const incrementUsage = mutation({
         update.aiRewritesUsed = usage.aiRewritesUsed + 1;
         break;
       case "create_resume":
-        update.resumesCreated = usage.resumesCreated + 1;
+        Object.assign(update, applicationIncrement(usage, now));
         break;
       case "export":
         update.exportsUsed = usage.exportsUsed + 1;
@@ -564,7 +534,7 @@ export const incrementUsage = mutation({
 export const updateUserPlan = mutation({
   args: {
     userId: v.string(),
-    plan: v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise")),
+    plan: planTierValidator,
     resetCounters: v.optional(v.boolean()), // If true, reset monthly counters (useful for upgrades)
   },
   handler: async (ctx, args) => {
@@ -580,7 +550,7 @@ export const updateUserPlan = mutation({
       // Create new usage record if it doesn't exist
       // Set subscription start date to now (first time user subscribes)
       const subscriptionStartDate = now;
-      const period = calculateBillingPeriod(now, subscriptionStartDate);
+      const period = periodForPlan(args.plan, now, subscriptionStartDate);
       await ctx.db.insert("userUsage", {
         userId: args.userId,
         plan: args.plan,
@@ -591,52 +561,81 @@ export const updateUserPlan = mutation({
         jobAnalysesUsed: 0,
         aiRewritesUsed: 0,
         exportsUsed: 0,
-        resumesCreated: 0, // New user, start with 0 resumes
+        resumesCreated: 0,
+        applicationsUsed: 0,
         createdAt: now,
         updatedAt: now,
       });
       return { success: true };
     }
     
-    // Determine if upgrading from free to paid plan
-    const isUpgradingToPaid = usage.plan === "free" && (args.plan === "pro" || args.plan === "enterprise");
-    const isDowngradingToFree = (usage.plan === "pro" || usage.plan === "enterprise") && args.plan === "free";
-    
-    // Update plan
+    const planChanged = usage.plan !== args.plan;
+    // A retried subscription.created must not start a second search window
+    // while the one we already opened is still running.
+    const searchWindowStillOpen =
+      args.plan === "search" && usage.plan === "search" && now < usage.periodEnd;
+    const openingPaidPeriod =
+      args.plan !== "free" &&
+      !searchWindowStillOpen &&
+      (planChanged || args.resetCounters === true);
+
     const update: Partial<typeof usage> = {
       plan: args.plan,
       planUpdatedAt: now,
       updatedAt: now,
     };
-    
-    // If upgrading from free to paid, reset subscription start date to upgrade date
-    // This ensures billing cycle aligns with when they started paying
-    if (isUpgradingToPaid) {
+
+    // A new search pass or billing period starts at zero applications.
+    // resumesCreated stays, so a finished pass still counts toward the free cap.
+    if (openingPaidPeriod) {
+      const period = periodForPlan(args.plan, now, now);
       update.subscriptionStartDate = now;
-      // Reset billing period to start from upgrade date
-      const period = calculateBillingPeriod(now, now);
       update.periodStart = period.start;
       update.periodEnd = period.end;
       update.jobAnalysesUsed = 0;
       update.aiRewritesUsed = 0;
       update.exportsUsed = 0;
-    } else if (args.resetCounters) {
-      // Optionally reset monthly counters (for other upgrade scenarios)
-      // Use existing subscription start date to maintain billing cycle
-      const period = calculateBillingPeriod(now, usage.subscriptionStartDate);
-      update.periodStart = period.start;
-      update.periodEnd = period.end;
-      update.jobAnalysesUsed = 0;
-      update.aiRewritesUsed = 0;
-      update.exportsUsed = 0;
+      update.applicationsUsed = 0;
+      if (effectivePlan(usage, now) === "free") {
+        const owned = await ctx.db
+          .query("resumes")
+          .withIndex("by_user", (q) => q.eq("userId", args.userId))
+          .collect();
+        const cap = PLAN_LIMITS[args.plan].applications.limit;
+        const count = applicationResumes(owned).length;
+        update.applicationsUsed = isUnlimited(cap) ? count : Math.min(count, cap);
+      }
     }
-    
-    // Note: resumesCreated is NOT reset (lifetime counter)
-    // Note: When downgrading to free, subscriptionStartDate is preserved
-    // (in case they upgrade again, we keep their original date)
     
     await ctx.db.patch(usage._id, update);
     return { success: true };
+  },
+});
+
+/**
+ * When the career record is hidden, every saved resume is an application.
+ * Raise the lifetime counter to that number if older masters were not counted.
+ */
+export const syncApplicationCount = mutation({
+  args: { applicationCount: v.number() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const resumes = await ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .collect();
+    const count = Math.min(Math.max(0, Math.floor(args.applicationCount)), resumes.length);
+    const usageId = await getOrCreateUserUsage(ctx, identity.subject);
+    const usage = await ctx.db.get(usageId);
+    if (!usage || count === 0 || usage.resumesCreated >= count) return { updated: false };
+
+    await ctx.db.patch(usageId, {
+      resumesCreated: count,
+      updatedAt: Date.now(),
+    });
+    return { updated: true, resumesCreated: count };
   },
 });
 
@@ -679,11 +678,12 @@ export const initializeUserUsage = mutation({
       periodEnd: period.end,
       jobAnalysesUsed: 0,
       aiRewritesUsed: 0,
-      exportsUsed: 0,
-      resumesCreated: 0,
-      createdAt: now,
-      updatedAt: now,
-    });
+    exportsUsed: 0,
+    resumesCreated: 0,
+    applicationsUsed: 0,
+    createdAt: now,
+    updatedAt: now,
+  });
 
     return { success: true, alreadyExists: false };
   },
@@ -722,7 +722,7 @@ export const canPerformActionServer = query({
         if (!hasFeature(defaultPlan, "pdfExport")) {
           return {
             allowed: false,
-            reason: "PDF export is not available in your plan. Upgrade to Pro for PDF export.",
+            reason: "PDF export is not available on this plan.",
             remaining: 0,
             upgradeRequired: true,
           };
@@ -746,7 +746,8 @@ export const canPerformActionServer = query({
       };
     }
 
-    const plan = usage.plan;
+    const now = Date.now();
+    const plan = effectivePlan(usage, now);
     const limit = getActionLimit(plan, action);
 
     // Check feature availability for export
@@ -754,7 +755,7 @@ export const canPerformActionServer = query({
       if (!hasFeature(plan, "pdfExport")) {
         return {
           allowed: false,
-          reason: "PDF export is not available in your plan. Upgrade to Pro for PDF export.",
+          reason: "PDF export is not available on this plan.",
           remaining: 0,
           upgradeRequired: true,
         };
@@ -771,7 +772,7 @@ export const canPerformActionServer = query({
         currentUsage = usage.aiRewritesUsed;
         break;
       case "create_resume":
-        currentUsage = usage.resumesCreated;
+        currentUsage = applicationsUsedNow(usage, plan, now);
         break;
       case "export":
         currentUsage = usage.exportsUsed;
@@ -796,16 +797,9 @@ export const canPerformActionServer = query({
 
     // Check if limit reached
     if (currentUsage >= limit) {
-      const actionNames: Record<ActionType, string> = {
-        job_analysis: "job analyses",
-        ai_rewrite: "AI rewrites",
-        create_resume: "resumes",
-        export: "PDF exports",
-      };
-
       return {
         allowed: false,
-        reason: `You've used all your free ${actionNames[action]} (${limit}/${limit}). Upgrade to Pro for unlimited access.`,
+        reason: limitReachedMessage(plan, action, limit),
         remaining: 0,
         upgradeRequired: true,
       };
@@ -882,7 +876,7 @@ export const incrementUsageServer = mutation({
           update.aiRewritesUsed = updatedUsage.aiRewritesUsed + 1;
           break;
         case "create_resume":
-          update.resumesCreated = updatedUsage.resumesCreated + 1;
+          Object.assign(update, applicationIncrement(updatedUsage, now));
           break;
         case "export":
           update.exportsUsed = updatedUsage.exportsUsed + 1;
@@ -906,7 +900,7 @@ export const incrementUsageServer = mutation({
         update.aiRewritesUsed = usage.aiRewritesUsed + 1;
         break;
       case "create_resume":
-        update.resumesCreated = usage.resumesCreated + 1;
+        Object.assign(update, applicationIncrement(usage, now));
         break;
       case "export":
         update.exportsUsed = usage.exportsUsed + 1;

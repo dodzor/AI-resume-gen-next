@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import type { ActionType, PlanTier } from '@/lib/plan-limits'
+import { OFFER, type ActionType, type PlanTier } from '@/lib/plan-limits'
 
 interface UpgradeModalProps {
   isOpen: boolean
@@ -36,41 +36,29 @@ export default function UpgradeModal({
   const getMessage = (): string => {
     if (message) return message
 
-    if (action) {
-      const actionMessages: Record<ActionType, string> = {
-        job_analysis: "You've used all your free job analyses for this month. Upgrade to Pro for unlimited job description analyses.",
-        ai_rewrite: "You've used all your free AI rewrites for this month. Upgrade to Pro for unlimited AI-powered rewrites.",
-        create_resume: "You've reached your free resume limit. Upgrade to Pro to create multiple resumes.",
-        export: "PDF export is available in Pro. Upgrade to download your resume as a professional PDF.",
-      }
-      return actionMessages[action]
+    if (action === 'create_resume' && plan === 'free') {
+      return `The free plan includes one tailored resume. This search is ${OFFER.searchPrice} for ${OFFER.paidApplications} applications over ${OFFER.searchDays} days.`
     }
-
-    return "Upgrade to Pro to unlock unlimited features and advanced capabilities."
-  }
-
-  // Get feature list based on action
-  const getFeatureList = (): string[] => {
-    const baseFeatures = [
-      'Unlimited job description analyses',
-      'Unlimited AI rewrites (bullet points, experience, summaries)',
-      'Multiple resumes (up to 10)',
-      'PDF export with ATS-friendly formatting',
-      'Advanced keyword targeting',
-      'Resume version history',
-    ]
-
+    if (action === 'create_resume') {
+      return `You've used all ${OFFER.paidApplications} applications for this period.`
+    }
     if (action === 'export') {
-      return [
-        'PDF export with professional formatting',
-        'ATS-friendly resume formats',
-        'Multiple export options',
-        ...baseFeatures.filter(f => !f.includes('PDF export')),
-      ]
+      return 'PDF export is included with the free resume. If this is still blocked, the pricing page has the next step.'
+    }
+    if (action) {
+      return "You've reached the limit on this plan. This search covers the next applications."
     }
 
-    return baseFeatures
+    return `This search is ${OFFER.searchPrice} for ${OFFER.paidApplications} tailored applications over ${OFFER.searchDays} days. ${OFFER.monthlyPrice}/month if the search runs longer.`
   }
+
+  const features = [
+    `${OFFER.paidApplications} tailored applications`,
+    'PDF export included',
+    `${OFFER.searchDays} days, or monthly if you are still looking`,
+  ]
+
+  const title = plan === 'free' ? 'Tailor the next jobs' : 'Application limit reached'
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -84,7 +72,7 @@ export default function UpgradeModal({
       <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">Upgrade to Pro</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -114,10 +102,10 @@ export default function UpgradeModal({
           {/* Feature List */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">
-              Pro Features Include:
+              This search includes:
             </h3>
             <ul className="space-y-2">
-              {getFeatureList().map((feature, index) => (
+              {features.map((feature, index) => (
                 <li key={index} className="flex items-start">
                   <svg
                     className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"
@@ -145,7 +133,7 @@ export default function UpgradeModal({
               className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-center"
               onClick={onClose}
             >
-              View Pricing & Upgrade
+              See pricing
             </Link>
             <button
               onClick={onClose}

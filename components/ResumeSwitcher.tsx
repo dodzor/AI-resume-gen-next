@@ -7,6 +7,7 @@ import { useUsageLimits } from '@/hooks/useUsageLimits'
 import { isUnlimited } from '@/lib/plan-limits'
 import UpgradeModal from './UpgradeModal'
 import { features } from '@/config/features'
+import { applicationResumes } from '@/lib/applicationResumes'
 
 interface Resume {
   _id: Id<'resumes'>
@@ -16,6 +17,7 @@ interface Resume {
   jobTitle?: string
   updatedAt: number
   kind?: 'master' | 'tailored'
+  masterResumeId?: Id<'resumes'>
 }
 
 interface ResumeSwitcherProps {
@@ -40,13 +42,13 @@ export default function ResumeSwitcher({
   const [isOpen, setIsOpen] = useState(false)
   const [deletingId, setDeletingId] = useState<Id<'resumes'> | null>(null)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
-  const { canCreateResume, limits, plan } = useUsageLimits()
+  const { canCreateResume, limits, plan, isLoading: usageLoading } = useUsageLimits()
 
   const master = resumes?.find((resume) => resume.kind === 'master')
-  const applications = resumes?.filter((resume) => resume.kind !== 'master') ?? []
+  const applications = applicationResumes(resumes ?? [])
   const applicationCount = applications.length
   const limit = limits.resumes
-  const isLimitReached = !canCreateResume || (!isUnlimited(limit) && applicationCount >= limit)
+  const isLimitReached = !usageLoading && (!canCreateResume || (!isUnlimited(limit) && applicationCount >= limit))
 
   if (isLoading) {
     return (
@@ -63,20 +65,22 @@ export default function ResumeSwitcher({
     : (currentResume?.jobTitle || 'New application')
 
   const handleCreateApplication = () => {
+    if (isLimitReached) {
+      setShowUpgradeModal(true)
+      return
+    }
     if (!master) {
       if (features.careerRecord) onOpenMaster()
       else onCreateApplication()
-      return
-    }
-    if (isLimitReached) {
-      setShowUpgradeModal(true)
       return
     }
     onCreateApplication()
   }
 
   const handleDelete = async (resume: Resume) => {
-    const title = resume.kind === 'master' ? 'Career record' : (resume.jobTitle || 'Untitled application')
+    const title = features.careerRecord && resume.kind === 'master'
+      ? 'Career record'
+      : (resume.jobTitle || 'Untitled application')
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return
 
     setDeletingId(resume._id)
@@ -97,7 +101,9 @@ export default function ResumeSwitcher({
 
   const renderRow = (resume: Resume) => {
     const isCurrent = resume._id === currentResumeId
-    const title = resume.kind === 'master' ? 'Career record' : (resume.jobTitle || 'Untitled application')
+    const title = features.careerRecord && resume.kind === 'master'
+      ? 'Career record'
+      : (resume.jobTitle || 'Untitled application')
     const isDeleting = deletingId === resume._id
     return (
       <div
@@ -114,7 +120,9 @@ export default function ResumeSwitcher({
         >
           <div className="font-medium truncate">{title}</div>
           <div className="text-xs text-gray-500 mt-0.5">
-            {resume.kind === 'master' ? 'Not exported' : new Date(resume.updatedAt).toLocaleDateString()}
+            {features.careerRecord && resume.kind === 'master'
+              ? 'Not exported'
+              : new Date(resume.updatedAt).toLocaleDateString()}
           </div>
         </button>
         <button
@@ -169,11 +177,11 @@ export default function ResumeSwitcher({
             type="button"
             onClick={handleCreateApplication}
             className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-              isLimitReached && master
+              isLimitReached
                 ? 'bg-gray-200 text-gray-500'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}
-            title={isLimitReached && master ? 'Application limit reached.' : features.careerRecord ? 'Copy evidence from the career record' : 'Start a new application'}
+            title={isLimitReached ? 'Application limit reached.' : features.careerRecord ? 'Copy evidence from the career record' : 'Start a new application'}
           >
             New application
           </button>

@@ -40,7 +40,7 @@ export type UsageCheckResult = UsageCheckSuccess | UsageCheckError;
  * @returns ConvexHttpClient instance
  * @throws Error if NEXT_PUBLIC_CONVEX_URL is not set
  */
-function getConvexClient(): ConvexHttpClient {
+export function getConvexClient(): ConvexHttpClient {
   const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!convexUrl) {
     throw new Error('NEXT_PUBLIC_CONVEX_URL environment variable is not set');
@@ -48,19 +48,32 @@ function getConvexClient(): ConvexHttpClient {
   return new ConvexHttpClient(convexUrl);
 }
 
-const ENTITLED_ITEM_STATUSES = new Set(['active', 'past_due']);
+function subscriptionItemEntitled(item: {
+  status: string;
+  endedAt: number | null;
+  periodEnd: number | null;
+}): boolean {
+  if (item.endedAt) return false;
+  if (item.status === 'active' || item.status === 'past_due') return true;
+  // Cancel-at-period-end keeps the search pass until periodEnd.
+  if (item.status === 'canceled') {
+    return item.periodEnd === null || item.periodEnd > Date.now();
+  }
+  return false;
+}
 
 /**
  * Read the signed-in user's Clerk Billing plan.
  * Convex can still say "free" when a webhook stored the display name "Pro"
  * as a miss, or when a later user.updated event cleared the plan.
  */
-async function clerkPaidPlan(userId: string): Promise<Exclude<PlanTier, 'free'> | null> {
+export async function clerkPaidPlan(userId: string): Promise<Exclude<PlanTier, 'free'> | null> {
   try {
     const session = await auth();
     if (session.userId === userId && typeof session.has === 'function') {
       if (session.has({ plan: 'user:enterprise' })) return 'enterprise';
       if (session.has({ plan: 'user:pro' })) return 'pro';
+      if (session.has({ plan: 'user:search' })) return 'search';
     }
   } catch (error) {
     console.error('Clerk session plan check failed:', error);
@@ -69,19 +82,41 @@ async function clerkPaidPlan(userId: string): Promise<Exclude<PlanTier, 'free'> 
   try {
     const client = await clerkClient();
     const subscription = await client.billing.getUserBillingSubscription(userId);
-    let paid: 'pro' | 'enterprise' | null = null;
+    let paid: Exclude<PlanTier, 'free'> | null = null;
     for (const item of subscription.subscriptionItems ?? []) {
-      if (!ENTITLED_ITEM_STATUSES.has(item.status)) continue;
+      if (!subscriptionItemEntitled(item)) continue;
       const tier = planTierFromLabel(item.plan?.slug) ?? planTierFromLabel(item.plan?.name);
       if (tier === 'enterprise') return 'enterprise';
+      if (tier === 'pro') {
+        paid = 'pro';
+        continue;
+      }
+      if (tier === 'search' && paid !== 'pro') {
+        paid = 'search';
+        continue;
+      }
       if (tier === 'free' || item.plan?.isDefault) continue;
-      if (tier === 'pro' || item.plan) paid = 'pro';
+      if (item.plan?.isRecurring === false && paid !== 'pro') paid = 'search';
+      else if (item.plan) paid = 'pro';
     }
     return paid;
   } catch (error) {
     console.error('Clerk billing lookup failed:', error);
     return null;
   }
+}
+
+/** Write the Clerk billing plan into Convex. Does nothing when Clerk has no paid plan. */
+export async function syncSignedInBillingPlan(userId: string): Promise<Exclude<PlanTier, 'free'> | null> {
+  const paidPlan = await clerkPaidPlan(userId);
+  if (!paidPlan) return null;
+  const client = getConvexClient();
+  await client.mutation(api.usage.updateUserPlan, {
+    userId,
+    plan: paidPlan,
+    resetCounters: false,
+  });
+  return paidPlan;
 }
 
 /**
@@ -114,7 +149,7 @@ export async function checkUsageLimit(
     const client = convex || getConvexClient();
     
     // Use server-side version that accepts userId directly
-    const result = await client.query(api.usage.canPerformActionServer, { userId, action });
+    let result = await client.query(api.usage.canPerformActionServer, { userId, action });
     
     if (!result.allowed) {
       const paidPlan = await clerkPaidPlan(userId);
@@ -125,10 +160,11 @@ export async function checkUsageLimit(
             plan: paidPlan,
             resetCounters: false,
           });
+          result = await client.query(api.usage.canPerformActionServer, { userId, action });
+          if (result.allowed) return { allowed: true };
         } catch (syncError) {
           console.error('Failed to sync Clerk plan into Convex:', syncError);
         }
-        return { allowed: true };
       }
 
       // Build error response with upgrade prompt

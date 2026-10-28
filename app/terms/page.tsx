@@ -76,11 +76,14 @@ export default function TermsPage() {
 
       <LegalSection heading="Plans and fees">
         <p>
-          Prices are shown in the pricing table before you pay. Clerk bills paid plans
-          and Stripe processes the card. We can change prices or plan limits for a future
-          billing period. Taxes may be added where the law requires. Unless a mandatory
-          consumer right says otherwise, fees already charged are not refunded because
-          you did not get an interview.
+          The free plan includes the public scanner and one tailored resume with PDF
+          export. This search is a one-time fee for 30 days and up to 8 tailored
+          resumes, and it does not renew. Still looking is a monthly fee for the same
+          access and renews until you cancel. Prices are shown on the pricing page
+          before you pay. Clerk bills paid plans and Stripe processes the card. We can
+          change prices or plan limits for a future billing period. Taxes may be added
+          where the law requires. Unless a mandatory consumer right says otherwise, fees
+          already charged are not refunded because you did not get an interview.
         </p>
       </LegalSection>
 

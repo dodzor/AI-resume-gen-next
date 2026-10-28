@@ -1,7 +1,7 @@
 'use client'
 
 import { useUsageLimits } from '@/hooks/useUsageLimits'
-import { isUnlimited } from '@/lib/plan-limits'
+import { OFFER, isUnlimited, planDisplayName } from '@/lib/plan-limits'
 import Link from 'next/link'
 
 interface UsageDisplayProps {
@@ -11,7 +11,7 @@ interface UsageDisplayProps {
 }
 
 /**
- * Component to display current plan and usage with progress bars
+ * Component to display current plan and application allowance.
  */
 export default function UsageDisplay({
   className = '',
@@ -20,11 +20,11 @@ export default function UsageDisplay({
 }: UsageDisplayProps) {
   const {
     plan,
-    isPro,
     isFree,
     usage,
     limits,
     remaining,
+    periodInfo,
     isLoading,
   } = useUsageLimits()
 
@@ -50,8 +50,10 @@ export default function UsageDisplay({
 
   const getPlanBadgeColor = (): string => {
     switch (plan) {
-      case 'pro':
+      case 'search':
         return 'bg-blue-100 text-blue-800'
+      case 'pro':
+        return 'bg-sky-100 text-sky-800'
       case 'enterprise':
         return 'bg-purple-100 text-purple-800'
       default:
@@ -59,67 +61,60 @@ export default function UsageDisplay({
     }
   }
 
-  const formatLimit = (limit: number): string => {
-    if (isUnlimited(limit)) return 'Unlimited'
-    return limit.toString()
-  }
+  const periodEnd = new Date(periodInfo.end).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  })
 
-  const formatUsage = (used: number, limit: number): string => {
-    if (isUnlimited(limit)) return 'Unlimited'
-    return `${used} / ${limit}`
-  }
+  const footer = isFree
+    ? 'One tailored resume, with PDF. The scanner stays free without an account.'
+    : plan === 'search'
+      ? `8 applications until ${periodEnd}. This pass does not renew.`
+      : plan === 'pro'
+        ? '8 applications each billing period. Cancel any time.'
+        : 'Enterprise access.'
+
+  const applications = (
+    <UsageItem
+      label="Applications"
+      used={usage.resumes}
+      limit={limits.resumes}
+      remaining={remaining.resumes}
+      getUsagePercentage={getUsagePercentage}
+      getProgressColor={getProgressColor}
+    />
+  )
 
   if (compact) {
     return (
       <div className={`bg-white rounded-lg shadow p-4 ${className}`}>
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-2">
-            <span className={`px-2 py-1 rounded text-xs font-medium ${getPlanBadgeColor()}`}>
-              {plan.charAt(0).toUpperCase() + plan.slice(1)}
-            </span>
-          </div>
+          <span className={`px-2 py-1 rounded text-xs font-medium ${getPlanBadgeColor()}`}>
+            {planDisplayName(plan)}
+          </span>
           {isFree && showUpgradeButton && (
             <Link
               href="/pricing"
               className="text-xs text-blue-600 hover:text-blue-800 font-medium"
             >
-              Upgrade
+              {OFFER.searchPrice} for this search
             </Link>
           )}
         </div>
-        <div className="space-y-2">
-          <UsageItem
-            label="AI Rewrites"
-            used={usage.aiRewrites}
-            limit={limits.aiRewrites}
-            remaining={remaining.aiRewrites}
-            getUsagePercentage={getUsagePercentage}
-            getProgressColor={getProgressColor}
-            formatUsage={formatUsage}
-          />
-          <UsageItem
-            label="Job Analyses"
-            used={usage.jobAnalyses}
-            limit={limits.jobAnalyses}
-            remaining={remaining.jobAnalyses}
-            getUsagePercentage={getUsagePercentage}
-            getProgressColor={getProgressColor}
-            formatUsage={formatUsage}
-          />
-        </div>
+        {applications}
       </div>
     )
   }
 
   return (
     <div className={`bg-white rounded-lg shadow-lg p-6 ${className}`}>
-      {/* Plan Badge */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">Usage & Limits</h3>
           <p className="text-sm text-gray-500 mt-1">
-            Current plan: <span className={`px-2 py-1 rounded text-xs font-medium ${getPlanBadgeColor()}`}>
-              {plan.charAt(0).toUpperCase() + plan.slice(1)}
+            Current plan:{' '}
+            <span className={`px-2 py-1 rounded text-xs font-medium ${getPlanBadgeColor()}`}>
+              {planDisplayName(plan)}
             </span>
           </p>
         </div>
@@ -128,59 +123,15 @@ export default function UsageDisplay({
             href="/pricing"
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
           >
-            Upgrade to Pro
+            This search · {OFFER.searchPrice}
           </Link>
         )}
       </div>
 
-      {/* Usage Items */}
-      <div className="space-y-5">
-        <UsageItem
-          label="Job Analyses"
-          used={usage.jobAnalyses}
-          limit={limits.jobAnalyses}
-          remaining={remaining.jobAnalyses}
-          getUsagePercentage={getUsagePercentage}
-          getProgressColor={getProgressColor}
-          formatUsage={formatUsage}
-        />
+      <div className="space-y-5">{applications}</div>
 
-        <UsageItem
-          label="AI Rewrites"
-          used={usage.aiRewrites}
-          limit={limits.aiRewrites}
-          remaining={remaining.aiRewrites}
-          getUsagePercentage={getUsagePercentage}
-          getProgressColor={getProgressColor}
-          formatUsage={formatUsage}
-        />
-
-        <UsageItem
-          label="Resumes Created"
-          used={usage.resumes}
-          limit={limits.resumes}
-          remaining={remaining.resumes}
-          getUsagePercentage={getUsagePercentage}
-          getProgressColor={getProgressColor}
-          formatUsage={formatUsage}
-        />
-
-        <UsageItem
-          label="PDF Exports"
-          used={usage.exports}
-          limit={limits.exports}
-          remaining={remaining.exports}
-          getUsagePercentage={getUsagePercentage}
-          getProgressColor={getProgressColor}
-          formatUsage={formatUsage}
-        />
-      </div>
-
-      {/* Billing Period Info */}
       <div className="mt-6 pt-6 border-t border-gray-200">
-        <p className="text-xs text-gray-500">
-          Usage resets monthly. Upgrade to Pro for unlimited access.
-        </p>
+        <p className="text-xs text-gray-500">{footer}</p>
       </div>
     </div>
   )
@@ -193,7 +144,6 @@ interface UsageItemProps {
   remaining: number
   getUsagePercentage: (used: number, limit: number) => number
   getProgressColor: (percentage: number) => string
-  formatUsage: (used: number, limit: number) => string
 }
 
 function UsageItem({
@@ -203,7 +153,6 @@ function UsageItem({
   remaining,
   getUsagePercentage,
   getProgressColor,
-  formatUsage,
 }: UsageItemProps) {
   const percentage = getUsagePercentage(used, limit)
   const isUnlimitedLimit = isUnlimited(limit)
@@ -217,7 +166,7 @@ function UsageItem({
             <span className="text-green-600 font-medium">Unlimited</span>
           ) : (
             <>
-              {formatUsage(used, limit)} used
+              {used} / {limit}
               {remaining > 0 && (
                 <span className="text-gray-500 ml-1">({remaining} left)</span>
               )}

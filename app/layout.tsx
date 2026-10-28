@@ -3,6 +3,7 @@ import localFont from 'next/font/local'
 import './globals.css'
 import { ClerkProvider } from '@clerk/nextjs'
 import ConvexClientProvider from '@/components/ConvexClientProvider'
+import { PlanSync } from '@/components/PlanSync'
 import { AnalyticsGate, CookieBanner, LegalFooter } from '@/components/CookieConsent'
 
 // Self-hosted so production builds do not fetch Google Fonts.
@@ -55,6 +56,7 @@ export default function RootLayout({
         {publishableKey ? (
           <ClerkProvider publishableKey={publishableKey}>
             <ConvexClientProvider>
+              <PlanSync />
               {children}
               <LegalFooter />
               <CookieBanner />

@@ -141,7 +141,10 @@ export default function UsageGatedButton({
         create_resume: 'resumes',
         export: 'PDF exports',
       }
-      return `You've reached your limit for ${actionNames[action]}. Upgrade to Pro for unlimited access.`
+      if (action === 'create_resume') {
+        return "You've used the applications on this plan. See pricing for the next ones."
+      }
+      return `You've reached the limit for ${actionNames[action]}.`
     }
     return null
   }

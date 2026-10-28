@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
+import { clerkClient } from '@clerk/nextjs/server';
 import { api } from '@/convex/_generated/api';
 import type { PlanTier } from '@/lib/plan-limits';
 import { planTierFromLabel } from '@/lib/plan-tier';
+import { clerkPaidPlan } from '@/lib/api-usage';
 
 // Clerk webhook event types
 type WebhookEvent = {
@@ -54,16 +56,33 @@ function subscriptionItems(data: any): any[] {
   return [];
 }
 
+function itemTimestamp(item: any, snake: string, camel: string): number | null {
+  const value = item?.[snake] ?? item?.[camel];
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  // Clerk webhooks sometimes send unix seconds.
+  return value < 1e12 ? value * 1000 : value;
+}
+
+/**
+ * A search item canceled at period end stays entitled until that period ends.
+ * Clerk's status becomes "canceled" while period_end is still in the future.
+ */
 function tierFromSubscriptionItem(item: any): PlanTier | null {
   const status = item?.status as string | undefined;
-  if (status && status !== 'active' && status !== 'past_due') return null;
+  const periodEnd = itemTimestamp(item, 'period_end', 'periodEnd');
+  const endedAt = itemTimestamp(item, 'ended_at', 'endedAt');
+  const canceledKeepsAccess =
+    status === 'canceled' && !endedAt && (periodEnd === null || periodEnd > Date.now());
+  if (status && status !== 'active' && status !== 'past_due' && !canceledKeepsAccess) return null;
   const plan = item?.plan;
   const labeled =
     planTierFromLabel(plan?.slug) ??
     planTierFromLabel(plan?.name) ??
     planTierFromLabel(item?.plan_slug);
-  if (labeled === 'enterprise' || labeled === 'pro') return labeled;
+  if (labeled === 'enterprise' || labeled === 'pro' || labeled === 'search') return labeled;
   if (labeled === 'free' || plan?.is_default === true || plan?.isDefault === true) return 'free';
+  const recurring = plan?.is_recurring ?? plan?.isRecurring;
+  if (recurring === false && (plan?.slug || plan?.name)) return 'search';
   if (plan?.slug || plan?.name) return 'pro';
   return null;
 }
@@ -92,6 +111,7 @@ function extractPlanTier(event: WebhookEvent): PlanTier | null {
       const tier = tierFromSubscriptionItem(item);
       if (tier === 'enterprise') return 'enterprise';
       if (tier === 'pro') found = 'pro';
+      else if (tier === 'search' && found !== 'pro') found = 'search';
       else if (tier === 'free' && !found) found = 'free';
     }
     if (found) {
@@ -116,20 +136,60 @@ function getUserId(event: WebhookEvent): string | null {
   if (event.type === 'user.created' || event.type === 'user.updated') {
     return event.data.id || null;
   }
-  if (
-    event.type === 'subscription.created' ||
-    event.type === 'subscription.updated' ||
-    event.type === 'subscription.deleted' ||
-    event.type === 'subscriptionItem.updated'
-  ) {
-    // Subscription events include user ID in payer object
-    const payer = (event.data as any)?.payer;
-    if (payer) {
-      return payer.user_id || payer.userId || null;
-    }
-    return null;
+  if (event.type.startsWith('subscription')) {
+    const data = event.data as any;
+    const payer = data?.payer;
+    return payer?.user_id || payer?.userId || data?.user_id || data?.userId || null;
   }
   return null;
+}
+
+function eventHasSearchPlan(event: WebhookEvent): boolean {
+  return subscriptionItems(event.data).some((item) => {
+    const plan = item?.plan;
+    const tier =
+      planTierFromLabel(plan?.slug) ??
+      planTierFromLabel(plan?.name) ??
+      planTierFromLabel(item?.plan_slug);
+    return tier === 'search';
+  });
+}
+
+/**
+ * Clerk only sells the search pass as a monthly subscription.
+ * Cancel it at period end so the $19 charge does not repeat.
+ * Access remains until the period ends.
+ */
+async function cancelSearchAtPeriodEnd(userId: string, requireItem: boolean) {
+  const client = await clerkClient();
+  const subscription = await client.billing.getUserBillingSubscription(userId);
+  let sawSearchItem = false;
+
+  for (const item of subscription.subscriptionItems ?? []) {
+    const tier = planTierFromLabel(item.plan?.slug) ?? planTierFromLabel(item.plan?.name);
+    if (tier !== 'search') continue;
+    sawSearchItem = true;
+    if (item.canceledAt || item.endedAt || item.status === 'canceled') continue;
+    if (item.status !== 'active' && item.status !== 'past_due') continue;
+
+    console.log(`cancelSearchAtPeriodEnd: scheduling ${item.id} to end at period end for ${userId}`);
+    try {
+      await client.billing.cancelSubscriptionItem(item.id, { endNow: false });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/already cancel/i.test(message)) {
+        console.log(`cancelSearchAtPeriodEnd: ${item.id} is already scheduled to end`);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (!sawSearchItem) {
+    const message = `Search subscription for ${userId} is not on the billing record yet`;
+    if (requireItem) throw new Error(message);
+    console.log(`cancelSearchAtPeriodEnd: ${message}`);
+  }
 }
 
 /**
@@ -229,6 +289,10 @@ async function handleSubscriptionCreated(
     console.error(`[handleSubscriptionCreated] ❌ Failed to update user ${userId}:`, error);
     throw error;
   }
+
+  if (plan === 'search' || eventHasSearchPlan(event)) {
+    await cancelSearchAtPeriodEnd(userId, true);
+  }
 }
 
 /**
@@ -270,6 +334,10 @@ async function handleSubscriptionUpdated(
     console.error(`[handleSubscriptionUpdated] ❌ Failed to update user ${userId}:`, error);
     throw error;
   }
+
+  if (plan === 'search' || eventHasSearchPlan(event)) {
+    await cancelSearchAtPeriodEnd(userId, false);
+  }
 }
 
 /**
@@ -286,12 +354,14 @@ async function handleSubscriptionDeleted(
     return;
   }
 
-  console.log(`subscription.deleted: Downgrading user ${userId} to free plan`);
+  const paidPlan = await clerkPaidPlan(userId);
+  const plan = paidPlan ?? 'free';
+  console.log(`subscription.deleted: Setting user ${userId} to plan ${plan}`);
 
   try {
     await convex.mutation(api.usage.updateUserPlan, {
       userId,
-      plan: 'free',
+      plan,
       resetCounters: false, // Keep usage counters when downgrading
     });
     console.log(`subscription.deleted: Successfully downgraded user ${userId}`);

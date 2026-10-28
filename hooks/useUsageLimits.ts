@@ -9,7 +9,7 @@ import { getRemainingQuota, isUnlimited } from '@/lib/plan-limits'
  * Response structure from getUserUsage query
  */
 interface UserUsageResponse {
-  plan: 'free' | 'pro' | 'enterprise'
+  plan: 'free' | 'search' | 'pro' | 'enterprise'
   usage: {
     jobAnalyses: number
     aiRewrites: number
@@ -127,8 +127,9 @@ export function useUsageLimits() {
   return {
     // Plan information
     plan: usage?.plan ?? 'free',
-    isPro: usage?.plan === 'pro',
-    isFree: usage?.plan === 'free',
+    isPro: usage?.plan === 'pro' || usage?.plan === 'search' || usage?.plan === 'enterprise',
+    isFree: usage?.plan === 'free' || usage === undefined,
+    isSearch: usage?.plan === 'search',
     isEnterprise: usage?.plan === 'enterprise',
 
     // Usage data
@@ -141,9 +142,9 @@ export function useUsageLimits() {
 
     // Limits
     limits: usage?.limits ?? {
-      jobAnalyses: 3,
-      aiRewrites: 3,
-      exports: 0,
+      jobAnalyses: -1,
+      aiRewrites: -1,
+      exports: -1,
       resumes: 1,
     },
 

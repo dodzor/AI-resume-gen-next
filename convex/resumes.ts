@@ -1,6 +1,8 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
+import { freePdfJobChanged, freePdfJobMessage, normalizeJobText } from "../lib/jobText";
+import type { PlanTier } from "../lib/plan-limits";
 
 // Save or update a resume
 export const saveResume = mutation({
@@ -329,6 +331,66 @@ export const createApplicationFromMaster = mutation({
   },
 });
 
+// New application seeded with the CV profile from an existing resume.
+// The target job stays empty unless this call passes one.
+export const createApplicationFromResume = mutation({
+  args: {
+    sourceResumeId: v.id("resumes"),
+    job: v.optional(v.string()),
+    jobTitle: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const userId = identity.subject;
+
+    const source = await ctx.db.get(args.sourceResumeId);
+    if (!source || source.userId !== userId) {
+      throw new Error("Resume not found");
+    }
+
+    const canCreate = await ctx.runQuery(api.usage.canPerformAction, {
+      action: "create_resume",
+    });
+    if (!canCreate.allowed) {
+      const error: any = new Error(canCreate.reason || "Resume limit reached");
+      error.upgradeRequired = canCreate.upgradeRequired || false;
+      error.code = "USAGE_LIMIT_EXCEEDED";
+      throw error;
+    }
+
+    const now = Date.now();
+    const resumeId = await ctx.db.insert("resumes", withoutEmpty({
+      userId,
+      kind: "tailored" as const,
+      name: source.name,
+      email: source.email,
+      phone: source.phone,
+      location: source.location,
+      experiences: source.experiences,
+      educationEntries: source.educationEntries,
+      certifications: source.certifications,
+      skills: source.skills,
+      portfolioProjects: source.portfolioProjects,
+      portfolioLink: source.portfolioLink,
+      summary: source.summary,
+      template: source.template || "modern-minimal",
+      job: args.job,
+      jobTitle: args.jobTitle,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    try {
+      await ctx.runMutation(api.usage.incrementUsage, { action: "create_resume" });
+    } catch (error) {
+      console.error("Failed to increment usage counter:", error);
+    }
+
+    return resumeId;
+  },
+});
+
 // Get all resumes for the current user
 export const getUserResumes = query({
   args: {},
@@ -368,5 +430,84 @@ export const getResume = query({
     }
 
     return resume;
+  },
+});
+
+async function planForPdfLock(ctx: QueryCtx | MutationCtx, userId: string): Promise<PlanTier> {
+  const usage = await ctx.db
+    .query("userUsage")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  if (!usage) return "free";
+  if (usage.plan === "search" && Date.now() >= usage.periodEnd) return "free";
+  return usage.plan;
+}
+
+/**
+ * Free PDFs stay on the job description from the first download.
+ * Paid plans are not locked to that text.
+ */
+export const freePdfJobAllowed = query({
+  args: {
+    userId: v.string(),
+    resumeId: v.optional(v.id("resumes")),
+    job: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const plan = await planForPdfLock(ctx, args.userId);
+    if (plan !== "free") return { allowed: true as const };
+
+    if (!args.resumeId) {
+      return {
+        allowed: false as const,
+        upgradeRequired: false,
+        reason: "Save the application before downloading.",
+      };
+    }
+
+    const resume = await ctx.db.get(args.resumeId);
+    if (!resume || resume.userId !== args.userId) {
+      return {
+        allowed: false as const,
+        upgradeRequired: false,
+        reason: "Resume not found",
+      };
+    }
+
+    const sameAsDownload = !freePdfJobChanged(resume.exportedJob, args.job)
+    const sameAsSaved = !freePdfJobChanged(resume.exportedJob, resume.job)
+    if (sameAsDownload && sameAsSaved) {
+      return { allowed: true as const };
+    }
+
+    return {
+      allowed: false as const,
+      upgradeRequired: true,
+      reason: freePdfJobMessage(),
+      exportedJob: resume.exportedJob,
+    };
+  },
+});
+
+/** Remember the job from the first free PDF. Later calls leave the stored text in place. */
+export const recordExportedJob = mutation({
+  args: {
+    userId: v.string(),
+    resumeId: v.id("resumes"),
+    job: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const plan = await planForPdfLock(ctx, args.userId);
+    if (plan !== "free") return { recorded: false };
+
+    const resume = await ctx.db.get(args.resumeId);
+    if (!resume || resume.userId !== args.userId) return { recorded: false };
+    if (resume.exportedJob !== undefined) return { recorded: false };
+
+    await ctx.db.patch(resume._id, {
+      exportedJob: normalizeJobText(args.job),
+      updatedAt: Date.now(),
+    });
+    return { recorded: true };
   },
 });

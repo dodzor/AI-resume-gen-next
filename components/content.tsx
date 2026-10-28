@@ -16,8 +16,9 @@ import UpgradeModal from './UpgradeModal'
 import { mergeImportedResume } from '@/lib/mergeResumeImport'
 import type { ResumeImportPayload } from '@/lib/resumeImportSchema'
 import type { ResumeMergeMode } from '@/lib/mergeResumeImport'
-import type { ActionType } from '@/lib/plan-limits'
+import { isUnlimited, type ActionType } from '@/lib/plan-limits'
 import { features } from '@/config/features'
+import { applicationResumes } from '@/lib/applicationResumes'
 
 // Default empty form data
 const getDefaultFormData = () => ({
@@ -80,6 +81,18 @@ const getDefaultFormData = () => ({
 const LAST_EDITED_RESUME_KEY = 'lastEditedResumeId'
 const LOADED_RESUME_DATA_KEY = 'loadedResumeData'
 
+function hasSavedProfile(resume: {
+  name?: string
+  email?: string
+  phone?: string
+  experiences?: { role?: string; company?: string; description?: string }[]
+}) {
+  if (resume.name?.trim() || resume.email?.trim() || resume.phone?.trim()) return true
+  return (resume.experiences ?? []).some(
+    (item) => item.role?.trim() || item.company?.trim() || item.description?.trim()
+  )
+}
+
 export default function Content() {
     const debugLog = (...args: any[]) => {
       if (process.env.NODE_ENV !== 'production') {
@@ -101,7 +114,7 @@ export default function Content() {
     const [currentResumeId, setCurrentResumeId] = useState<Id<'resumes'> | null>(null)
     
     // Usage limits and upgrade modal state
-    const { canCreateResume, plan } = useUsageLimits()
+    const { canCreateResume, plan, limits, isLoading: usageLoading } = useUsageLimits()
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
     const [upgradeModalAction, setUpgradeModalAction] = useState<ActionType>('create_resume')
 
@@ -120,9 +133,11 @@ export default function Content() {
       currentResumeId ? { resumeId: currentResumeId } : "skip" // Get a single resume when ID is set
     )
     const saveResume = useMutation(api.resumes.saveResume)
+    const syncApplicationCount = useMutation(api.usage.syncApplicationCount)
     const deleteResume = useMutation(api.resumes.deleteResume)
     const ensureMaster = useMutation(api.resumes.ensureMaster)
     const createApplicationFromMaster = useMutation(api.resumes.createApplicationFromMaster)
+    const createApplicationFromResume = useMutation(api.resumes.createApplicationFromResume)
     const [tailorUrl, setTailorUrl] = useState<string | null>(null)
     const discoveredJob = useQuery(
       api.softwareJobs.getSoftwareJobByUrl,
@@ -156,6 +171,15 @@ export default function Content() {
       const url = new URLSearchParams(window.location.search).get('tailorUrl')
       if (url) setTailorUrl(url)
     }, [])
+
+    const syncedApplicationCount = useRef<number | null>(null)
+    useEffect(() => {
+      if (features.careerRecord || !resumes?.length) return
+      const count = applicationResumes(resumes).length
+      if (count === 0 || syncedApplicationCount.current === count) return
+      syncedApplicationCount.current = count
+      void syncApplicationCount({ applicationCount: count })
+    }, [resumes, syncApplicationCount])
     
     // Save function - called when user navigates steps
     const handleSave = useCallback(async (override?: Record<string, unknown>) => {
@@ -207,7 +231,7 @@ export default function Content() {
           thematicSummary: formData.thematicSummary || undefined,
           generatedResume: generatedResume || undefined,
           maxStepReached: maxStepReached || undefined,
-          kind: formData.kind === 'master' ? 'master' : 'tailored',
+          kind: features.careerRecord && formData.kind === 'master' ? 'master' : 'tailored',
           rawDump: formData.rawDump || undefined,
           clarifyingQA: formData.clarifyingQA?.length ? formData.clarifyingQA : undefined,
           confirmedFacts: formData.confirmedFacts?.length ? formData.confirmedFacts : undefined,
@@ -318,9 +342,7 @@ export default function Content() {
           
           let resumeToLoad: Id<'resumes'> | null = null
           
-          const selectable = features.careerRecord
-            ? resumes
-            : resumes.filter((resume) => resume.kind !== 'master')
+          const selectable = features.careerRecord ? resumes : applicationResumes(resumes)
 
           if (lastEditedId) {
             // Check if resume still exists
@@ -342,6 +364,7 @@ export default function Content() {
               reason: lastEditedId === resumeToLoad ? 'localStorage' : 'mostRecent',
             })
             setCurrentResumeId(resumeToLoad)
+            setResumeEntryPhase('done')
             // The getResume query will be called automatically via useQuery
           } else {
             // No resumes exist - start with empty form
@@ -421,6 +444,7 @@ export default function Content() {
           portfolioProjects: getResume.portfolioProjects || [],
           portfolioLink: getResume.portfolioLink || '',
           job: getResume.job || '',
+          exportedJob: getResume.exportedJob,
           jobTitle: getResume.jobTitle || '',
           template: (getResume.template || 'modern-minimal') as 'modern-minimal',
           tone: getResume.tone || '',
@@ -654,14 +678,59 @@ export default function Content() {
     }, [ensureMaster])
 
     const handleCreateApplication = useCallback(async (job?: string, jobTitle?: string) => {
+      const existingCount = applicationResumes(resumes ?? []).length
+      const atLimit = !usageLoading && (
+        !canCreateResume || (!isUnlimited(limits.resumes) && existingCount >= limits.resumes)
+      )
+      if (atLimit) {
+        setUpgradeModalAction('create_resume')
+        setShowUpgradeModal(true)
+        return
+      }
+
       const epoch = ++navigationEpoch.current
       const master = (resumes ?? []).find((resume) => resume.kind === 'master')
-      if (!master) {
-        if (!features.careerRecord) {
+      if (!features.careerRecord) {
+        const openResumeId = currentResumeIdRef.current
+        if (openResumeId && hasSavedProfile(formDataRef.current)) {
+          await handleSave()
+        }
+        const saved = (resumes ?? []).filter(hasSavedProfile)
+        const latest = [...saved].sort((a, b) => b.updatedAt - a.updatedAt)[0]
+        const sourceId = openResumeId && hasSavedProfile(formDataRef.current)
+          ? openResumeId
+          : latest?._id
+        if (!sourceId) {
           resetEditor()
           setResumeEntryPhase('done')
           return
         }
+        try {
+          const resumeId = await createApplicationFromResume({
+            sourceResumeId: sourceId,
+            job,
+            jobTitle,
+          })
+          if (navigationEpoch.current !== epoch) return
+          skipAutoLoad.current = false
+          isLoadingFromConvex.current = true
+          lastLoadedResumeId.current = null
+          currentResumeIdRef.current = resumeId
+          setCurrentResumeId(resumeId)
+          setResumeEntryPhase('done')
+          setCurrentStep(1)
+          setMaxStepReached(1)
+        } catch (error: any) {
+          if (error?.upgradeRequired || error?.code === 'USAGE_LIMIT_EXCEEDED') {
+            setUpgradeModalAction('create_resume')
+            setShowUpgradeModal(true)
+            return
+          }
+          alert(error?.message || 'Could not create the application.')
+        }
+        return
+      }
+      if (!master) {
         await handleOpenMaster()
         return
       }
@@ -686,7 +755,7 @@ export default function Content() {
         }
         alert(error?.message || 'Could not create the application.')
       }
-    }, [resumes, createApplicationFromMaster, handleOpenMaster, resetEditor])
+    }, [resumes, canCreateResume, limits.resumes, usageLoading, createApplicationFromMaster, createApplicationFromResume, handleOpenMaster, handleSave, resetEditor])
 
     const handleStartFreshFromGate = useCallback(() => {
       setImportMeta(null)
@@ -710,10 +779,10 @@ export default function Content() {
 
     const handleFinishImport = useCallback(
       (data: ResumeImportPayload, mode: ResumeMergeMode) => {
-        const hasMaster = (resumes ?? []).some((resume) => resume.kind === 'master')
+        const hasMaster = features.careerRecord && (resumes ?? []).some((resume) => resume.kind === 'master')
         setFormData((prev) => {
           const merged = mergeImportedResume(prev as Record<string, unknown>, data, mode) as typeof prev
-          if (hasMaster) return merged
+          if (hasMaster || !features.careerRecord) return merged
           return { ...merged, kind: 'master' as const, rawDump: resumeImportText || prev.rawDump }
         })
         setImportMeta({ fileName: resumeImportFileName || 'resume.pdf', importedAt: Date.now() })

@@ -6,6 +6,7 @@ import Link from 'next/link'
 
 import Content from '../components/content'
 import { SiteHeader } from '@/components/SiteHeader'
+import { OFFER } from '@/lib/plan-limits'
 
 function LandingPage() {
   return (
@@ -312,8 +313,8 @@ function LandingPage() {
               description="Detect missing keywords that ATS systems scan for so your resume mirrors what screening tools expect."
             />
             <FeatureCard
-              title="Usage‑based freemium"
-              description="Start free with sensible limits. Free plan includes 3 job analyses and 3 AI rewrites each month."
+              title="One resume free"
+              description={`The scanner needs no account. A free account includes one tailored resume with PDF. This search is ${OFFER.searchPrice} for eight applications over ${OFFER.searchDays} days.`}
             />
           </div>
         </section>

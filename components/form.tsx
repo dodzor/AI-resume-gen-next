@@ -16,6 +16,7 @@ import UsageGatedButton from './UsageGatedButton'
 import UsageDisplay from './UsageDisplay'
 import UpgradeModal from './UpgradeModal'
 import type { ActionType } from '@/lib/plan-limits'
+import { freePdfJobChanged, freePdfJobMessage, normalizeJobText } from '@/lib/jobText'
 
 interface FormProps {
   formData: any
@@ -81,9 +82,17 @@ export default function Form({
     const [isTailoring, setIsTailoring] = useState(false)
     
     // Usage limits and upgrade modal state
-    const { plan, canExport, isPro, isFree } = useUsageLimits()
+    const { plan, canExport, isLoading: usageLoading } = useUsageLimits()
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
     const [upgradeModalAction, setUpgradeModalAction] = useState<ActionType | undefined>(undefined)
+    const [upgradeMessage, setUpgradeMessage] = useState<string | undefined>(undefined)
+    const pdfJobLocked = !usageLoading && plan === 'free' && freePdfJobChanged(formData.exportedJob, formData.job)
+
+    const openUpgrade = (action: ActionType, message?: string) => {
+        setUpgradeModalAction(action)
+        setUpgradeMessage(message)
+        setShowUpgradeModal(true)
+    }
     const [analyzedTone, setAnalyzedTone] = useState<string | null>(null)
     const [analyzedThemes, setAnalyzedThemes] = useState<{
         themes: string[];
@@ -590,6 +599,10 @@ export default function Form({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (pdfJobLocked) {
+            openUpgrade('create_resume', freePdfJobMessage())
+            return
+        }
         setIsGenerating(true)
         
         try {
@@ -634,6 +647,8 @@ export default function Form({
                     content: data.resume,
                     templateId,
                     fileName,
+                    resumeId: currentResumeId,
+                    job: formData.job || '',
                 }),
             })
 
@@ -745,10 +760,13 @@ export default function Form({
     }
 
     const handleDownloadPDF = async () => {
-        // Check if user can export PDF (Pro feature)
-        if (!canExport || isFree) {
-            setUpgradeModalAction('export')
-            setShowUpgradeModal(true)
+        if (usageLoading) return
+        if (pdfJobLocked) {
+            openUpgrade('create_resume', freePdfJobMessage())
+            return
+        }
+        if (!canExport) {
+            openUpgrade('export')
             return
         }
 
@@ -781,11 +799,21 @@ export default function Form({
                     content: previewContent,
                     templateId,
                     fileName,
+                    resumeId: currentResumeId,
+                    job: formData.job || '',
                 }),
             })
 
             if (!response.ok) {
                 const errorData = await response.json()
+
+                if (errorData.code === 'PDF_JOB_LOCKED') {
+                    if (typeof errorData.details?.exportedJob === 'string') {
+                        setFormData((prev: any) => ({ ...prev, exportedJob: errorData.details.exportedJob }))
+                    }
+                    openUpgrade('create_resume', errorData.message || freePdfJobMessage())
+                    return
+                }
                 
                 // Check for upgrade requirement in error response
                 if (errorData.upgradeRequired) {
@@ -806,6 +834,14 @@ export default function Form({
             a.click()
             window.URL.revokeObjectURL(url)
             document.body.removeChild(a)
+
+            if (plan === 'free') {
+                setFormData((prev: any) => (
+                    prev.exportedJob == null
+                        ? { ...prev, exportedJob: normalizeJobText(prev.job) }
+                        : prev
+                ))
+            }
             
         } catch (error: any) {
             if (!handleAPIError(error, 'export')) {
@@ -1118,8 +1154,7 @@ export default function Form({
         
         // Check if error response contains upgrade requirement
         if (error && typeof error === 'object' && 'upgradeRequired' in error && error.upgradeRequired) {
-            setUpgradeModalAction(action)
-            setShowUpgradeModal(true)
+            openUpgrade(action)
             return true // Indicates upgrade modal was shown
         }
         
@@ -3535,63 +3570,42 @@ export default function Form({
                         </button>
                     ) : (
                         <div className="flex gap-2">
-                            {isFree ? (
-                                <>
-                                    <button 
-                                        type="button"
-                                        onClick={handleCopyToClipboard}
-                                        disabled={isGenerating || !validateStep(currentStep)}
-                                        className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3 px-2 rounded-lg hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition duration-200 shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            <button
+                                type="button"
+                                onClick={handleCopyToClipboard}
+                                disabled={isGenerating || !validateStep(currentStep)}
+                                className="bg-white text-slate-700 font-semibold py-3 px-3 rounded-lg border border-slate-300 hover:bg-slate-50 transition duration-200 shadow-sm flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span>Copy</span>
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={handleDownloadPDF}
+                                disabled={!pdfJobLocked && (isDownloading || isGenerating || !validateStep(currentStep))}
+                                title={pdfJobLocked ? 'This job description is a new application.' : undefined}
+                                className={`font-semibold py-3 px-8 rounded-lg transition duration-200 flex items-center justify-center space-x-2 ${
+                                    pdfJobLocked
+                                        ? 'bg-gray-200 text-gray-500 cursor-pointer'
+                                        : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none'
+                                }`}
+                            >
+                                {isDownloading ? (
+                                    <>
+                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
-                                        <span>Copy to Clipboard</span>
-                                    </button>
-                                    <button 
-                                        type="button"
-                                        onClick={() => {
-                                            setUpgradeModalAction('export')
-                                            setShowUpgradeModal(true)
-                                        }}
-                                        disabled={isGenerating || !validateStep(currentStep)}
-                                        className="bg-gray-200 text-gray-500 font-semibold py-3 px-2 rounded-lg cursor-pointer transition duration-200 shadow-md flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed relative group hover:bg-gray-300"
-                                        title="Upgrade to Pro to export your resume as a polished PDF"
-                                    >
+                                        <span>Generating PDF...</span>
+                                    </>
+                                ) : (
+                                    <>
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                         </svg>
-                                        <span>Download PDF (Pro)</span>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                                        </svg>
-                                    </button>
-                                </>
-                            ) : (
-                                <button 
-                                    type="button"
-                                    onClick={handleDownloadPDF}
-                                    disabled={isDownloading || isGenerating || !validateStep(currentStep)}
-                                    className="bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold py-3 px-8 rounded-lg hover:from-green-700 hover:to-emerald-700 transform hover:scale-105 transition duration-200 shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                                >
-                                    {isDownloading ? (
-                                        <>
-                                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            <span>Generating PDF...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                            </svg>
-                                            <span>Download PDF</span>
-                                        </>
-                                    )}
-                                </button>
-                            )}
+                                        <span>Download PDF</span>
+                                    </>
+                                )}
+                            </button>
                         </div>
                     )}
                 </div>
@@ -3604,6 +3618,7 @@ export default function Form({
             onClose={() => setShowUpgradeModal(false)}
             action={upgradeModalAction}
             plan={plan}
+            message={upgradeMessage}
         />
         </>
     )

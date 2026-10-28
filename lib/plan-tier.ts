@@ -8,7 +8,15 @@ export function planTierFromLabel(value: unknown): PlanTier | null {
   if (typeof value !== 'string') return null
   const label = value.trim().toLowerCase().replace(/^(user|org):/, '')
   if (/(^|[^a-z])enterprise([^a-z]|$)/.test(label)) return 'enterprise'
-  if (/(^|[^a-z])pro([^a-z]|$)/.test(label)) return 'pro'
+  if (label.includes('search')) return 'search'
+  if (
+    /(^|[^a-z])pro([^a-z]|$)/.test(label) ||
+    label.includes('still-looking') ||
+    label.includes('still_looking') ||
+    label === 'monthly'
+  ) {
+    return 'pro'
+  }
   if (label === 'free' || label.startsWith('free_') || label.startsWith('free-')) return 'free'
   return null
 }

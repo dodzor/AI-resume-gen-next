@@ -49,6 +49,8 @@ export default defineSchema({
     
     // Job Description & Template
     job: v.optional(v.string()),
+    // Target job locked by the first free PDF. Absent until that download.
+    exportedJob: v.optional(v.string()),
     jobTitle: v.optional(v.string()), // Extracted job title
     template: v.optional(v.string()),
     tone: v.optional(v.string()), // 'junior' | 'mid' | 'senior'
@@ -124,7 +126,12 @@ export default defineSchema({
     userId: v.string(),
     
     // Plan information
-    plan: v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise")), // Current plan tier
+    plan: v.union(
+      v.literal("free"),
+      v.literal("search"),
+      v.literal("pro"),
+      v.literal("enterprise")
+    ),
     planUpdatedAt: v.number(), // Timestamp when plan was last updated
     
     // Subscription tracking (for per-user billing periods)
@@ -139,8 +146,10 @@ export default defineSchema({
     aiRewritesUsed: v.number(), // Count of AI rewrites (bullet + experience + summary combined)
     exportsUsed: v.number(), // Count of PDF exports this period
     
-    // Lifetime usage counters (never reset)
-    resumesCreated: v.number(), // Count of resumes created (lifetime, not monthly)
+    // Lifetime total. The free cap uses this. Paid plans use applicationsUsed.
+    resumesCreated: v.number(),
+    // Applications opened in the current search pass or billing period.
+    applicationsUsed: v.optional(v.number()),
     
     // Metadata
     createdAt: v.number(),
