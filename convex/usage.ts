@@ -595,16 +595,17 @@ export const updateUserPlan = mutation({
       update.jobAnalysesUsed = 0;
       update.aiRewritesUsed = 0;
       update.exportsUsed = 0;
-      update.applicationsUsed = 0;
-      if (effectivePlan(usage, now) === "free") {
-        const owned = await ctx.db
-          .query("resumes")
-          .withIndex("by_user", (q) => q.eq("userId", args.userId))
-          .collect();
-        const cap = PLAN_LIMITS[args.plan].applications.limit;
-        const count = applicationResumes(owned).length;
-        update.applicationsUsed = isUnlimited(cap) ? count : Math.min(count, cap);
-      }
+      const owned = await ctx.db
+        .query("resumes")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .collect();
+      const cap = PLAN_LIMITS[args.plan].applications.limit;
+      const count = applicationResumes(owned).length;
+      const seeded = isUnlimited(cap) ? count : Math.min(count, cap);
+      // A new billing period on the same plan starts over.
+      // Switching plans keeps the applications already saved.
+      const renewingSamePlan = !planChanged && args.resetCounters === true;
+      update.applicationsUsed = renewingSamePlan ? 0 : seeded;
     }
     
     await ctx.db.patch(usage._id, update);
@@ -629,13 +630,25 @@ export const syncApplicationCount = mutation({
     const count = Math.min(Math.max(0, Math.floor(args.applicationCount)), resumes.length);
     const usageId = await getOrCreateUserUsage(ctx, identity.subject);
     const usage = await ctx.db.get(usageId);
-    if (!usage || count === 0 || usage.resumesCreated >= count) return { updated: false };
+    if (!usage || count === 0) return { updated: false };
 
-    await ctx.db.patch(usageId, {
-      resumesCreated: count,
-      updatedAt: Date.now(),
-    });
-    return { updated: true, resumesCreated: count };
+    const now = Date.now();
+    const plan = effectivePlan(usage, now);
+    const patch: { resumesCreated?: number; applicationsUsed?: number; updatedAt: number } = {
+      updatedAt: now,
+    };
+    if (usage.resumesCreated < count) patch.resumesCreated = count;
+    if (PLAN_LIMITS[plan].applications.resetsEachPeriod) {
+      const cap = PLAN_LIMITS[plan].applications.limit;
+      const next = isUnlimited(cap) ? count : Math.min(count, cap);
+      if ((usage.applicationsUsed ?? 0) !== next) patch.applicationsUsed = next;
+    }
+    if (patch.resumesCreated === undefined && patch.applicationsUsed === undefined) {
+      return { updated: false };
+    }
+
+    await ctx.db.patch(usageId, patch);
+    return { updated: true, resumesCreated: patch.resumesCreated, applicationsUsed: patch.applicationsUsed };
   },
 });
 

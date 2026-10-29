@@ -177,8 +177,10 @@ export default function Content() {
       if (features.careerRecord || !resumes?.length) return
       const count = applicationResumes(resumes).length
       if (count === 0 || syncedApplicationCount.current === count) return
-      syncedApplicationCount.current = count
-      void syncApplicationCount({ applicationCount: count })
+      syncedApplicationCount.current = null
+      void syncApplicationCount({ applicationCount: count }).then((result) => {
+        if (result?.updated !== false) syncedApplicationCount.current = count
+      })
     }, [resumes, syncApplicationCount])
     
     // Save function - called when user navigates steps

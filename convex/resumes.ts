@@ -2,6 +2,7 @@ import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/s
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { freePdfJobChanged, freePdfJobMessage, normalizeJobText } from "../lib/jobText";
+import { applicationResumes } from "../lib/applicationResumes";
 import type { PlanTier } from "../lib/plan-limits";
 
 // Save or update a resume
@@ -202,13 +203,23 @@ export const deleteResume = mutation({
       .query("userUsage")
       .withIndex("by_user", (q) => q.eq("userId", identity.subject))
       .unique();
+    if (!usage) return;
 
-    if (resume.kind !== "master" && usage && usage.resumesCreated > 0) {
-      await ctx.db.patch(usage._id, {
-        resumesCreated: usage.resumesCreated - 1,
-        updatedAt: Date.now(),
-      });
+    const remaining = await ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .collect();
+    const applicationsLeft = applicationResumes(remaining).length;
+    const patch: { resumesCreated?: number; applicationsUsed?: number; updatedAt: number } = {
+      updatedAt: Date.now(),
+    };
+    if (resume.kind !== "master" && usage.resumesCreated > 0) {
+      patch.resumesCreated = usage.resumesCreated - 1;
     }
+    if ((usage.applicationsUsed ?? 0) > applicationsLeft) {
+      patch.applicationsUsed = applicationsLeft;
+    }
+    await ctx.db.patch(usage._id, patch);
   },
 });
 

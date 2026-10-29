@@ -3,7 +3,6 @@ import OpenAI from 'openai';
 import { createResumePrompt } from '../../../lib/resumeTemplate';
 import { EVIDENCE_RULES, FIDELITY_TEMPERATURE, scrubInventedClaims } from '@/lib/evidenceRules';
 import { requireAuth } from '@/lib/api-auth';
-import { checkUsageLimit, incrementUsageAfterAction } from '@/lib/api-usage';
 
 // Lazy-initialize OpenAI client to avoid build-time errors
 function getOpenAIClient() {
@@ -18,13 +17,6 @@ export async function POST(request: NextRequest) {
     const authResult = await requireAuth();
     if ('error' in authResult) {
       return authResult.error;
-    }
-    const { userId } = authResult;
-
-    // 2. Check usage limit BEFORE processing (lifetime limit for resume creation)
-    const usageCheck = await checkUsageLimit(userId, 'create_resume');
-    if (!usageCheck.allowed) {
-      return usageCheck.error;
     }
 
     // Check if API key is available
@@ -115,9 +107,6 @@ export async function POST(request: NextRequest) {
     content = scrubInventedClaims(content, factSource);
 
     console.log('Resume generated successfully for:', name);
-
-    // 4. Increment usage AFTER successful operation
-    await incrementUsageAfterAction(userId, 'create_resume');
 
     return NextResponse.json({
       success: true,
