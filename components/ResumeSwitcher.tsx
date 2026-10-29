@@ -78,6 +78,8 @@ export default function ResumeSwitcher({
   }
 
   const handleDelete = async (resume: Resume) => {
+    const isApplication = applications.some((item) => item._id === resume._id)
+    if (isApplication && !features.deleteApplication) return
     const title = features.careerRecord && resume.kind === 'master'
       ? 'Career record'
       : (resume.jobTitle || 'Untitled application')
@@ -99,7 +101,7 @@ export default function ResumeSwitcher({
     return `${applicationCount} / ${limit} applications`
   }
 
-  const renderRow = (resume: Resume) => {
+  const renderRow = (resume: Resume, allowDelete: boolean) => {
     const isCurrent = resume._id === currentResumeId
     const title = features.careerRecord && resume.kind === 'master'
       ? 'Career record'
@@ -125,6 +127,7 @@ export default function ResumeSwitcher({
               : new Date(resume.updatedAt).toLocaleDateString()}
           </div>
         </button>
+        {allowDelete && (
         <button
           type="button"
           aria-label={`Delete ${title}`}
@@ -141,6 +144,7 @@ export default function ResumeSwitcher({
             </svg>
           )}
         </button>
+        )}
       </div>
     )
   }
@@ -202,14 +206,14 @@ export default function ResumeSwitcher({
               {features.careerRecord && master && (
                 <>
                   <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Career record</div>
-                  {renderRow(master)}
+                  {renderRow(master, true)}
                 </>
               )}
               <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Applications</div>
               {applications.length === 0 && (
                 <p className="px-3 py-2 text-xs text-gray-500">{features.careerRecord ? 'No applications yet. New application copies the career record.' : 'No applications yet.'}</p>
               )}
-              {applications.map(renderRow)}
+              {applications.map((resume) => renderRow(resume, features.deleteApplication))}
             </div>
           </div>
         </>

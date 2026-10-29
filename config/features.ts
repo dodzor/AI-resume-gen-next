@@ -17,4 +17,6 @@ export const features = {
   productRule: false,
   /** Block copy and PDF export while [X] or a stock phrase is still on the resume. */
   exportGuard: false,
+  /** Trash button on an application in Switch. A production build always leaves this off. */
+  deleteApplication: process.env.NODE_ENV === 'production' ? false : true,
 }

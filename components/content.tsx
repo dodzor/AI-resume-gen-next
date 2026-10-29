@@ -621,7 +621,11 @@ export default function Content() {
     }, [])
 
     const handleDeleteResume = useCallback(async (resumeId: Id<'resumes'>) => {
-      const remaining = (resumes ?? []).filter((resume) => resume._id !== resumeId)
+      const owned = resumes ?? []
+      const isApplication = applicationResumes(owned).some((resume) => resume._id === resumeId)
+      if (isApplication && !features.deleteApplication) return
+
+      const remaining = owned.filter((resume) => resume._id !== resumeId)
       const isCurrent = currentResumeId === resumeId
       const previousLastEdited = localStorage.getItem(LAST_EDITED_RESUME_KEY)
 
