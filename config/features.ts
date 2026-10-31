@@ -21,4 +21,19 @@ export const features = {
   deleteApplication: process.env.NODE_ENV === 'production' ? false : true,
   /** "Discover jobs" in the header, on the landing page, and in the application switcher. */
   discoverJobs: process.env.NODE_ENV === 'production' ? false : true,
+  /**
+   * Model-call ceilings. They reset with the billing period.
+   * Paid covers the 30-day search pass and the monthly plan.
+   * -1 is unlimited.
+   */
+  analyses: {
+    free: 8,
+    paid: 40,
+  },
+  rewrites: {
+    free: 40,
+    paid: 500,
+  },
+  /** Analyses and rewrites on the usage card. A production build always leaves this off. */
+  showAiUsage: process.env.NODE_ENV === 'production' ? false : true,
 }

@@ -12,6 +12,7 @@ import { ConvexHttpClient } from 'convex/browser';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { api } from '@/convex/_generated/api';
 import type { ActionType, PlanTier } from '@/lib/plan-limits';
+import { getActionLimit } from '@/lib/plan-limits';
 import { planTierFromLabel } from '@/lib/plan-tier';
 
 /**
@@ -147,9 +148,22 @@ export async function checkUsageLimit(
 ): Promise<UsageCheckResult> {
   try {
     const client = convex || getConvexClient();
-    
-    // Use server-side version that accepts userId directly
-    let result = await client.query(api.usage.canPerformActionServer, { userId, action });
+    const ceilings =
+      action === 'job_analysis' || action === 'ai_rewrite'
+        ? {
+            free: getActionLimit('free', action),
+            search: getActionLimit('search', action),
+            pro: getActionLimit('pro', action),
+            enterprise: getActionLimit('enterprise', action),
+          }
+        : undefined;
+
+    // Ceilings come from config/features.ts on this request. Convex stores the counts.
+    let result = await client.query(api.usage.canPerformActionServer, {
+      userId,
+      action,
+      ...(ceilings ? { ceilings } : {}),
+    });
     
     if (!result.allowed) {
       const paidPlan = await clerkPaidPlan(userId);
@@ -160,7 +174,11 @@ export async function checkUsageLimit(
             plan: paidPlan,
             resetCounters: false,
           });
-          result = await client.query(api.usage.canPerformActionServer, { userId, action });
+          result = await client.query(api.usage.canPerformActionServer, {
+            userId,
+            action,
+            ...(ceilings ? { ceilings } : {}),
+          });
           if (result.allowed) return { allowed: true };
         } catch (syncError) {
           console.error('Failed to sync Clerk plan into Convex:', syncError);
@@ -273,7 +291,7 @@ export function getActionTypeForRoute(routePath: string): ActionType | null {
     '/api/improve-experience': 'ai_rewrite',
     '/api/generate-summary': 'ai_rewrite',
     '/api/resume/import-text': 'ai_rewrite',
-    '/api/generate-resume': 'create_resume',
+    '/api/generate-resume': 'ai_rewrite',
     '/api/generate-pdf': 'export',
   };
   

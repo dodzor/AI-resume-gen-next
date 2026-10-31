@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { createResumePrompt } from '../../../lib/resumeTemplate';
 import { EVIDENCE_RULES, FIDELITY_TEMPERATURE, scrubInventedClaims } from '@/lib/evidenceRules';
 import { requireAuth } from '@/lib/api-auth';
+import { checkUsageLimit, incrementUsageAfterAction } from '@/lib/api-usage';
 
 // Lazy-initialize OpenAI client to avoid build-time errors
 function getOpenAIClient() {
@@ -17,6 +18,12 @@ export async function POST(request: NextRequest) {
     const authResult = await requireAuth();
     if ('error' in authResult) {
       return authResult.error;
+    }
+    const { userId } = authResult;
+
+    const usageCheck = await checkUsageLimit(userId, 'ai_rewrite');
+    if (!usageCheck.allowed) {
+      return usageCheck.error;
     }
 
     // Check if API key is available
@@ -107,6 +114,8 @@ export async function POST(request: NextRequest) {
     content = scrubInventedClaims(content, factSource);
 
     console.log('Resume generated successfully for:', name);
+
+    await incrementUsageAfterAction(userId, 'ai_rewrite');
 
     return NextResponse.json({
       success: true,

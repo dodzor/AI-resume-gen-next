@@ -143,7 +143,7 @@ export default defineSchema({
     
     // Monthly usage counters (reset at billing period start)
     jobAnalysesUsed: v.number(), // Count of job analyses this period
-    aiRewritesUsed: v.number(), // Count of AI rewrites (bullet + experience + summary combined)
+    aiRewritesUsed: v.number(), // Rewrites, summaries, imports, and full resume generations this period
     exportsUsed: v.number(), // Count of PDF exports this period
     
     // Lifetime total. The free cap uses this. Paid plans use applicationsUsed.

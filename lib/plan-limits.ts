@@ -4,7 +4,12 @@
  * Free is one tailored resume, with PDF. The public scanner does not use these limits.
  * Search is a 30-day pass for 8 applications. Pro is the same access, billed monthly.
  * Enterprise stays in the data model and is not shown on the pricing page.
+ *
+ * Analyses and rewrites are abuse ceilings from config/features.ts. They reset
+ * with the billing period and are not part of the offer on the pricing page.
  */
+
+import { features } from '../config/features';
 
 /** Length of the one-time search pass. */
 export const SEARCH_PERIOD_MS = 30 * 24 * 60 * 60 * 1000
@@ -84,8 +89,8 @@ export interface PlanLimits {
  */
 const paidAccess = {
   monthly: {
-    jobAnalyses: -1,
-    aiRewrites: -1,
+    jobAnalyses: features.analyses.paid,
+    aiRewrites: features.rewrites.paid,
     exports: -1,
   },
   applications: {
@@ -104,8 +109,8 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
   free: {
     plan: 'free',
     monthly: {
-      jobAnalyses: -1,
-      aiRewrites: -1,
+      jobAnalyses: features.analyses.free,
+      aiRewrites: features.rewrites.free,
       exports: -1,
     },
     applications: {
@@ -292,6 +297,12 @@ export function limitReachedMessage(plan: PlanTier, action: ActionType, limit: n
   }
   if (action === 'create_resume') {
     return `You've used all ${limit} applications for this period.`
+  }
+  if (action === 'ai_rewrite') {
+    return 'You have used the rewrites included in this period. They reset at the start of the next one.'
+  }
+  if (action === 'job_analysis') {
+    return 'You have used the job analyses included in this period. They reset at the start of the next one.'
   }
   return `You've reached the limit for this period (${limit}).`
 }

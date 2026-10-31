@@ -1,6 +1,7 @@
 'use client'
 
 import { useUsageLimits } from '@/hooks/useUsageLimits'
+import { features } from '@/config/features'
 import { OFFER, isUnlimited, planDisplayName } from '@/lib/plan-limits'
 import Link from 'next/link'
 
@@ -74,16 +75,29 @@ export default function UsageDisplay({
         ? '8 applications each billing period. Cancel any time.'
         : 'Enterprise access.'
 
-  const applications = (
+  const usageItem = (
+    label: string,
+    used: number,
+    limit: number,
+    remainingCount: number,
+  ) => (
     <UsageItem
-      label="Applications"
-      used={usage.resumes}
-      limit={limits.resumes}
-      remaining={remaining.resumes}
+      label={label}
+      used={used}
+      limit={limit}
+      remaining={remainingCount}
       getUsagePercentage={getUsagePercentage}
       getProgressColor={getProgressColor}
     />
   )
+
+  const applications = usageItem('Applications', usage.resumes, limits.resumes, remaining.resumes)
+  const modelUsage = features.showAiUsage ? (
+    <>
+      {usageItem('Analyses', usage.jobAnalyses, limits.jobAnalyses, remaining.jobAnalyses)}
+      {usageItem('Rewrites', usage.aiRewrites, limits.aiRewrites, remaining.aiRewrites)}
+    </>
+  ) : null
 
   if (compact) {
     return (
@@ -101,7 +115,10 @@ export default function UsageDisplay({
             </Link>
           )}
         </div>
-        {applications}
+        <div className="space-y-4">
+          {applications}
+          {modelUsage}
+        </div>
       </div>
     )
   }
@@ -128,7 +145,10 @@ export default function UsageDisplay({
         )}
       </div>
 
-      <div className="space-y-5">{applications}</div>
+      <div className="space-y-5">
+        {applications}
+        {modelUsage}
+      </div>
 
       <div className="mt-6 pt-6 border-t border-gray-200">
         <p className="text-xs text-gray-500">{footer}</p>

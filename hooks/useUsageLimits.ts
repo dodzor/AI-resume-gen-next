@@ -3,7 +3,7 @@
 import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import type { ActionType } from '@/lib/plan-limits'
-import { getRemainingQuota, isUnlimited } from '@/lib/plan-limits'
+import { getActionLimit, getRemainingQuota, isUnlimited, limitReachedMessage } from '@/lib/plan-limits'
 
 /**
  * Response structure from getUserUsage query
@@ -121,8 +121,20 @@ function getUsageForAction(
  * 
  * @returns Object containing plan info, usage data, limits, and helper functions
  */
+function withConfigCeilings(usage: UserUsageResponse): UserUsageResponse {
+  return {
+    ...usage,
+    limits: {
+      ...usage.limits,
+      jobAnalyses: getActionLimit(usage.plan, 'job_analysis'),
+      aiRewrites: getActionLimit(usage.plan, 'ai_rewrite'),
+    },
+  }
+}
+
 export function useUsageLimits() {
-  const usage = useQuery(api.usage.getUserUsage)
+  const queried = useQuery(api.usage.getUserUsage)
+  const usage = queried ? withConfigCeilings(queried) : undefined
 
   return {
     // Plan information
@@ -184,7 +196,24 @@ export function useUsageLimits() {
  * @returns Object with allowed status, reason, remaining quota, and upgrade requirement
  */
 export function useCanPerformAction(action: ActionType) {
-  const result = useQuery(api.usage.canPerformAction, { action })
+  const { plan, usage, isLoading: usageLoading } = useUsageLimits()
+  const result = useQuery(
+    api.usage.canPerformAction,
+    action === 'ai_rewrite' || action === 'job_analysis' ? 'skip' : { action }
+  )
+
+  if (action === 'ai_rewrite' || action === 'job_analysis') {
+    const limit = getActionLimit(plan, action)
+    const used = action === 'ai_rewrite' ? usage.aiRewrites : usage.jobAnalyses
+    const allowed = !usageLoading && (isUnlimited(limit) || used < limit)
+    return {
+      allowed,
+      reason: allowed ? undefined : limitReachedMessage(plan, action, limit),
+      remaining: usageLoading ? 0 : getRemainingQuota(used, limit),
+      upgradeRequired: false,
+      isLoading: usageLoading,
+    }
+  }
 
   return {
     allowed: result?.allowed ?? false,

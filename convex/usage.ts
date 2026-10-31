@@ -33,9 +33,33 @@ type UsageSnapshot = {
   applicationsUsed?: number;
 };
 
-function effectivePlan(usage: { plan: PlanTier; periodEnd: number }, now: number): PlanTier {
-  if (usage.plan === "search" && now >= usage.periodEnd) return "free";
+function effectivePlan(
+  usage: { plan: PlanTier; subscriptionStartDate: number },
+  now: number
+): PlanTier {
+  // The search pass ends 30 days after it was bought. periodEnd also rolls
+  // forward after that so the free monthly ceiling can reset, and that roll
+  // must not turn the pass back on.
+  if (usage.plan === "search" && now >= usage.subscriptionStartDate + SEARCH_PERIOD_MS) {
+    return "free";
+  }
   return usage.plan;
+}
+
+function monthlyUsed(
+  usage: {
+    periodEnd: number;
+    jobAnalysesUsed: number;
+    aiRewritesUsed: number;
+    exportsUsed: number;
+  },
+  action: "job_analysis" | "ai_rewrite" | "export",
+  now: number
+): number {
+  if (now >= usage.periodEnd) return 0;
+  if (action === "job_analysis") return usage.jobAnalysesUsed;
+  if (action === "ai_rewrite") return usage.aiRewritesUsed;
+  return usage.exportsUsed;
 }
 
 function applicationsUsedNow(
@@ -54,7 +78,13 @@ function periodForPlan(plan: PlanTier, now: number, subscriptionStartDate: numbe
 }
 
 function applicationIncrement(
-  usage: { resumesCreated: number; applicationsUsed?: number; plan: PlanTier; periodEnd: number },
+  usage: {
+    resumesCreated: number;
+    applicationsUsed?: number;
+    plan: PlanTier;
+    periodEnd: number;
+    subscriptionStartDate: number;
+  },
   now: number
 ): { resumesCreated: number; applicationsUsed?: number } {
   const plan = effectivePlan(usage, now);
@@ -75,6 +105,24 @@ function limitsFor(plan: PlanTier) {
     exports: limits.monthly.exports,
     resumes: limits.applications.limit,
   };
+}
+
+const modelCeilings = v.object({
+  free: v.number(),
+  search: v.number(),
+  pro: v.number(),
+  enterprise: v.number(),
+});
+
+function ceilingFor(
+  plan: PlanTier,
+  action: ActionType,
+  ceilings: { free: number; search: number; pro: number; enterprise: number } | undefined
+): number {
+  if (ceilings && (action === "job_analysis" || action === "ai_rewrite")) {
+    return ceilings[plan];
+  }
+  return getActionLimit(plan, action);
 }
 
 /**
@@ -378,16 +426,12 @@ export const canPerformAction = query({
     let currentUsage: number;
     switch (action) {
       case "job_analysis":
-        currentUsage = usage.jobAnalysesUsed;
-        break;
       case "ai_rewrite":
-        currentUsage = usage.aiRewritesUsed;
+      case "export":
+        currentUsage = monthlyUsed(usage, action, now);
         break;
       case "create_resume":
         currentUsage = applicationsUsedNow(usage, plan, now);
-        break;
-      case "export":
-        currentUsage = usage.exportsUsed;
         break;
       default:
         return {
@@ -413,7 +457,7 @@ export const canPerformAction = query({
         allowed: false,
         reason: limitReachedMessage(plan, action, limit),
         remaining: 0,
-        upgradeRequired: true,
+        upgradeRequired: action !== "job_analysis" && action !== "ai_rewrite",
       };
     }
 
@@ -716,6 +760,7 @@ export const canPerformActionServer = query({
       v.literal("create_resume"),
       v.literal("export")
     ),
+    ceilings: v.optional(modelCeilings),
   },
   handler: async (ctx, args) => {
     const userId = args.userId;
@@ -728,7 +773,7 @@ export const canPerformActionServer = query({
     // Record will be created automatically by first mutation
     if (!usage) {
       const defaultPlan: PlanTier = "free";
-      const limit = getActionLimit(defaultPlan, action);
+      const limit = ceilingFor(defaultPlan, action, args.ceilings);
       
       // For export, check feature availability
       if (action === "export") {
@@ -761,7 +806,7 @@ export const canPerformActionServer = query({
 
     const now = Date.now();
     const plan = effectivePlan(usage, now);
-    const limit = getActionLimit(plan, action);
+    const limit = ceilingFor(plan, action, args.ceilings);
 
     // Check feature availability for export
     if (action === "export") {
@@ -779,16 +824,12 @@ export const canPerformActionServer = query({
     let currentUsage: number;
     switch (action) {
       case "job_analysis":
-        currentUsage = usage.jobAnalysesUsed;
-        break;
       case "ai_rewrite":
-        currentUsage = usage.aiRewritesUsed;
+      case "export":
+        currentUsage = monthlyUsed(usage, action, now);
         break;
       case "create_resume":
         currentUsage = applicationsUsedNow(usage, plan, now);
-        break;
-      case "export":
-        currentUsage = usage.exportsUsed;
         break;
       default:
         return {
@@ -814,7 +855,7 @@ export const canPerformActionServer = query({
         allowed: false,
         reason: limitReachedMessage(plan, action, limit),
         remaining: 0,
-        upgradeRequired: true,
+        upgradeRequired: action !== "job_analysis" && action !== "ai_rewrite",
       };
     }
 

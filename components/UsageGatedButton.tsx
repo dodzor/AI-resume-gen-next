@@ -34,7 +34,8 @@ export default function UsageGatedButton({
   size = 'md',
 }: UsageGatedButtonProps) {
   const { plan, isLoading: usageLoading } = useUsageLimits()
-  const { allowed, remaining, upgradeRequired, isLoading: actionLoading } = useCanPerformAction(action)
+  const { allowed, remaining, reason, upgradeRequired, isLoading: actionLoading } = useCanPerformAction(action)
+  const isModelCeiling = action === 'job_analysis' || action === 'ai_rewrite'
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   const isLoading = usageLoading || actionLoading
@@ -42,7 +43,7 @@ export default function UsageGatedButton({
   // Determine if button should be disabled (only for external disabled state or loading)
   // Don't disable for usage limits - show locked style instead
   const isDisabled = externalDisabled || isLoading
-  const isLocked = !allowed && upgradeRequired && !isLoading
+  const isLocked = !allowed && !isLoading && (upgradeRequired || isModelCeiling)
 
   // Get button text with remaining count
   const getButtonText = (): ReactNode => {
@@ -50,7 +51,7 @@ export default function UsageGatedButton({
       return 'Loading...'
     }
 
-    if (!showRemaining) {
+    if (!showRemaining || isModelCeiling) {
       return children
     }
 
@@ -84,6 +85,10 @@ export default function UsageGatedButton({
   const handleClick = async () => {
     // If limit reached, show upgrade modal
     if (isLocked) {
+      if (isModelCeiling) {
+        alert(reason || 'You have used the model calls included in this period. They reset at the start of the next one.')
+        return
+      }
       setShowUpgradeModal(true)
       return
     }
