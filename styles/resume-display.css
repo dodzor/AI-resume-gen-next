@@ -882,17 +882,3 @@
 .scan-active .scan-dim {
   opacity: 0.38;
 }
-
-@media (max-width: 767px) {
-  [class^="resume-display-"],
-  .resume-container.simple-preview {
-    padding: 16px;
-    overflow-wrap: anywhere;
-  }
-
-  [class^="resume-display-"] .name,
-  .resume-container.simple-preview .name {
-    font-size: 1.5rem;
-    line-height: 1.2;
-  }
-}

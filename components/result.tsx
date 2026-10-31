@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { generateFileName } from '../lib/pdfUtils'
 import { validatePDFContent } from '../lib/pdfErrorHandler'
 import { getDisplayClassName, TemplateId } from '../lib/templates'
@@ -13,6 +14,75 @@ import { exportBlockReason, resumePlainText, type HostileAnnotation } from '@/li
 import { features } from '@/config/features'
 
 const NO_ANNOTATIONS: HostileAnnotation[] = []
+
+// Same width the on-screen templates and the PDF stylesheet use.
+const EXPORT_PAGE_WIDTH = 800
+// A4 at that width: 800 * (297 / 210).
+const EXPORT_PAGE_HEIGHT = 1131
+
+function ExportPage({
+    html,
+    className,
+    scan,
+    mode,
+}: {
+    html: string
+    className: string
+    scan: boolean
+    mode: 'fit' | 'actual'
+}) {
+    const frameRef = useRef<HTMLDivElement>(null)
+    const pageRef = useRef<HTMLDivElement>(null)
+    const [fitScale, setFitScale] = useState(1)
+    const [pageHeight, setPageHeight] = useState(EXPORT_PAGE_HEIGHT)
+    const scale = mode === 'actual' ? 1 : fitScale
+
+    useLayoutEffect(() => {
+        const frame = frameRef.current
+        const page = pageRef.current
+        if (!frame || !page) return
+
+        const measure = () => {
+            const available = Math.max(frame.clientWidth - 16, 160)
+            setFitScale(Math.min(1, available / EXPORT_PAGE_WIDTH))
+            setPageHeight(Math.max(page.offsetHeight, EXPORT_PAGE_HEIGHT))
+        }
+
+        measure()
+        const observer = new ResizeObserver(measure)
+        observer.observe(frame)
+        observer.observe(page)
+        return () => observer.disconnect()
+    }, [html, className, mode])
+
+    return (
+        <div ref={frameRef} className="min-h-0 flex-1 overflow-auto px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div
+                className="mx-auto"
+                style={{ width: EXPORT_PAGE_WIDTH * scale, height: pageHeight * scale }}
+            >
+                <div
+                    ref={pageRef}
+                    className={`bg-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] ${scan ? 'scan-active' : ''}`}
+                    style={{
+                        width: EXPORT_PAGE_WIDTH,
+                        minHeight: EXPORT_PAGE_HEIGHT,
+                        transform: `scale(${scale})`,
+                        transformOrigin: 'top left',
+                    }}
+                >
+                    {html ? (
+                        <div className={className} dangerouslySetInnerHTML={{ __html: html }} />
+                    ) : (
+                        <div className="flex h-full min-h-[300px] items-center justify-center px-8 text-center text-gray-500">
+                            <p className="text-lg font-medium">Your resume will appear here</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
 
 function hostileLabels(text: string, annotations: HostileAnnotation[]): string[] {
     const lower = text.toLowerCase()
@@ -57,6 +127,9 @@ export default function Result({ formData, generatedResume, currentStep, showPre
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
     const [showScan, setShowScan] = useState(false)
     const [badgesReady, setBadgesReady] = useState(false)
+    const [pageOpen, setPageOpen] = useState(false)
+    const [pageMode, setPageMode] = useState<'fit' | 'actual'>('fit')
+    const closePageRef = useRef<HTMLButtonElement>(null)
     const { canExport, plan, isLoading: usageLoading } = useUsageLimits()
     
     // Get the template from formData, default to 'professional-blue'
@@ -85,6 +158,26 @@ export default function Result({ formData, generatedResume, currentStep, showPre
     useEffect(() => {
         setBadgesReady(true)
     }, [])
+
+    useEffect(() => {
+        if (!pageOpen) return
+        const previous = document.body.style.overflow
+        document.body.style.overflow = 'hidden'
+        const background = [...document.body.children].filter(
+            (node) => !(node instanceof HTMLElement && node.getAttribute('role') === 'dialog')
+        )
+        background.forEach((node) => node.setAttribute('inert', ''))
+        closePageRef.current?.focus()
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setPageOpen(false)
+        }
+        window.addEventListener('keydown', onKey)
+        return () => {
+            document.body.style.overflow = previous
+            background.forEach((node) => node.removeAttribute('inert'))
+            window.removeEventListener('keydown', onKey)
+        }
+    }, [pageOpen])
 
     // Copy resume content to clipboard (for free users)
     const handleCopyToClipboard = async () => {
@@ -255,10 +348,21 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                       Not ready to export. {exportBlockReason(resumePlainText(formData))}
                     </p>
                 )}
+                <button
+                    type="button"
+                    onClick={() => {
+                        setPageMode('fit')
+                        setPageOpen(true)
+                    }}
+                    className="flex min-h-24 w-full flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 text-center active:bg-gray-100 md:hidden"
+                >
+                    <span className="text-base font-semibold text-gray-900">View resume</span>
+                    <span className="text-sm text-gray-500">Full page, same layout as the PDF</span>
+                </button>
                 <div
                     data-testid="eleven-second-preview"
                     data-scan-active={showScan ? 'true' : 'false'}
-                    className={`min-w-0 flex-1 overflow-x-auto overflow-y-auto rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-3 custom-scrollbar sm:p-6 min-h-[300px] lg:min-h-0 ${showForm === false ? 'lg:max-w-[800px] lg:mx-auto' : ''} ${showScan ? 'scan-active' : ''}`}
+                    className={`hidden min-w-0 flex-1 overflow-x-auto overflow-y-auto rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-3 custom-scrollbar sm:p-6 min-h-[300px] md:block lg:min-h-0 ${showForm === false ? 'lg:max-w-[800px] lg:mx-auto' : ''} ${showScan ? 'scan-active' : ''}`}
                 >
                     {previewContent ? (
                         <div className={finalDisplayClassName} dangerouslySetInnerHTML={{ __html: displayHtml }} />
@@ -315,6 +419,46 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                     </div>
                 )} */}
             </div>
+
+            {pageOpen && createPortal(
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Resume"
+                    className="fixed inset-0 z-[80] flex flex-col bg-neutral-800 md:hidden"
+                >
+                    <div className="flex items-center justify-between gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+                        <div className="flex rounded-md bg-neutral-700 p-0.5">
+                            <button
+                                type="button"
+                                aria-pressed={pageMode === 'fit'}
+                                onClick={() => setPageMode('fit')}
+                                className={`inline-flex min-h-11 items-center rounded px-3 text-sm font-semibold ${pageMode === 'fit' ? 'bg-white text-neutral-900' : 'text-white'}`}
+                            >
+                                Fit
+                            </button>
+                            <button
+                                type="button"
+                                aria-pressed={pageMode === 'actual'}
+                                onClick={() => setPageMode('actual')}
+                                className={`inline-flex min-h-11 items-center rounded px-3 text-sm font-semibold ${pageMode === 'actual' ? 'bg-white text-neutral-900' : 'text-white'}`}
+                            >
+                                100%
+                            </button>
+                        </div>
+                        <button
+                            ref={closePageRef}
+                            type="button"
+                            onClick={() => setPageOpen(false)}
+                            className="inline-flex min-h-11 items-center rounded-md bg-white px-4 text-sm font-semibold text-neutral-900 active:bg-neutral-200"
+                        >
+                            Close
+                        </button>
+                    </div>
+                    <ExportPage html={displayHtml} className={finalDisplayClassName} scan={showScan} mode={pageMode} />
+                </div>,
+                document.body
+            )}
             
             {/* Upgrade Modal */}
             <UpgradeModal
