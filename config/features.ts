@@ -36,4 +36,6 @@ export const features = {
   },
   /** Analyses and rewrites on the usage card. A production build always leaves this off. */
   showAiUsage: process.env.NODE_ENV === 'production' ? false : true,
+  /** Usage table at /dev/usage. A production build always leaves this off. */
+  usageDashboard: process.env.NODE_ENV === 'production' ? false : true,
 }

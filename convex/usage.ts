@@ -22,6 +22,7 @@ const planTierValidator = v.union(
 
 type UsageSnapshot = {
   _id: Id<"userUsage">;
+  userId: string;
   subscriptionStartDate: number;
   periodStart: number;
   periodEnd: number;
@@ -31,6 +32,7 @@ type UsageSnapshot = {
   exportsUsed: number;
   resumesCreated: number;
   applicationsUsed?: number;
+  updatedAt: number;
 };
 
 function effectivePlan(
@@ -338,6 +340,63 @@ export const getUserUsage = query({
         end: displayPeriod.end,
       },
     };
+  },
+});
+
+/**
+ * Development dashboard. Every usage row, with the same plan and period
+ * numbers the product uses. Requires a signed-in user.
+ */
+export const listUserUsage = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    // Any signed-in user can call this. /dev/usage stays off in a production
+    // build through config/features.ts usageDashboard. Production uses this
+    // same Convex deployment, so the gate lives in Next.js.
+
+    const now = Date.now();
+    const rows = await ctx.db.query("userUsage").collect();
+
+    return rows
+      .map((usage) => {
+        let jobAnalysesUsed = usage.jobAnalysesUsed;
+        let aiRewritesUsed = usage.aiRewritesUsed;
+        let exportsUsed = usage.exportsUsed;
+        let periodStart = usage.periodStart;
+        let periodEnd = usage.periodEnd;
+        const periodExpired = now >= usage.periodEnd;
+
+        if (periodExpired) {
+          const period = calculateBillingPeriod(now, usage.subscriptionStartDate);
+          periodStart = period.start;
+          periodEnd = period.end;
+          jobAnalysesUsed = 0;
+          aiRewritesUsed = 0;
+          exportsUsed = 0;
+        }
+
+        const plan = effectivePlan(usage, now);
+        return {
+          userId: usage.userId,
+          plan,
+          storedPlan: usage.plan,
+          periodExpired,
+          jobAnalysesUsed,
+          aiRewritesUsed,
+          exportsUsed,
+          resumesCreated: usage.resumesCreated,
+          applicationsUsed: applicationsUsedNow(usage, plan, now),
+          limits: limitsFor(plan),
+          periodStart,
+          periodEnd,
+          updatedAt: usage.updatedAt,
+        };
+      })
+      .sort((a, b) => b.updatedAt - a.updatedAt);
   },
 });
 
