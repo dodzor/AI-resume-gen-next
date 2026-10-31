@@ -39,6 +39,10 @@ interface FormProps {
   masterRecord?: any
 }
 
+function usesFinePointer() {
+    return typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+}
+
 const STEPS = [
   { id: 1, title: 'Target Job', description: 'Analyze the job description to determine the CV tone and extract important keywords' },
   { id: 2, title: 'Template', description: 'Choose your resume style' },
@@ -1568,6 +1572,14 @@ export default function Form({
     }
 
     const ProgressIndicator = () => {
+        const stepRail = useRef<HTMLDivElement>(null)
+        useEffect(() => {
+            const rail = stepRail.current
+            const active = rail?.querySelector<HTMLElement>('[aria-current="step"]')
+            if (!rail || !active) return
+            const left = active.offsetLeft - rail.clientWidth / 2 + active.offsetWidth / 2
+            rail.scrollTo({ left })
+        }, [currentStep])
         // Helper function to determine if a step is accessible
         const isStepAccessible = (stepId: number): boolean => {
             // All steps up to maxStepReached are always accessible
@@ -1585,8 +1597,34 @@ export default function Form({
         }
 
         return (
-            <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
+            <div className="mb-6 md:mb-8">
+                <div ref={stepRail} className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1 md:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {STEPS.map((step) => {
+                        const isAccessible = isStepAccessible(step.id)
+                        const active = step.id === currentStep
+                        const done = step.id < currentStep || (step.id <= maxStepReached && step.id !== currentStep)
+                        return (
+                            <button
+                                key={step.id}
+                                type="button"
+                                onClick={() => goToStep(step.id)}
+                                disabled={!isAccessible}
+                                aria-current={active ? 'step' : undefined}
+                                aria-label={step.title}
+                                className={`flex h-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold active:brightness-95 disabled:cursor-not-allowed ${
+                                    active
+                                        ? 'bg-blue-600 px-4 text-white'
+                                        : done
+                                        ? 'w-11 bg-green-500 text-white'
+                                        : 'w-11 bg-gray-200 text-gray-500'
+                                }`}
+                            >
+                                {active ? `${step.id}. ${step.title}` : step.id}
+                            </button>
+                        )
+                    })}
+                </div>
+                <div className="mb-4 hidden items-center justify-between md:flex">
                     {STEPS.map((step, index) => {
                         const isAccessible = isStepAccessible(step.id)
                         return (
@@ -1624,10 +1662,10 @@ export default function Form({
                     })}
             </div>
             <div className="text-center">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-2">
+                <h2 className="mb-2 text-xl font-semibold text-gray-800 md:text-2xl">
                     {STEPS[currentStep - 1].title}
                 </h2>
-                <p className="text-gray-600">
+                <p className="text-sm text-gray-600 md:text-base">
                     {STEPS[currentStep - 1].description}
                 </p>
             </div>
@@ -1644,7 +1682,7 @@ export default function Form({
                         <button
                             type="button"
                             onClick={onReimport}
-                            className="shrink-0 rounded-md border border-blue-300 bg-white px-3 py-1.5 text-sm font-medium text-blue-800 hover:bg-blue-100"
+                            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border border-blue-300 bg-white px-3 text-sm font-medium text-blue-800 hover:bg-blue-100 active:bg-blue-200"
                         >
                             Re-import PDF
                         </button>
@@ -1774,15 +1812,15 @@ export default function Form({
                                     Based on my analysis, you are applying to a <strong className="text-gray-900">{(analyzedTone || formData.tone)}</strong> role.
                                 </p>
                                 
-                                <div className="flex items-center space-x-4">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                                     <label className="text-sm font-medium text-gray-700">CV Tone:</label>
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex flex-wrap items-center gap-2">
                                         {(['junior', 'mid', 'senior'] as const).map((tone) => (
                                             <button
                                                 key={tone}
                                                 type="button"
                                                 onClick={() => handleToneChange(tone)}
-                                                className={`px-4 py-2 rounded-lg text-sm font-medium transition duration-200 ${
+                                                className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium transition duration-200 active:brightness-95 ${
                                                     (formData.tone || analyzedTone) === tone
                                                         ? 'bg-blue-600 text-white shadow-md'
                                                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
@@ -1794,9 +1832,11 @@ export default function Form({
                                         {/* Info Icon */}
                                         <button
                                             type="button"
+                                            aria-label="Tone details"
+                                            aria-expanded={showToneInfoTooltip}
                                             onMouseEnter={(e) => {
+                                                if (!usesFinePointer()) return
                                                 setShowToneInfoTooltip(true)
-                                                // Store button position for tooltip positioning
                                                 const rect = e.currentTarget.getBoundingClientRect()
                                                 setToneTooltipPosition({ 
                                                     top: rect.top - 220, 
@@ -1804,11 +1844,23 @@ export default function Form({
                                                 })
                                             }}
                                             onMouseLeave={() => {
+                                                if (!usesFinePointer()) return
                                                 setShowToneInfoTooltip(false)
                                                 setToneTooltipPosition(null)
                                             }}
-                                            className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-700 flex items-center justify-center transition duration-200"
-                                            title=""
+                                            onClick={(e) => {
+                                                if (usesFinePointer()) return
+                                                const rect = e.currentTarget.getBoundingClientRect()
+                                                setShowToneInfoTooltip((open) => {
+                                                    if (open) {
+                                                        setToneTooltipPosition(null)
+                                                        return false
+                                                    }
+                                                    setToneTooltipPosition({ top: rect.top - 220, left: rect.right + 8 })
+                                                    return true
+                                                })
+                                            }}
+                                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition duration-200 hover:bg-gray-200 hover:text-gray-700 active:bg-gray-300 md:h-7 md:w-7"
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -1818,8 +1870,10 @@ export default function Form({
                                     
                                     {/* Tone Info Tooltip */}
                                     {showToneInfoTooltip && (
+                                        <>
+                                        <button type="button" aria-label="Close details" className="fixed inset-0 z-[9998] bg-slate-900/40 md:hidden" onClick={() => { setShowToneInfoTooltip(false); setToneTooltipPosition(null) }} />
                                         <div 
-                                            className="fixed w-[520px] bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-[9999] pointer-events-auto"
+                                            className="touch-sheet fixed z-[9999] w-[520px] pointer-events-auto rounded-lg border border-gray-200 bg-white p-4 shadow-xl"
                                             style={{ 
                                                 maxWidth: 'min(520px, calc(100vw - 2rem))',
                                                 top: toneTooltipPosition ? `${toneTooltipPosition.top}px` : 'auto',
@@ -1864,6 +1918,7 @@ export default function Form({
                                                 </div>
                                             </div>
                                         </div>
+                                        </>
                                     )}
                                 </div>
 
@@ -1900,9 +1955,11 @@ export default function Form({
                                             {/* Info Icon */}
                                             <button
                                                 type="button"
+                                                aria-label="Keyword details"
+                                                aria-expanded={showKeywordsInfoTooltip}
                                                 onMouseEnter={(e) => {
+                                                    if (!usesFinePointer()) return
                                                     setShowKeywordsInfoTooltip(true)
-                                                    // Store button position for tooltip positioning
                                                     const rect = e.currentTarget.getBoundingClientRect()
                                                     setKeywordsTooltipPosition({ 
                                                         top: rect.top - 220, 
@@ -1910,11 +1967,23 @@ export default function Form({
                                                     })
                                                 }}
                                                 onMouseLeave={() => {
+                                                    if (!usesFinePointer()) return
                                                     setShowKeywordsInfoTooltip(false)
                                                     setKeywordsTooltipPosition(null)
                                                 }}
-                                                className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-700 flex items-center justify-center transition duration-200"
-                                                title=""
+                                                onClick={(e) => {
+                                                    if (usesFinePointer()) return
+                                                    const rect = e.currentTarget.getBoundingClientRect()
+                                                    setShowKeywordsInfoTooltip((open) => {
+                                                        if (open) {
+                                                            setKeywordsTooltipPosition(null)
+                                                            return false
+                                                        }
+                                                        setKeywordsTooltipPosition({ top: rect.top - 220, left: rect.right + 8 })
+                                                        return true
+                                                    })
+                                                }}
+                                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition duration-200 hover:bg-gray-200 hover:text-gray-700 active:bg-gray-300 md:h-7 md:w-7"
                                             >
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -1961,8 +2030,10 @@ export default function Form({
                                         
                                         {/* Keywords Info Tooltip */}
                                         {showKeywordsInfoTooltip && (
+                                            <>
+                                            <button type="button" aria-label="Close details" className="fixed inset-0 z-[9998] bg-slate-900/40 md:hidden" onClick={() => { setShowKeywordsInfoTooltip(false); setKeywordsTooltipPosition(null) }} />
                                             <div 
-                                                className="fixed w-[520px] bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-[9999] pointer-events-auto"
+                                                className="touch-sheet fixed z-[9999] w-[520px] pointer-events-auto rounded-lg border border-gray-200 bg-white p-4 shadow-xl"
                                                 style={{ 
                                                     maxWidth: 'min(520px, calc(100vw - 2rem))',
                                                     top: keywordsTooltipPosition ? `${keywordsTooltipPosition.top}px` : 'auto',
@@ -1997,6 +2068,7 @@ export default function Form({
                                                     </div>
                                                 </div>
                                             </div>
+                                            </>
                                         )}
                                     </div>
                                 )}
@@ -2069,6 +2141,7 @@ export default function Form({
                             <input 
                                 name="name" 
                                 type="text"
+                                autoComplete="name"
                                 placeholder="John Doe"
                                 required
                                 value={formData.name || ''}
@@ -2082,6 +2155,8 @@ export default function Form({
                             <input 
                                 name="email" 
                                 type="email"
+                                autoComplete="email"
+                                inputMode="email"
                                 placeholder="john.doe@example.com" 
                                 required
                                 value={formData.email || ''}
@@ -2099,6 +2174,8 @@ export default function Form({
                                 <input 
                                     name="phone" 
                                     type="tel"
+                                    autoComplete="tel"
+                                    inputMode="tel"
                                     placeholder="+1 (555) 123-4567"
                                     value={formData.phone || ''}
                                     onChange={handleInputChange}
@@ -2284,7 +2361,7 @@ export default function Form({
                                                                         )}
                                                                     </div>
                                                                 )}
-                                                                <div className="flex items-start gap-2">
+                                                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                                                                     <textarea
                                                                         rows={3}
                                                                         placeholder={`Bullet point ${bulletIndex + 1} (e.g., Built web applications using React and Node.js)`}
@@ -2326,10 +2403,12 @@ export default function Form({
                                                                             {/* Info Icon */}
                                                                             <button
                                                                                 type="button"
+                                                                                aria-label="Learn about the rewrite format"
+                                                                                aria-expanded={Boolean(showInfoTooltip[`${index}-${bulletIndex}`])}
                                                                                 onMouseEnter={(e) => {
+                                                                                    if (!usesFinePointer()) return
                                                                                     const key = `${index}-${bulletIndex}`
                                                                                     setShowInfoTooltip((prev) => ({ ...prev, [key]: true }))
-                                                                                    // Store button position for tooltip positioning
                                                                                     const rect = e.currentTarget.getBoundingClientRect()
                                                                                     setTooltipPositions((prev) => ({
                                                                                         ...prev,
@@ -2340,6 +2419,7 @@ export default function Form({
                                                                                     }))
                                                                                 }}
                                                                                 onMouseLeave={() => {
+                                                                                    if (!usesFinePointer()) return
                                                                                     const key = `${index}-${bulletIndex}`
                                                                                     setShowInfoTooltip((prev) => {
                                                                                         const updated = { ...prev }
@@ -2352,8 +2432,27 @@ export default function Form({
                                                                                         return updated
                                                                                     })
                                                                                 }}
-                                                                                className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-700 flex items-center justify-center transition duration-200"
-                                                                                title="Learn about the rewrite format"
+                                                                                onClick={(e) => {
+                                                                                    if (usesFinePointer()) return
+                                                                                    const key = `${index}-${bulletIndex}`
+                                                                                    const rect = e.currentTarget.getBoundingClientRect()
+                                                                                    setShowInfoTooltip((prev) => {
+                                                                                        if (prev[key]) {
+                                                                                            const updated = { ...prev }
+                                                                                            delete updated[key]
+                                                                                            return updated
+                                                                                        }
+                                                                                        return { ...prev, [key]: true }
+                                                                                    })
+                                                                                    setTooltipPositions((prev) => ({
+                                                                                        ...prev,
+                                                                                        [key]: {
+                                                                                            top: Math.max(12, rect.top),
+                                                                                            left: Math.min(rect.right, window.innerWidth - 480)
+                                                                                        }
+                                                                                    }))
+                                                                                }}
+                                                                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition duration-200 hover:bg-gray-200 hover:text-gray-700 active:bg-gray-300 md:h-7 md:w-7"
                                                                             >
                                                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -2368,8 +2467,21 @@ export default function Form({
                                                                                 const hasJobAnalysis = formData.themes && formData.themes.length > 0
                                                                                 
                                                                                 return (
+                                                                                    <>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        aria-label="Close details"
+                                                                                        className="fixed inset-0 z-[9998] bg-slate-900/40 md:hidden"
+                                                                                        onClick={() => {
+                                                                                            setShowInfoTooltip((prev) => {
+                                                                                                const updated = { ...prev }
+                                                                                                delete updated[key]
+                                                                                                return updated
+                                                                                            })
+                                                                                        }}
+                                                                                    />
                                                                                     <div 
-                                                                                        className="fixed w-[480px] max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-[9999] pointer-events-auto"
+                                                                                        className="touch-sheet fixed z-[9999] w-[480px] max-w-[calc(100vw-2rem)] pointer-events-auto rounded-lg border border-gray-200 bg-white p-4 shadow-xl"
                                                                                         style={{ 
                                                                                             maxWidth: 'min(460px, calc(100vw - 2rem))',
                                                                                             top: position ? `${position.top}px` : '1rem',
@@ -2394,7 +2506,7 @@ export default function Form({
                                                                                                         return updated
                                                                                                     })
                                                                                                 }}
-                                                                                                className="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-600"
+                                                                                                className="ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-gray-400 hover:text-gray-600 active:bg-gray-100 md:h-8 md:w-8"
                                                                                             >
                                                                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -2502,6 +2614,7 @@ export default function Form({
                                                                                             This format helps your resume pass ATS systems and catch recruiters' attention.
                                                                                         </p>
                                                                                     </div>
+                                                                                    </>
                                                                                 )
                                                                             })()}
                                                                             
@@ -3294,9 +3407,11 @@ export default function Form({
                                             {/* Info Icon */}
                                             <button
                                                 type="button"
+                                                aria-label="Summary details"
+                                                aria-expanded={showSummaryInfoTooltip}
                                                 onMouseEnter={(e) => {
+                                                    if (!usesFinePointer()) return
                                                     setShowSummaryInfoTooltip(true)
-                                                    // Store button position for tooltip positioning
                                                     const rect = e.currentTarget.getBoundingClientRect()
                                                     setSummaryTooltipPosition({ 
                                                         top: rect.top - 220, 
@@ -3304,11 +3419,23 @@ export default function Form({
                                                     })
                                                 }}
                                                 onMouseLeave={() => {
+                                                    if (!usesFinePointer()) return
                                                     setShowSummaryInfoTooltip(false)
                                                     setSummaryTooltipPosition(null)
                                                 }}
-                                                className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-700 flex items-center justify-center transition duration-200"
-                                                title=""
+                                                onClick={(e) => {
+                                                    if (usesFinePointer()) return
+                                                    const rect = e.currentTarget.getBoundingClientRect()
+                                                    setShowSummaryInfoTooltip((open) => {
+                                                        if (open) {
+                                                            setSummaryTooltipPosition(null)
+                                                            return false
+                                                        }
+                                                        setSummaryTooltipPosition({ top: rect.top - 220, left: rect.right + 8 })
+                                                        return true
+                                                    })
+                                                }}
+                                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition duration-200 hover:bg-gray-200 hover:text-gray-700 active:bg-gray-300 md:h-7 md:w-7"
                                             >
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -3329,8 +3456,10 @@ export default function Form({
                                         
                                         {/* Summary Info Tooltip */}
                                         {showSummaryInfoTooltip && (
+                                            <>
+                                            <button type="button" aria-label="Close details" className="fixed inset-0 z-[9998] bg-slate-900/40 md:hidden" onClick={() => { setShowSummaryInfoTooltip(false); setSummaryTooltipPosition(null) }} />
                                             <div 
-                                                className="fixed w-[520px] bg-white border border-gray-200 rounded-lg shadow-xl p-4 z-[9999] pointer-events-auto"
+                                                className="touch-sheet fixed z-[9999] w-[520px] pointer-events-auto rounded-lg border border-gray-200 bg-white p-4 shadow-xl"
                                                 style={{ 
                                                     maxWidth: 'min(520px, calc(100vw - 2rem))',
                                                     top: summaryTooltipPosition ? `${summaryTooltipPosition.top}px` : 'auto',
@@ -3375,6 +3504,7 @@ export default function Form({
                                                     </div>
                                                 </div>
                                             </div>
+                                            </>
                                         )}
                                     </div>
                                     </>
@@ -3406,7 +3536,7 @@ export default function Form({
                             </UsageGatedButton>
                             
                             {formData.summary && (
-                                    <div className="grid grid-cols-3 gap-2">
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                         <UsageGatedButton
                                             action="ai_rewrite"
                                             onClick={() => handleModifySummary('concise')}
@@ -3461,7 +3591,7 @@ export default function Form({
 
     if (isFormCompleted) {
         return (
-            <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
+            <div className="mb-8 rounded-xl bg-white p-4 shadow-lg sm:p-6 lg:p-8">
                 <div className="text-center">
                     <div className="mb-6">
                         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -3490,7 +3620,7 @@ export default function Form({
 
     return (
         <>
-            <div className="bg-white rounded-xl shadow-lg p-8 max-w-5xl mx-auto" style={{ overflow: 'visible' }}>
+            <div className="mx-auto w-full min-w-0 max-w-5xl rounded-xl bg-white p-4 shadow-lg sm:p-6 lg:p-8" style={{ overflow: 'visible' }}>
                 {/* Usage Display - Compact version in header */}
                 <div className="mb-6">
                     <UsageDisplay compact={true} showUpgradeButton={true} />
@@ -3511,16 +3641,16 @@ export default function Form({
                     )}
 
                 {/* Navigation Buttons */}
-                <div className="flex justify-between items-center pt-6 border-t border-gray-200">
-                    <div className="flex items-center space-x-3">
+                <div className="flex flex-col gap-3 border-t border-gray-200 pt-6 md:flex-row md:items-center md:justify-between">
+                    <div className="flex w-full items-center gap-2 md:w-auto">
                         <button
                             type="button"
                             onClick={prevStep}
                             disabled={currentStep === 1}
-                            className={`px-2 py-3 rounded-lg font-medium transition duration-200 flex items-center space-x-2 ${
+                            className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-3 font-medium transition duration-200 active:brightness-95 md:flex-none ${
                                 currentStep === 1
                                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300 active:bg-gray-400'
                             }`}
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3533,10 +3663,10 @@ export default function Form({
                             <button
                                 type="button"
                                 onClick={() => setShowPreview(!showPreview)}
-                                className={`px-2 py-3 rounded-lg font-medium transition duration-200 flex items-center space-x-2 ${
+                                className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-3 font-medium transition duration-200 active:brightness-95 md:flex-none ${
                                     showPreview
-                                        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 active:bg-blue-300'
+                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300 active:bg-gray-400'
                                 }`}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3548,7 +3678,7 @@ export default function Form({
                         )}
                     </div>
 
-                    <div className="text-sm text-gray-500">
+                    <div className="hidden text-center text-sm text-gray-500 md:block">
                         Step {currentStep} of {STEPS.length}
                     </div>
 
@@ -3557,7 +3687,7 @@ export default function Form({
                             type="button"
                             onClick={nextStep}
                             disabled={!validateStep(currentStep)}
-                            className={`px-6 py-3 rounded-lg font-medium transition duration-200 flex items-center space-x-2 ${
+                            className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-6 py-3 font-medium transition duration-200 active:brightness-95 md:w-auto ${
                                 validateStep(currentStep)
                                     ? 'bg-blue-600 text-white hover:bg-blue-700'
                                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
@@ -3569,12 +3699,12 @@ export default function Form({
                             </svg>
                         </button>
                     ) : (
-                        <div className="flex gap-2">
+                        <div className="flex w-full gap-2 md:w-auto">
                             <button
                                 type="button"
                                 onClick={handleCopyToClipboard}
                                 disabled={isGenerating || !validateStep(currentStep)}
-                                className="bg-white text-slate-700 font-semibold py-3 px-3 rounded-lg border border-slate-300 hover:bg-slate-50 transition duration-200 shadow-sm flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-3 font-semibold text-slate-700 shadow-sm transition duration-200 hover:bg-slate-50 active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 md:flex-none"
                             >
                                 <span>Copy</span>
                             </button>
@@ -3583,10 +3713,10 @@ export default function Form({
                                 onClick={handleDownloadPDF}
                                 disabled={!pdfJobLocked && (isDownloading || isGenerating || !validateStep(currentStep))}
                                 title={pdfJobLocked ? 'This job description is a new application.' : undefined}
-                                className={`font-semibold py-3 px-8 rounded-lg transition duration-200 flex items-center justify-center space-x-2 ${
+                                className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg px-6 py-3 font-semibold transition duration-200 md:flex-none md:px-8 ${
                                     pdfJobLocked
                                         ? 'bg-gray-200 text-gray-500 cursor-pointer'
-                                        : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none'
+                                        : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg hover:from-green-700 hover:to-emerald-700 active:from-green-800 active:to-emerald-800 disabled:transform-none disabled:cursor-not-allowed disabled:opacity-50 md:hover:scale-105'
                                 }`}
                             >
                                 {isDownloading ? (

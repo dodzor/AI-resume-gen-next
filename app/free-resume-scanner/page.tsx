@@ -120,7 +120,7 @@ export default function FreeResumeScannerPage() {
               <input
                 type="file"
                 accept="application/pdf"
-                className="mt-3 block w-full rounded-md border border-slate-300 bg-white p-2 text-sm"
+                className="mt-3 block min-h-11 w-full rounded-md border border-slate-300 bg-white p-2 text-base"
                 onChange={(event) => {
                   const selected = event.target.files?.[0];
                   if (selected) {
@@ -143,7 +143,7 @@ export default function FreeResumeScannerPage() {
                 value={jobDescription}
                 onChange={(event) => setJobDescription(event.target.value)}
                 placeholder="Paste the full job description here..."
-                className="mt-3 h-36 w-full rounded-md border border-slate-300 bg-white p-3 text-sm text-slate-800"
+                className="mt-3 h-36 w-full rounded-md border border-slate-300 bg-white p-3 text-base text-slate-800"
               />
             </div>
           </div>
@@ -153,7 +153,7 @@ export default function FreeResumeScannerPage() {
               type="button"
               onClick={() => void handleScan()}
               disabled={isScanning || isParsingPdf || !resumeText.trim() || !jobDescription.trim()}
-              className="rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {isScanning ? 'Scanning...' : 'Run free keyword scan'}
             </button>

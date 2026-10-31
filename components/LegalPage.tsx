@@ -13,11 +13,11 @@ export function LegalPage({
   return (
     <>
     <SiteHeader />
-    <main className="mx-auto max-w-3xl px-4 py-12 text-sm leading-relaxed text-slate-700">
+    <main className="mx-auto max-w-3xl px-4 py-8 text-sm leading-relaxed text-slate-700 md:py-12">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
         {legal.productName}
       </p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{title}</h1>
+      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">{title}</h1>
       <p className="mt-2 text-slate-500">Last updated {legal.lastUpdated}</p>
       {!legalContactReady() && (
         <p className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-950">

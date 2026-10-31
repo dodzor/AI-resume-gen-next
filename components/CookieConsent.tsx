@@ -70,7 +70,7 @@ export function CookieBanner() {
       aria-describedby="cookie-banner-body"
       className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-300 bg-white shadow-[0_-8px_30px_rgba(15,23,42,0.08)]"
     >
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 md:flex-row md:items-end md:justify-between md:px-6">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 md:flex-row md:items-end md:justify-between md:px-6">
         <div className="max-w-3xl">
           <h2 id="cookie-banner-title" className="text-sm font-semibold text-slate-900">
             Cookies and measurement for {legal.productName}
@@ -86,14 +86,14 @@ export function CookieBanner() {
             .
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
           <button
             type="button"
             onClick={() => {
               writeChoice('rejected')
               setOpen(false)
             }}
-            className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 active:bg-slate-100"
           >
             Reject analytics
           </button>
@@ -103,7 +103,7 @@ export function CookieBanner() {
               writeChoice('accepted')
               setOpen(false)
             }}
-            className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="inline-flex min-h-11 items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 active:bg-blue-800"
           >
             Accept analytics
           </button>
@@ -116,14 +116,14 @@ export function CookieBanner() {
 export function LegalFooter() {
   return (
     <footer className="border-t border-border bg-white px-4 py-5 text-xs text-slate-500">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-4 gap-y-2">
-        <Link href="/privacy" className="hover:text-slate-800">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-2 gap-y-1">
+        <Link href="/privacy" className="inline-flex min-h-11 items-center px-2 hover:text-slate-800">
           Privacy policy
         </Link>
-        <Link href="/terms" className="hover:text-slate-800">
+        <Link href="/terms" className="inline-flex min-h-11 items-center px-2 hover:text-slate-800">
           Terms of service
         </Link>
-        <button type="button" onClick={openCookieSettings} className="hover:text-slate-800">
+        <button type="button" onClick={openCookieSettings} className="inline-flex min-h-11 items-center px-2 hover:text-slate-800">
           Cookie settings
         </button>
       </div>

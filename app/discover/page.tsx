@@ -206,18 +206,18 @@ export default async function DiscoverPage({
     <div className="min-h-screen bg-background text-foreground">
       <SiteHeader />
 
-      <main className="mx-auto max-w-3xl px-4 py-10 md:px-6">
+      <main className="mx-auto max-w-3xl px-4 py-6 md:px-6 md:py-10">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
           Greenhouse
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
           Open roles
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {listingLead(remote, query, loaded.companyCount, country, resumeLabel)}
         </p>
 
-        <form method="get" action="/discover" className="mt-6 flex gap-2">
+        <form method="get" action="/discover" className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center">
           {remote ? <input type="hidden" name="remote" value="1" /> : null}
           {countryParamSlug ? <input type="hidden" name="country" value={countryParamSlug} /> : null}
           {requestedResume ? <input type="hidden" name="resume" value={requestedResume} /> : null}
@@ -231,25 +231,27 @@ export default async function DiscoverPage({
             defaultValue={query}
             placeholder="Search titles and descriptions"
             maxLength={80}
-            className="min-w-0 flex-1 rounded-md border border-border bg-white px-3 py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-blue-600"
+            className="min-h-11 min-w-0 flex-1 rounded-md border border-border bg-white px-3 text-base text-foreground outline-none placeholder:text-muted-foreground focus:border-blue-600 sm:text-sm"
           />
+          <div className="flex gap-2">
           <button
             type="submit"
-            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-md border border-border px-4 text-sm font-medium text-foreground hover:bg-muted/60 active:bg-muted sm:flex-none"
           >
             Search
           </button>
           {query ? (
             <Link
               href={discoverHref(1, undefined, undefined, remote, countryParamSlug, requestedResume)}
-              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-md border border-border px-4 text-sm font-medium text-foreground hover:bg-muted/60 active:bg-muted sm:flex-none"
             >
               Clear
             </Link>
           ) : null}
+          </div>
         </form>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
           <RemoteCheckbox checked={remote} href={discoverHref(1, undefined, query, !remote, countryParamSlug, requestedResume)} />
           <ResumeMatchToggle
             activeResumeId={requestedResume}
@@ -301,7 +303,7 @@ export default async function DiscoverPage({
                     return (
                       <li key={`${job.boardToken}-${job.id}`} className="px-4 py-4 md:px-5">
                         <div className="flex items-start gap-3">
-                          <span className="mt-0.5 w-14 shrink-0 text-right text-sm font-medium tabular-nums text-slate-400">
+                          <span className="mt-1 w-8 shrink-0 text-right text-xs font-medium tabular-nums text-slate-400 sm:w-14 sm:text-sm">
                             {(start + index).toLocaleString()}
                           </span>
                           <div className="min-w-0">
@@ -322,7 +324,7 @@ export default async function DiscoverPage({
                             ) : null}
                             <Link
                               href={`/?tailorUrl=${encodeURIComponent(job.url)}`}
-                              className="mt-2 inline-block text-xs font-medium text-blue-700 hover:text-blue-900"
+                              className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-blue-700 hover:text-blue-900"
                             >
                               Use for an application
                             </Link>

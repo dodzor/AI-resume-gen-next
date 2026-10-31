@@ -854,32 +854,17 @@ export default function Content() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="max-w-[1920px] mx-auto">
           {/* Navigation bar */}
-          <header className="relative border-b border-gray-200 bg-white/80 backdrop-blur">
-            <div className="flex max-w-6xl items-center justify-between gap-4 px-4 pr-14 sm:px-6 sm:pr-16">
-              {/* Left: Brand */}
-              <div className="min-w-0 flex shrink-0 items-center gap-2">
-                {/* <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
-                  <span className="text-lg font-semibold">RM</span>
-                </div> */}
-                <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg">
-                  <img
-                    src="/logo-mirror.jpg"
-                    alt="RoleMirror"
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-                {/* <div className="flex min-w-0 flex-col">
-                  <span className="text-base font-semibold tracking-tight text-slate-900">
-                    RoleMirror
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    Job description intelligence
-                  </span>
-                </div> */}
+          <header className="relative z-20 border-b border-gray-200 bg-white">
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-2 sm:px-6">
+              <div className="col-start-1 row-start-1 flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg md:h-24 md:w-24">
+                <img
+                  src="/logo-mirror.jpg"
+                  alt="RoleMirror"
+                  className="h-full w-full object-contain"
+                />
               </div>
 
-              {/* Right: Resume switcher + autosave (reserve space for UserButton) */}
-              <div className="flex min-w-0 flex-1 flex-col items-end gap-1 text-right">
+              <div className="col-span-3 row-start-2 min-w-0 sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:justify-self-end sm:pr-14">
                 {showResumeSwitcher && (
                   <ResumeSwitcher
                     resumes={resumes}
@@ -893,14 +878,14 @@ export default function Content() {
                 )}
 
                 {hasStartedEditing && !isLoadingResume && (
-                  <div className="text-[11px] text-gray-500">
+                  <div className="mt-1 text-xs text-gray-500 sm:text-right">
                     {isSaving ? (
-                      <span className="flex items-center justify-end gap-1.5">
+                      <span className="flex items-center gap-1.5 sm:justify-end">
                         <span className="animate-spin">💾</span>
                         <span>Saving...</span>
                       </span>
                     ) : lastSaved ? (
-                      <span className="flex items-center justify-end gap-1.5">
+                      <span className="flex items-center gap-1.5 sm:justify-end">
                         <span>✓</span>
                         <span>Saved {lastSaved.toLocaleTimeString()}</span>
                       </span>
@@ -908,20 +893,20 @@ export default function Content() {
                   </div>
                 )}
               </div>
-            </div>
-            {/* Pinned to the right edge of the header bar */}
-            <div className="absolute right-4 top-1/2 z-10 -translate-y-1/2 sm:right-6">
-              <UserButton
-                appearance={{
-                  elements: {
-                    userButtonAvatarBox: 'h-9 w-9',
-                  },
-                }}
-              />
+
+              <div className="col-start-3 row-start-1 justify-self-end sm:absolute sm:right-6 sm:top-1/2 sm:z-30 sm:-translate-y-1/2">
+                <UserButton
+                  appearance={{
+                    elements: {
+                      userButtonAvatarBox: 'h-11 w-11',
+                    },
+                  }}
+                />
+              </div>
             </div>
           </header>
 
-          <div className="px-4 pt-8 sm:px-6 pb-6">
+          <div className="min-w-0 px-4 pb-6 pt-4 sm:px-6 md:pt-8">
             {discoveredJob && (
               <div className="mx-auto mb-4 max-w-5xl rounded-lg border border-blue-200 bg-white px-4 py-3 text-sm text-slate-800">
                 <p className="font-medium">Use this discovered role: {discoveredJob.title} at {discoveredJob.companyName}</p>
@@ -929,7 +914,7 @@ export default function Content() {
                 <button
                   type="button"
                   onClick={() => { void handleCreateApplication(discoveredJob.text, discoveredJob.title) }}
-                  className="mt-2 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white"
+                  className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white active:bg-blue-800 sm:w-auto"
                 >
                   New application with this job
                 </button>
@@ -992,10 +977,10 @@ export default function Content() {
               </div>
             ) : (
               // Responsive side-by-side layout during form filling
-              <div className={`grid gap-4 sm:gap-6 ${showForm && showPreview ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} ${showPreview ? 'lg:h-[calc(100vh-220px)]' : ''}`}>
+              <div className={`grid min-w-0 gap-4 sm:gap-6 ${showForm && showPreview ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} ${showPreview ? 'lg:h-[calc(100vh-220px)]' : ''}`}>
                 {/* Form Section - Left on desktop, top on mobile */}
                 {showForm && (
-                  <div className={`${showPreview ? 'lg:order-1' : ''} ${showPreview ? 'lg:flex lg:flex-col lg:min-h-0 lg:overflow-hidden' : ''}`}>
+                  <div className={`min-w-0 ${showPreview ? 'lg:order-1' : ''} ${showPreview ? 'lg:flex lg:flex-col lg:min-h-0 lg:overflow-hidden' : ''}`}>
                     <div className={`${showPreview ? 'lg:flex-1 lg:overflow-y-auto lg:pr-2 lg:-mr-2 custom-scrollbar' : ''}`}>
                       <Form 
                         formData={formData}
@@ -1023,7 +1008,7 @@ export default function Content() {
                 
                 {/* Preview Section - Right on desktop, bottom on mobile */}
                 {showPreview && (
-                  <div className={`${showForm ? 'lg:order-2' : ''} lg:flex lg:flex-col lg:min-h-0 lg:overflow-hidden`}>
+                  <div className={`min-w-0 ${showForm ? 'lg:order-2' : ''} lg:flex lg:flex-col lg:min-h-0 lg:overflow-hidden`}>
                     <div className="lg:flex-1 lg:overflow-y-auto lg:pr-2 lg:-mr-2 custom-scrollbar">
                       <Result 
                         formData={formData} 

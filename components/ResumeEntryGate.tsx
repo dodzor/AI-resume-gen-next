@@ -162,7 +162,7 @@ export default function ResumeEntryGate({
 
   if (phase === 'choose') {
     return (
-      <div className="mx-auto max-w-3xl rounded-2xl border border-gray-200 bg-white p-6 shadow-sm md:p-10">
+      <div className="mx-auto max-w-3xl rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6 md:p-10">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">
           New resume
         </p>
@@ -202,14 +202,14 @@ export default function ResumeEntryGate({
 
   if (phase === 'import_upload') {
     return (
-      <div className="mx-auto max-w-3xl rounded-2xl border border-gray-200 bg-white p-6 shadow-sm md:p-10">
+      <div className="mx-auto max-w-3xl rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6 md:p-10">
         <button
           type="button"
           onClick={() => {
             onClearImport()
             onPhaseChange('choose')
           }}
-          className="text-sm font-medium text-gray-600 hover:text-gray-900"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-gray-600 hover:text-gray-900"
         >
           ← Back
         </button>
@@ -220,7 +220,7 @@ export default function ResumeEntryGate({
         <input
           type="file"
           accept="application/pdf"
-          className="mt-4 block w-full rounded-md border border-gray-300 bg-white p-2 text-sm"
+          className="mt-4 block min-h-11 w-full rounded-md border border-gray-300 bg-white p-2 text-base"
           disabled={isParsingPdf}
           onChange={(e) => {
             const f = e.target.files?.[0]
@@ -240,7 +240,7 @@ export default function ResumeEntryGate({
 
   // import_review
   return (
-    <div className="mx-auto max-w-3xl rounded-2xl border border-gray-200 bg-white p-6 shadow-sm md:p-10">
+    <div className="mx-auto max-w-3xl rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6 md:p-10">
       <button
         type="button"
         onClick={() => {
@@ -249,7 +249,7 @@ export default function ResumeEntryGate({
           setExtractError('')
           onPhaseChange('import_upload')
         }}
-        className="text-sm font-medium text-gray-600 hover:text-gray-900"
+        className="inline-flex min-h-11 items-center text-sm font-medium text-gray-600 hover:text-gray-900"
       >
         ← Re-upload
       </button>
@@ -325,7 +325,7 @@ export default function ResumeEntryGate({
               type="button"
               disabled={!extracted}
               onClick={() => extracted && onFinishImport(extracted, mergeMode)}
-              className="rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 sm:w-auto"
             >
               Continue to workspace
             </button>

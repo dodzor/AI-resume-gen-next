@@ -46,23 +46,23 @@ function LandingPage() {
                 RoleMirror helps you align it to the role.
               </span>
             </p>
-            <div className="mt-6 flex flex-wrap items-center gap-3">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               {features.discoverJobs && (
                 <Link
                   href="/discover"
-                  className="inline-flex items-center justify-center rounded-md border border-border bg-white px-5 py-2 text-sm font-semibold text-foreground shadow-sm hover:bg-muted/60"
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-border bg-white px-5 py-2 text-sm font-semibold text-foreground shadow-sm hover:bg-muted/60 active:bg-muted sm:w-auto"
                 >
                   Discover jobs
                 </Link>
               )}
               <Link
                 href="/free-resume-scanner"
-                className="inline-flex items-center justify-center rounded-md border border-blue-300 bg-blue-50 px-5 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-100"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-blue-300 bg-blue-50 px-5 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-100 active:bg-blue-200 sm:w-auto"
               >
                 Try free scanner
               </Link>
               <SignInButton mode="modal">
-                <button className="inline-flex items-center justify-center rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
+                <button className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 sm:w-auto">
                   Analyze a job description
                 </button>
               </SignInButton>
@@ -207,7 +207,7 @@ function LandingPage() {
         </section> */}
 
         {/* Before / After transformation */}
-        <section className="mt-20">
+          <section className="mt-12 md:mt-20">
           <div className="space-y-6 rounded-2xl border border-slate-300 bg-white px-4 py-5 shadow-md md:px-8 md:py-6">
             <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-900 md:text-xs text-center">
               Before / after: from vague bullet to role‑aligned impact
@@ -289,7 +289,7 @@ function LandingPage() {
         </section>
 
         {/* "Your personal coach" style section */}
-        <section className="mt-20 border-t border-slate-200 pt-10">
+        <section className="mt-12 border-t border-slate-200 pt-8 md:mt-20 md:pt-10">
           <h2 className="text-center text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">
             Your personal resume alignment coach
           </h2>
@@ -323,7 +323,7 @@ function LandingPage() {
         </section>
 
         {/* Deep-dive section similar to "Score My Resume" */}
-        <section className="mt-20 grid gap-10 rounded-2xl border border-slate-300 bg-slate-50/70 px-5 py-8 shadow-md md:grid-cols-[1.2fr,1fr] md:px-8">
+        <section className="mt-12 grid gap-8 rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-6 shadow-md md:mt-20 md:grid-cols-[1.2fr,1fr] md:gap-10 md:px-8 md:py-8">
           <div>
             <h3 className="text-xl font-semibold tracking-tight text-slate-900 md:text-2xl">
               Get expert‑level guidance on your resume, instantly
@@ -356,9 +356,9 @@ function LandingPage() {
                 </span>
               </li>
             </ul>
-            <div className="mt-5 flex flex-wrap items-center gap-3">
+            <div className="mt-5 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <SignInButton mode="modal">
-                <button className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
+                <button className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 sm:w-auto">
                   Analyze a job description
                 </button>
               </SignInButton>
@@ -427,7 +427,7 @@ function LandingPage() {
         </section>
 
         {/* Footer-style CTA */}
-        <section className="mt-20 rounded-2xl border border-slate-300 bg-white px-6 py-7 text-center shadow-md md:px-10">
+        <section className="mt-12 rounded-2xl border border-slate-300 bg-white px-4 py-6 text-center shadow-md md:mt-20 md:px-10 md:py-7">
           <h3 className="text-xl font-semibold tracking-tight text-slate-900 md:text-2xl">
             Start seeing exactly how well your resume matches each job
           </h3>
@@ -436,9 +436,9 @@ function LandingPage() {
             themes and recommendations — and transform your resume with
             profession‑aware AI rewrites.
           </p>
-          <div className="mt-5 flex justify-center gap-3">
+          <div className="mt-5 flex justify-center">
             <SignInButton mode="modal">
-              <button className="inline-flex items-center justify-center rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
+              <button className="inline-flex min-h-11 w-full max-w-sm items-center justify-center rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 sm:w-auto">
                 Analyze a job description
               </button>
             </SignInButton>

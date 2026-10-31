@@ -108,7 +108,44 @@ function UsageTable() {
         {rows.length} {rows.length === 1 ? 'user' : 'users'}
         {summary ? ` · ${summary}` : ''}
       </p>
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+      <ul className="space-y-3 md:hidden">
+        {rows.map((row) => (
+          <li
+            key={row.userId}
+            className={`rounded-lg border border-gray-200 bg-white p-4 ${row.userId === userId ? 'ring-2 ring-blue-200' : ''}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <UserCell userId={row.userId} account={accounts[row.userId]} />
+              <span className={`shrink-0 rounded px-2 py-1 text-xs font-medium ${planBadge[row.plan]}`}>
+                {row.plan}
+              </span>
+            </div>
+            <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+              <div>
+                <dt className="text-xs text-gray-500">Applications</dt>
+                <dd className="text-gray-800">{quota(row.applicationsUsed, row.limits.resumes)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">Analyses</dt>
+                <dd className="text-gray-800">{quota(row.jobAnalysesUsed, row.limits.jobAnalyses)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">Rewrites</dt>
+                <dd className="text-gray-800">{quota(row.aiRewritesUsed, row.limits.aiRewrites)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">Exports</dt>
+                <dd className="text-gray-800">{quota(row.exportsUsed, row.limits.exports)}</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-xs text-gray-500">
+              {formatDate(row.periodStart)} – {formatDate(row.periodEnd)}
+            </p>
+            <p className="mt-1 text-xs text-gray-400">Updated {formatDateTime(row.updatedAt)}</p>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden overflow-x-auto rounded-lg border border-gray-200 bg-white md:block">
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
             <tr>

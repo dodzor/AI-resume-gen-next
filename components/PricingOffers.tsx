@@ -124,7 +124,7 @@ export function PricingOffers() {
           <div className="mt-6 flex flex-col gap-2">
             <Link
               href="/free-resume-scanner"
-              className="inline-flex items-center justify-center rounded-md border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 active:bg-blue-200"
             >
               Try the scanner
             </Link>
@@ -132,7 +132,7 @@ export function PricingOffers() {
               <SignInButton mode="modal" fallbackRedirectUrl="/">
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                  className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 active:bg-slate-100"
                 >
                   Create the free resume
                 </button>
@@ -141,7 +141,7 @@ export function PricingOffers() {
             <SignedIn>
               <Link
                 href="/"
-                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 active:bg-slate-100"
               >
                 Open the app
               </Link>
@@ -165,7 +165,7 @@ export function PricingOffers() {
           <div className="mt-6">
             <PayButton
               plan={searchPlan}
-              className="inline-flex w-full items-center justify-center rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 active:bg-blue-800"
             >
               {`Get this search · ${searchPrice}`}
             </PayButton>
@@ -190,7 +190,7 @@ export function PricingOffers() {
           <div className="mt-6">
             <PayButton
               plan={monthlyPlan}
-              className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 active:bg-slate-100"
             >
               {`Continue monthly · ${monthlyPrice}`}
             </PayButton>

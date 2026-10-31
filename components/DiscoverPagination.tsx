@@ -1,7 +1,7 @@
 import Link from "next/link"
 
 const control =
-  "inline-flex h-8 items-center justify-center rounded-md border px-2.5 text-sm font-medium"
+  "inline-flex h-11 items-center justify-center rounded-md border px-3 text-sm font-medium active:bg-muted sm:h-8 sm:px-2.5"
 const idle = `${control} border-border text-foreground hover:bg-muted/60`
 const current = `${control} min-w-8 border-blue-600 bg-blue-600 tabular-nums text-white`
 const numberClass = `${control} min-w-8 border-border tabular-nums text-foreground hover:bg-muted/60`

@@ -128,11 +128,11 @@ export default function UsageGatedButton({
   const getSizeClasses = (): string => {
     switch (size) {
       case 'sm':
-        return 'px-3 py-1.5 text-sm'
+        return 'min-h-11 px-3 py-2 text-sm md:min-h-0 md:py-1.5'
       case 'lg':
-        return 'px-6 py-3 text-base'
+        return 'min-h-11 px-6 py-3 text-base'
       default:
-        return 'px-4 py-2 text-sm'
+        return 'min-h-11 px-4 py-2.5 text-sm md:min-h-0 md:py-2'
     }
   }
 
@@ -163,7 +163,7 @@ export default function UsageGatedButton({
         onClick={handleClick}
         disabled={isDisabled && !isLocked}
         className={cn(
-          'rounded-lg font-medium transition-colors flex items-center justify-center space-x-2',
+          'flex items-center justify-center space-x-2 rounded-lg font-medium transition-colors active:brightness-95',
           getVariantClasses(),
           getSizeClasses(),
           className

@@ -210,7 +210,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                             aria-pressed={showScan}
                             data-testid="eleven-second-scan-toggle"
                             onClick={() => setShowScan((on) => !on)}
-                            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition duration-200 ${
+                            className={`min-h-11 rounded-lg px-3 py-1.5 text-sm font-medium transition duration-200 active:brightness-95 ${
                               showScan
                                 ? 'bg-slate-900 text-white'
                                 : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
@@ -222,7 +222,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                         {setShowForm && (
                           <button
                             onClick={() => setShowForm(!showForm)}
-                            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition duration-200 flex items-center space-x-2 ${
+                            className={`flex min-h-11 items-center space-x-2 rounded-lg px-3 py-1.5 text-sm font-medium transition duration-200 active:brightness-95 ${
                               showForm
                                 ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                 : 'bg-blue-600 text-white hover:bg-blue-700'
@@ -258,7 +258,7 @@ export default function Result({ formData, generatedResume, currentStep, showPre
                 <div
                     data-testid="eleven-second-preview"
                     data-scan-active={showScan ? 'true' : 'false'}
-                    className={`flex-1 bg-gray-50 rounded-lg p-4 sm:p-6 border-2 border-dashed border-gray-300 overflow-y-auto min-h-[300px] lg:min-h-0 custom-scrollbar ${showForm === false ? 'lg:max-w-[800px] lg:mx-auto' : ''} ${showScan ? 'scan-active' : ''}`}
+                    className={`min-w-0 flex-1 overflow-x-auto overflow-y-auto rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-3 custom-scrollbar sm:p-6 min-h-[300px] lg:min-h-0 ${showForm === false ? 'lg:max-w-[800px] lg:mx-auto' : ''} ${showScan ? 'scan-active' : ''}`}
                 >
                     {previewContent ? (
                         <div className={finalDisplayClassName} dangerouslySetInnerHTML={{ __html: displayHtml }} />

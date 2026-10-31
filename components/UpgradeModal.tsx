@@ -30,6 +30,15 @@ export default function UpgradeModal({
     setMounted(true)
   }, [])
 
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen, onClose])
+
   if (!isOpen || !mounted) return null
 
   // Get context-specific message
@@ -61,21 +70,26 @@ export default function UpgradeModal({
   const title = plan === 'free' ? 'Tailor the next jobs' : 'Application limit reached'
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-black/50 transition-opacity"
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+      {/* Sheet on phones, centered dialog from sm up */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="upgrade-modal-title"
+        className="relative max-h-[90dvh] w-full overflow-y-auto rounded-t-2xl bg-white pb-[env(safe-area-inset-bottom)] shadow-xl sm:mx-4 sm:max-w-md sm:rounded-lg"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+        <div className="flex items-center justify-between gap-3 border-b border-gray-200 p-4 sm:p-6">
+          <h2 id="upgrade-modal-title" className="text-xl font-bold text-gray-900 sm:text-2xl">{title}</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-gray-400 hover:text-gray-600 active:bg-gray-100"
             aria-label="Close modal"
           >
             <svg
@@ -95,7 +109,7 @@ export default function UpgradeModal({
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {/* Message */}
           <p className="text-gray-700 mb-6">{getMessage()}</p>
 
@@ -127,17 +141,17 @@ export default function UpgradeModal({
           </div>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               href="/pricing"
-              className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-center"
+              className="flex min-h-11 flex-1 items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-center font-medium text-white transition-colors hover:bg-blue-700 active:bg-blue-800"
               onClick={onClose}
             >
               See pricing
             </Link>
             <button
               onClick={onClose}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              className="min-h-11 rounded-lg border border-gray-300 px-6 py-3 font-medium text-gray-700 transition-colors hover:bg-gray-50 active:bg-gray-100"
             >
               Maybe Later
             </button>

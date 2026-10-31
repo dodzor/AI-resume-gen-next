@@ -42,7 +42,7 @@ export function ResumeMatchToggle({
   if (!isSignedIn || !resumes) {
     return (
       <SignInButton mode="modal">
-        <button type="button" className="text-sm font-medium text-blue-700 hover:text-blue-800">
+        <button type="button" className="inline-flex min-h-11 items-center text-sm font-medium text-blue-700 hover:text-blue-800">
           Login to match resume
         </button>
       </SignInButton>
@@ -59,7 +59,7 @@ export function ResumeMatchToggle({
 
   if (!selected) {
     return (
-      <Link href="/" className="text-sm font-medium text-blue-700 hover:text-blue-800">
+      <Link href="/" className="inline-flex min-h-11 items-center text-sm font-medium text-blue-700 hover:text-blue-800">
         Create a resume to match
       </Link>
     )
@@ -69,7 +69,7 @@ export function ResumeMatchToggle({
   const href = discoverHref(1, category, query, remote, country, checked ? undefined : selected._id)
 
   return (
-    <label className="inline-flex max-w-xs items-center gap-2 text-sm text-foreground">
+    <label className="inline-flex min-h-11 max-w-full items-center gap-3 text-sm text-foreground sm:max-w-xs">
       <input
         type="checkbox"
         checked={checked}
@@ -77,7 +77,7 @@ export function ResumeMatchToggle({
           beginDiscoverRequest(href)
           router.push(href)
         }}
-        className="h-4 w-4 accent-blue-600"
+        className="h-5 w-5 shrink-0 accent-blue-600"
       />
       <span className="truncate">{resumeMatchLabel(selected)}</span>
     </label>

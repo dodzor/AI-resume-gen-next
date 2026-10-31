@@ -14,8 +14,8 @@ export function CountrySelect({
   const beginDiscoverRequest = useBeginDiscoverRequest()
 
   return (
-    <label className="inline-flex items-center gap-2 text-sm text-foreground">
-      Country
+    <label className="flex min-h-11 w-full items-center gap-3 text-sm text-foreground sm:inline-flex sm:w-auto">
+      <span className="shrink-0">Country</span>
       <select
         value={value}
         onChange={(event) => {
@@ -24,7 +24,7 @@ export function CountrySelect({
           beginDiscoverRequest(next.href)
           router.push(next.href)
         }}
-        className="max-w-full rounded-md border border-border bg-white px-3 py-1.5 text-sm text-foreground outline-none focus:border-blue-600"
+        className="min-h-11 min-w-0 flex-1 rounded-md border border-border bg-white px-3 text-base text-foreground outline-none focus:border-blue-600 sm:max-w-xs sm:flex-none sm:text-sm"
       >
         {options.map((option) => (
           <option key={option.value || "any"} value={option.value}>
