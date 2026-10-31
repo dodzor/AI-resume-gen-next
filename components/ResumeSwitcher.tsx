@@ -189,12 +189,14 @@ export default function ResumeSwitcher({
           >
             New application
           </button>
+          {features.discoverJobs && (
           <Link
             href="/discover"
             className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700 transition-colors"
           >
             Discover jobs
           </Link>
+          )}
         </div>
       </div>
 

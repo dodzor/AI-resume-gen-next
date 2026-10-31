@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs'
+import { features } from '@/config/features'
 
 const navLink =
   'hidden rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60 md:inline-flex'
@@ -17,9 +18,11 @@ export function SiteHeader() {
           <img src="/logo.jpg" alt="RoleMirror" className="h-full w-full object-contain" />
         </Link>
         <div className="flex items-center gap-3">
-          <Link href="/discover" className={navLink}>
-            Discover jobs
-          </Link>
+          {features.discoverJobs && (
+            <Link href="/discover" className={navLink}>
+              Discover jobs
+            </Link>
+          )}
           <Link
             href="/free-resume-scanner"
             className="hidden rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100 md:inline-flex"

@@ -19,4 +19,6 @@ export const features = {
   exportGuard: false,
   /** Trash button on an application in Switch. A production build always leaves this off. */
   deleteApplication: process.env.NODE_ENV === 'production' ? false : true,
+  /** "Discover jobs" in the header, on the landing page, and in the application switcher. */
+  discoverJobs: process.env.NODE_ENV === 'production' ? false : true,
 }

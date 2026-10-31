@@ -12,6 +12,7 @@ import type { SkillTerm } from "@/lib/jobSearch"
 import { loadMatchResume } from "@/lib/loadMatchResume"
 import { resumeMatchLabel, resumeSearchTerms } from "@/lib/resumeMatch"
 import { SiteHeader } from "@/components/SiteHeader"
+import { features } from "@/config/features"
 
 const PAGE_SIZE = 20
 
@@ -129,6 +130,8 @@ export default async function DiscoverPage({
     resume?: string | string[]
   }>
 }) {
+  if (!features.discoverJobs) redirect("/")
+
   const {
     page: pageParam,
     q: queryParam,
